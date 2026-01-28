@@ -1,0 +1,30 @@
+{
+    "seedUrls": [
+        {
+            "Scheme": "https",
+            "Host": "my-documentation.com",
+            "Path": "/docs"
+        },
+        {
+            "Scheme": "http",
+            "Host": "my-other-documentation.com",
+            "Path": "/docs"
+        }
+    ],
+    "allowedHosts": {
+        "custom.com": {}
+    },
+    "allowedPathPrefix": [
+        "/docs"
+    ],
+    "maxDepth": 7,
+    "maxPages": 299,
+    "concurrency": 29,
+    "baseDelay": 2000000000,
+    "jitter": 1000000000,
+    "randomSeed": 42,
+    "timeout": 30000000000,
+    "userAgent": "TestBot/1.0",
+    "outputDir": "test_output",
+    "dryRun": true
+}

@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import cmd "github.com/rohmanhakim/docs-crawler/internal/cli"
 
 func main() {
-	fmt.Println("Hello World!")
+	cmd.Execute()
 }
