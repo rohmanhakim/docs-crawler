@@ -22,7 +22,7 @@ type Sink struct {
 	normalizedDoc normalize.NormalizedMarkdownDoc
 }
 
-func NewWriter(
+func NewSink(
 	cfg config.Config,
 	normalizedDoc normalize.NormalizedMarkdownDoc,
 ) WriteResult {

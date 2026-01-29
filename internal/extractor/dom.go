@@ -33,7 +33,9 @@ type DomExtractor struct {
 	fetchResult fetcher.FetchResult
 }
 
-func NewDomParser(
+func NewDomExtractor(
 	config config.Config,
 	fetchResult fetcher.FetchResult,
-)
+) DomExtractor {
+	return DomExtractor{}
+}

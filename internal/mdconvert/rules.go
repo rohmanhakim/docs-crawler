@@ -27,7 +27,7 @@ type Rule struct {
 	sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc
 }
 
-func NewMapping(
+func NewRule(
 	cfg config.Config,
 	sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc,
 ) MarkdownDoc {
