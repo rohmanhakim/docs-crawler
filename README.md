@@ -1,0 +1,1 @@
+[![codecov](https://codecov.io/github/rohmanhakim/docs-crawler/branch/master/graph/badge.svg?token=L2Y4SSQDXO)](https://codecov.io/github/rohmanhakim/docs-crawler)
