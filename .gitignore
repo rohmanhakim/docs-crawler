@@ -1,3 +1,4 @@
 cmd/crawler/crawler
 .rules
 .clinerules
+coverage.txt
