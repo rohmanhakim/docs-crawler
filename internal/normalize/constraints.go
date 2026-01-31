@@ -1,8 +1,13 @@
 package normalize
 
 import (
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
-	"github.com/rohmanhakim/docs-crawler/internal/config"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 )
 
 /*
@@ -24,13 +29,39 @@ RAG-Oriented Constraints
 */
 
 type MarkdownConstraint struct {
-	cfg                 config.Config
-	assetfulMarkdownDoc assets.AssetfulMarkdownDoc
+	metadataSink metadata.MetadataSink
 }
 
 func NewMarkdownConstraint(
-	cfg config.Config,
+	metadataSink metadata.MetadataSink,
+) MarkdownConstraint {
+	return MarkdownConstraint{
+		metadataSink: metadataSink,
+	}
+}
+
+func (m *MarkdownConstraint) Normalize(
 	assetfulMarkdownDoc assets.AssetfulMarkdownDoc,
-) NormalizedMarkdownDoc {
-	return NormalizedMarkdownDoc{}
+) (NormalizedMarkdownDoc, internal.ClassifiedError) {
+	normalizedMarkdown, err := normalize()
+	if err != nil {
+		var normalizationError *NormalizationError
+		errors.As(err, &normalizationError)
+		m.metadataSink.RecordError(
+			time.Now(),
+			"normalize",
+			"MarkdownConstraint.Normalize",
+			mapNormalizationErrorToMetadataCause(*normalizationError),
+			err.Error(),
+			[]metadata.Attribute{
+				metadata.NewAttr(metadata.AttrField, fmt.Sprintf("H1: %v", "the-violated-h1-invariant-value")),
+			},
+		)
+		return NormalizedMarkdownDoc{}, normalizationError
+	}
+	return normalizedMarkdown, nil
+}
+
+func normalize() (NormalizedMarkdownDoc, error) {
+	return NormalizedMarkdownDoc{}, nil
 }

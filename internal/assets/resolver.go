@@ -1,8 +1,12 @@
 package assets
 
 import (
-	"github.com/rohmanhakim/docs-crawler/internal/config"
+	"errors"
+	"time"
+
+	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 )
 
 /*
@@ -19,13 +23,39 @@ Asset Policies
 - Missing assets reported, not fatal
 */
 type Resolver struct {
-	cfg         config.Config
-	markdownDoc mdconvert.MarkdownDoc
+	metadataSink metadata.MetadataSink
 }
 
 func NewResolver(
-	cfg config.Config,
+	metadataSink metadata.MetadataSink,
+) Resolver {
+	return Resolver{
+		metadataSink: metadataSink,
+	}
+}
+
+func (r *Resolver) Resolve(
 	markdownDoc mdconvert.MarkdownDoc,
-) AssetfulMarkdownDoc {
-	return AssetfulMarkdownDoc{}
+) (AssetfulMarkdownDoc, internal.ClassifiedError) {
+	assetfulMarkdownDoc, err := resolve()
+	if err != nil {
+		var assetsError *AssetsError
+		errors.As(err, &assetsError)
+		r.metadataSink.RecordError(
+			time.Now(),
+			"assets",
+			"Resolver.Resolve",
+			mapAssetsErrorToMetadataCause(*assetsError),
+			err.Error(),
+			[]metadata.Attribute{
+				metadata.NewAttr(metadata.AttrAssetURL, "https://the-failed-image-url"),
+			},
+		)
+		return AssetfulMarkdownDoc{}, assetsError
+	}
+	return assetfulMarkdownDoc, nil
+}
+
+func resolve() (AssetfulMarkdownDoc, error) {
+	return AssetfulMarkdownDoc{}, nil
 }

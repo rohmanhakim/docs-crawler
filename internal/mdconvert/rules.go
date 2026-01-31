@@ -27,9 +27,16 @@ type Rule struct {
 	sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc
 }
 
-func NewRule(
-	cfg config.Config,
+func NewRule() Rule {
+	return Rule{}
+}
+
+func (r *Rule) Convert(
 	sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc,
 ) MarkdownDoc {
+	return convert()
+}
+
+func convert() MarkdownDoc {
 	return MarkdownDoc{}
 }

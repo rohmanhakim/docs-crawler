@@ -1,8 +1,13 @@
 package extractor
 
 import (
-	"github.com/rohmanhakim/docs-crawler/internal/config"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 )
 
 /*
@@ -29,13 +34,39 @@ Only content relevant to the document body may pass through.
 */
 
 type DomExtractor struct {
-	config      config.Config
-	fetchResult fetcher.FetchResult
+	metadataSink metadata.MetadataSink
 }
 
 func NewDomExtractor(
-	config config.Config,
-	fetchResult fetcher.FetchResult,
+	metadataSink metadata.MetadataSink,
 ) DomExtractor {
-	return DomExtractor{}
+	return DomExtractor{
+		metadataSink: metadataSink,
+	}
+}
+
+func (d *DomExtractor) Extract(
+	fetchResult fetcher.FetchResult,
+) (ExtractionResult, internal.ClassifiedError) {
+	result, err := extract()
+	if err != nil {
+		var extractionError *ExtractionError
+		errors.As(err, &extractionError)
+		d.metadataSink.RecordError(
+			time.Now(),
+			"extractor",
+			"DomExtractor.Extract",
+			mapExtractionErrorToMetadataCause(extractionError),
+			err.Error(),
+			[]metadata.Attribute{
+				metadata.NewAttr(metadata.AttrURL, fmt.Sprintf("%v", fetchResult.GetFetchURL())),
+			},
+		)
+		return ExtractionResult{}, extractionError
+	}
+	return result, nil
+}
+
+func extract() (ExtractionResult, error) {
+	return ExtractionResult{}, nil
 }
