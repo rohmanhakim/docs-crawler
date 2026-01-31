@@ -3,7 +3,9 @@ package storage
 // Persistence
 
 type WriteResult struct {
-	artifacts []Artifact
+	artifact Artifact
 }
 
-type Artifact struct{}
+type Artifact struct {
+	path string
+}

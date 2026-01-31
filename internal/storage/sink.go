@@ -1,7 +1,11 @@
 package storage
 
 import (
-	"github.com/rohmanhakim/docs-crawler/internal/config"
+	"errors"
+	"time"
+
+	"github.com/rohmanhakim/docs-crawler/internal"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/normalize"
 )
 
@@ -18,13 +22,40 @@ Output Characteristics
 */
 
 type Sink struct {
-	cfg           config.Config
-	normalizedDoc normalize.NormalizedMarkdownDoc
+	metadataSink metadata.MetadataSink
 }
 
 func NewSink(
-	cfg config.Config,
+	metadataSink metadata.MetadataSink,
+) Sink {
+	return Sink{
+		metadataSink: metadataSink,
+	}
+}
+
+func (s *Sink) Write(
 	normalizedDoc normalize.NormalizedMarkdownDoc,
-) WriteResult {
-	return WriteResult{}
+) (WriteResult, internal.ClassifiedError) {
+	writeResult, err := write()
+	if err != nil {
+		var storageError *StorageError
+		errors.As(err, &storageError)
+		s.metadataSink.RecordError(
+			time.Now(),
+			"storage",
+			"Sink.Write",
+			mapStorageErrorToMetadataCause(storageError),
+			err.Error(),
+			[]metadata.Attribute{
+				metadata.NewAttr(metadata.AttrWritePath, "path/to/write"),
+			},
+		)
+		return WriteResult{}, storageError
+	}
+	s.metadataSink.RecordArtifact(writeResult.artifact.path)
+	return writeResult, nil
+}
+
+func write() (WriteResult, *StorageError) {
+	return WriteResult{}, nil
 }
