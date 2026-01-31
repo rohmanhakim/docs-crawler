@@ -7,21 +7,23 @@ import (
 
 // Crawl state & ordering
 
-// Per-URL Crawling policy
-type CrawlingPolicy struct {
-	urlNode URLNode
-	depth   Depth
+// CrawlToken
+// Frontier-issued, per-URL crawl Token
+// It represents: “This URL, at this depth, in this deterministic order, is next”
+// It contains no semantic policy decisions.
+// It represents ordering + depth metadata only.
+type CrawlToken struct {
+	url   url.URL
+	depth int
 }
 
-func (c *CrawlingPolicy) GetURL() url.URL {
-	return c.urlNode.url
+func (c *CrawlToken) URL() url.URL {
+	return c.url
 }
 
-type URLNode struct {
-	url url.URL
+func (c *CrawlToken) Depth() int {
+	return c.depth
 }
-
-type Depth struct{}
 
 // queueEntity - internal scheduling metadata for a single URL.
 // It answers mechanical questions like:
@@ -70,6 +72,8 @@ func NewCrawlAdmissionCandidate(
 }
 
 type DiscoveryMetadata struct {
-	depth         int
+	// the depth of the path relative to hostname where the url is found
+	// hostname/root -> depth = 0
+	Depth         int
 	delayOverride *time.Duration
 }

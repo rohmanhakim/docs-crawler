@@ -1,0 +1,34 @@
+feat(urlutil): implement URL canonicalization for duplicate suppression [#4]
+
+Implement deterministic URL normalization to prevent duplicate crawling and
+enable bounded traversal, directly addressing Task 1.1 (URL Normalization and
+Scope Enforcement) from the Phase 1 development plan.
+
+Changes:
+- Add pkg/urlutil/Canonicalize() function that normalizes URLs to a single
+  canonical form by:
+  - Lowercasing scheme and host
+  - Removing fragments and query parameters
+  - Stripping trailing slashes (except root)
+  - Omitting default ports (:80 for http, :443 for https)
+  
+- Implement pure, deterministic, and idempotent canonicalization that maps
+  equivalent URL spellings to a single representation, enabling deduplication
+  in the frontier
+  
+- Add comprehensive unit tests covering:
+  - Basic normalization rules (fragments, queries, slashes, case)
+  - Port handling (default vs non-standard)
+  - Idempotency guarantees
+  - Immutability of input URLs
+  - Helper function behavior
+
+Properties aligned with design constraints:
+- Pure: no state or side effects
+- Deterministic: same input always produces same output
+- Idempotent: Canonicalize(Canonicalize(url)) == Canonicalize(url)
+- Context-free: does not depend on crawl history
+
+This foundation enables the Frontier (Task 1.2) and downstream deduplication
+logic to work deterministically, supporting the overall goal of safe,
+bounded, and repeatable crawling.
