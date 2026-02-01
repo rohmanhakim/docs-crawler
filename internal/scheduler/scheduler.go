@@ -55,7 +55,6 @@ import (
 type Scheduler struct {
 	metadataSink           metadata.MetadataSink
 	crawlFinalizer         metadata.CrawlFinalizer
-	crawlingPolicy         frontier.CrawlingPolicy
 	robot                  robots.Robot
 	robotsCrawlDelay       *time.Duration
 	frontier               frontier.Frontier
@@ -109,6 +108,7 @@ func NewScheduler() Scheduler {
 func (s *Scheduler) SubmitUrlForAdmission(
 	url url.URL,
 	sourceContext frontier.SourceContext,
+	depth int,
 ) error {
 	// Fetch robots.txt
 	robotsDecision, err := s.robot.Decide(url)
@@ -135,7 +135,9 @@ func (s *Scheduler) SubmitUrlForAdmission(
 	candidate := frontier.NewCrawlAdmissionCandidate(
 		robotsDecision.Url,
 		sourceContext,
-		frontier.DiscoveryMetadata{},
+		frontier.DiscoveryMetadata{
+			Depth: depth,
+		},
 	)
 
 	// Submit Allowed URL for Admission by Frontier
@@ -166,20 +168,20 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	s.frontier.Init(cfg)
 
 	// 2. Fetch robots.txt & decide the crawling policy for this hostname based on that
-	err = s.SubmitUrlForAdmission(cfg.SeedURLs()[0], frontier.SourceSeed)
+	err = s.SubmitUrlForAdmission(cfg.SeedURLs()[0], frontier.SourceSeed, 0)
 	if err != nil {
 		return CrawlingExecution{}, err
 	}
 
 	// If frontier still has URL to be crawl...
 	for {
-		nextPolicy, ok := s.frontier.Dequeue()
+		nextCrawlToken, ok := s.frontier.Dequeue()
 		if !ok {
 			break
 		}
 
 		// 3. Fetch Page URL
-		fetchResult, err := s.htmlFetcher.Fetch(nextPolicy.GetURL())
+		fetchResult, err := s.htmlFetcher.Fetch(nextCrawlToken.URL())
 		if err != nil {
 			if err.Severity() == internal.SeverityFatal {
 				return CrawlingExecution{}, err
@@ -205,7 +207,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 
 		// 5.1 submit all discovered links through robots checking to frontier
 		for _, discoveredurl := range sanitizedHtml.GetDiscoveredURLs() {
-			submissionErr := s.SubmitUrlForAdmission(discoveredurl, frontier.SourceCrawl)
+			submissionErr := s.SubmitUrlForAdmission(discoveredurl, frontier.SourceCrawl, nextCrawlToken.Depth())
 			if submissionErr != nil {
 				return CrawlingExecution{}, err
 			}
