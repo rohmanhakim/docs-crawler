@@ -57,7 +57,7 @@ type Scheduler struct {
 	crawlFinalizer         metadata.CrawlFinalizer
 	robot                  robots.Robot
 	robotsCrawlDelay       *time.Duration
-	frontier               frontier.Frontier
+	frontier               *frontier.Frontier
 	htmlFetcher            fetcher.HtmlFetcher
 	domExtractor           extractor.DomExtractor
 	htmlSanitizer          sanitizer.HtmlSanitizer
@@ -83,7 +83,38 @@ func NewScheduler() Scheduler {
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
 		robot:                  robot,
-		frontier:               frontier,
+		frontier:               &frontier,
+		htmlFetcher:            fetcher,
+		domExtractor:           extractor,
+		htmlSanitizer:          sanitizer,
+		markdownConversionRule: conversionRule,
+		assetResolver:          resolver,
+		markdownConstraint:     markdownConstraint,
+		storageSink:            storageSink,
+	}
+}
+
+// NewSchedulerWithDeps creates a Scheduler with injected dependencies for testing.
+// This constructor allows tests to provide mock implementations of metadata interfaces
+// to verify behavior without relying on real infrastructure.
+func NewSchedulerWithDeps(
+	crawlFinalizer metadata.CrawlFinalizer,
+	metadataSink metadata.MetadataSink,
+) Scheduler {
+	robot := robots.NewRobot(metadataSink)
+	frontier := frontier.NewFrontier()
+	fetcher := fetcher.NewHtmlFetcher(metadataSink)
+	extractor := extractor.NewDomExtractor(metadataSink)
+	sanitizer := sanitizer.NewHTMLSanitizer(metadataSink)
+	conversionRule := mdconvert.NewRule()
+	resolver := assets.NewResolver(metadataSink)
+	markdownConstraint := normalize.NewMarkdownConstraint(metadataSink)
+	storageSink := storage.NewSink(metadataSink)
+	return Scheduler{
+		metadataSink:           metadataSink,
+		crawlFinalizer:         crawlFinalizer,
+		robot:                  robot,
+		frontier:               &frontier,
 		htmlFetcher:            fetcher,
 		domExtractor:           extractor,
 		htmlSanitizer:          sanitizer,
@@ -149,6 +180,25 @@ func (s *Scheduler) SubmitUrlForAdmission(
 // This does not imply a global ordering guarantee.
 // TODO: In the future consider implementing global ordering guarantee
 func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error) {
+	// Track crawl start time for duration calculation
+	crawlStartTime := time.Now()
+
+	// Statistics tracking
+	var totalErrors int
+	var totalAssets int
+
+	// Ensure final stats are recorded even if errors occur
+	defer func() {
+		crawlDuration := time.Since(crawlStartTime)
+		totalPages := s.frontier.VisitedCount()
+		s.crawlFinalizer.RecordFinalCrawlStats(
+			totalPages,
+			totalErrors,
+			totalAssets,
+			crawlDuration,
+		)
+	}()
+
 	// 1. Prepare config File
 	cfg, err := config.WithConfigFile(configPath)
 	if err != nil {
@@ -162,6 +212,21 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 				metadata.NewAttr(metadata.AttrField, fmt.Sprintf("field: %v", "theFieldError")),
 			},
 		)
+		return CrawlingExecution{}, err
+	}
+
+	// Validate that at least one seed URL exists
+	if len(cfg.SeedURLs()) == 0 {
+		err := fmt.Errorf("no seed URLs configured")
+		s.metadataSink.RecordError(
+			time.Now(),
+			"config",
+			"config validation",
+			metadata.CauseContentInvalid,
+			err.Error(),
+			[]metadata.Attribute{},
+		)
+		return CrawlingExecution{}, err
 	}
 
 	// 1.1 Initialize Frontier
@@ -186,7 +251,9 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			if err.Severity() == internal.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
-			// recoverable → log already done → continue
+			// recoverable → log already done → count error
+			totalErrors++
+			continue
 		}
 
 		// 4. Extract HTML DOM
@@ -195,6 +262,8 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			if err.Severity() == internal.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
+			totalErrors++
+			continue
 		}
 
 		// 5. Sanitize extracted HTML
@@ -203,13 +272,17 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			if err.Severity() == internal.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
+			totalErrors++
+			continue
 		}
 
 		// 5.1 submit all discovered links through robots checking to frontier
 		for _, discoveredurl := range sanitizedHtml.GetDiscoveredURLs() {
-			submissionErr := s.SubmitUrlForAdmission(discoveredurl, frontier.SourceCrawl, nextCrawlToken.Depth())
+			submissionErr := s.SubmitUrlForAdmission(discoveredurl, frontier.SourceCrawl, nextCrawlToken.Depth()+1)
 			if submissionErr != nil {
-				return CrawlingExecution{}, err
+				// Submission errors are scheduler-level errors, count them
+				totalErrors++
+				// Continue processing other URLs, don't abort the crawl
 			}
 		}
 
@@ -222,7 +295,12 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			if err.Severity() == internal.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
+			totalErrors++
+			// Continue to process the markdown even if asset resolution had errors
 		}
+		// Count assets processed (for now, this is a placeholder until asset resolver exposes count)
+		// TODO: Extract actual asset count from assetfulMarkdown when available
+		totalAssets += 0
 
 		// 8. Markdown Normalization
 		normalizedMarkdown, err := s.markdownConstraint.Normalize(assetfulMarkdown)
@@ -230,6 +308,8 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			if err.Severity() == internal.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
+			totalErrors++
+			continue
 		}
 
 		// 9. Write Artifact
@@ -238,18 +318,14 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			if err.Severity() == internal.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
-			// recoverable → log already done → continue
+			// recoverable → log already done → count error
+			totalErrors++
+			continue
 		}
 		s.writeResults = append(s.writeResults, writeResult)
 	}
 
-	// Terminal metadata emission: crawl is complete.
-	s.crawlFinalizer.RecordFinalCrawlStats(
-		0,
-		0,
-		0,
-		0*time.Second,
-	)
+	// Stats are recorded by defer - return successful execution result
 	return CrawlingExecution{
 		WriteResults: s.writeResults,
 	}, nil

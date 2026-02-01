@@ -131,6 +131,16 @@ func (f *Frontier) CurrentMinDepth() int {
 	return -1
 }
 
+// VisitedCount returns the total number of unique URLs that have been
+// submitted to the frontier (i.e., the size of the visited URL set).
+// This represents the total unique URLs admitted for crawling.
+func (f *Frontier) VisitedCount() int {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.visitedUrl.Size()
+}
+
 // Get next URL from the queue,
 // returns false on the second returned values if empty
 func (f *Frontier) Dequeue() (CrawlToken, bool) {
