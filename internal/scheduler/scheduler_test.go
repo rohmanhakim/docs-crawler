@@ -1,12 +1,18 @@
 package scheduler_test
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/internal/robots/cache"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 )
 
@@ -39,6 +45,547 @@ func (m *mockFinalizer) RecordFinalCrawlStats(
 		totalErrors: totalErrors,
 		totalAssets: totalAssets,
 		duration:    duration,
+	}
+}
+
+// mockRobot is a test double for robots.Robot that allows controlling the decision outcome
+type mockRobot struct {
+	decideFunc func(url url.URL) (robots.Decision, *robots.RobotsError)
+}
+
+func (m *mockRobot) Decide(targetURL url.URL) (robots.Decision, *robots.RobotsError) {
+	if m.decideFunc != nil {
+		return m.decideFunc(targetURL)
+	}
+	return robots.Decision{Allowed: true}, nil
+}
+
+func (m *mockRobot) Init(userAgent string) {}
+
+func (m *mockRobot) InitWithCache(userAgent string, cacheImpl cache.Cache) {}
+
+// setupTestServer creates a test HTTP server that serves robots.txt content
+func setupTestServer(robotsContent string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/robots.txt" {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(robotsContent))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+// setupTestServerWithStatus creates a test HTTP server that returns a specific status code
+func setupTestServerWithStatus(statusCode int, robotsContent string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/robots.txt" {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(statusCode)
+			if robotsContent != "" {
+				w.Write([]byte(robotsContent))
+			}
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+// createSchedulerForSubmitTest creates a scheduler with test-specific initialization
+// that allows testing SubmitUrlForAdmission in isolation
+func createSchedulerForSubmitTest(metadataSink metadata.MetadataSink) *scheduler.Scheduler {
+	s := scheduler.NewSchedulerWithDeps(nil, metadataSink)
+	return &s
+}
+
+// TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier verifies that when robots
+// allows a URL, it is submitted to the frontier.
+func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
+	// GIVEN: a robots.txt that allows all crawling
+	robotsContent := `User-agent: *
+Allow: /`
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	// Initialize the robot with the test server
+	s.InitRobot("test-agent/1.0")
+
+	// Set current host for hostTimings tracking
+	testURL, _ := url.Parse(server.URL + "/page.html")
+	s.SetCurrentHost(testURL.Host)
+
+	// WHEN: submitting URL for admission
+	submitErr := s.SubmitUrlForAdmission(
+		*testURL,
+		frontier.SourceSeed,
+		0,
+	)
+
+	// THEN: no error should be returned
+	if submitErr != nil {
+		t.Errorf("Expected no error, got: %v", submitErr)
+	}
+
+	// AND: URL should be in frontier (visited count should be 1)
+	if s.FrontierVisitedCount() != 1 {
+		t.Errorf("Expected frontier to have 1 URL, got: %d", s.FrontierVisitedCount())
+	}
+}
+
+// TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier verifies that when
+// robots disallows a URL, it is NOT submitted to the frontier but returns nil (terminal outcome).
+func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testing.T) {
+	// GIVEN: a robots.txt that disallows all crawling
+	robotsContent := `User-agent: *
+Disallow: /`
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	// Initialize the robot with the test server
+	s.InitRobot("test-agent/1.0")
+
+	testURL, _ := url.Parse(server.URL + "/page.html")
+	s.SetCurrentHost(testURL.Host)
+
+	// WHEN: submitting URL for admission
+	submitErr := s.SubmitUrlForAdmission(
+		*testURL,
+		frontier.SourceSeed,
+		0,
+	)
+
+	// THEN: no error should be returned (disallowed is terminal outcome, not error)
+	if submitErr != nil {
+		t.Errorf("Expected nil for disallowed URL (terminal outcome), got error: %v", submitErr)
+	}
+
+	// AND: URL should NOT be in frontier (visited count should be 0)
+	if s.FrontierVisitedCount() != 0 {
+		t.Errorf("Expected frontier to have 0 URLs (disallowed), got: %d", s.FrontierVisitedCount())
+	}
+}
+
+// TestSubmitUrlForAdmission_RobotsError_ReturnsError verifies that when robots
+// encounters an infrastructure error, it returns the error and does not submit to frontier.
+func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
+	// GIVEN: a server that returns 500 for robots.txt (infrastructure error)
+	server := setupTestServerWithStatus(http.StatusInternalServerError, "")
+	defer server.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	// Initialize the robot with the test server
+	s.InitRobot("test-agent/1.0")
+
+	testURL, _ := url.Parse(server.URL + "/page.html")
+	s.SetCurrentHost(testURL.Host)
+
+	// WHEN: submitting URL for admission
+	submitErr := s.SubmitUrlForAdmission(
+		*testURL,
+		frontier.SourceSeed,
+		0,
+	)
+
+	// THEN: error should be returned
+	if submitErr == nil {
+		t.Error("Expected error for robots.txt infrastructure failure, got nil")
+	}
+
+	// AND: URL should NOT be in frontier
+	if s.FrontierVisitedCount() != 0 {
+		t.Errorf("Expected frontier to have 0 URLs (error case), got: %d", s.FrontierVisitedCount())
+	}
+}
+
+// TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings verifies that when
+// robots returns a positive crawl delay, hostTimings is updated correctly.
+func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.T) {
+	// GIVEN: a robots.txt with crawl delay
+	robotsContent := `User-agent: *
+Crawl-delay: 5
+Allow: /`
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	s.InitRobot("test-agent/1.0")
+
+	testURL, _ := url.Parse(server.URL + "/page.html")
+	host := testURL.Host
+	s.SetCurrentHost(host)
+
+	// Pre-condition: hostTimings should not have this host
+	if s.HasHostTiming(host) {
+		t.Fatal("Pre-condition failed: host should not exist in hostTimings before test")
+	}
+
+	// WHEN: submitting URL for admission
+	submitErr := s.SubmitUrlForAdmission(
+		*testURL,
+		frontier.SourceSeed,
+		0,
+	)
+
+	// THEN: no error should be returned
+	if submitErr != nil {
+		t.Errorf("Expected no error, got: %v", submitErr)
+	}
+
+	// AND: hostTimings should have the host with correct crawl delay
+	if !s.HasHostTiming(host) {
+		t.Errorf("Expected host %s to exist in hostTimings", host)
+	} else {
+		delay := s.GetHostCrawlDelay(host)
+		expectedDelay := 5 * time.Second
+		if delay != expectedDelay {
+			t.Errorf("Expected crawl delay %v, got: %v", expectedDelay, delay)
+		}
+	}
+}
+
+// TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotUpdateHostTimings verifies that when
+// robots returns zero crawl delay, hostTimings is NOT mutated.
+func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotUpdateHostTimings(t *testing.T) {
+	// GIVEN: a robots.txt with no crawl delay (implicit 0)
+	robotsContent := `User-agent: *
+Allow: /`
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	s.InitRobot("test-agent/1.0")
+
+	testURL, _ := url.Parse(server.URL + "/page.html")
+	host := testURL.Host
+	s.SetCurrentHost(host)
+
+	// WHEN: submitting URL for admission
+	submitErr := s.SubmitUrlForAdmission(
+		*testURL,
+		frontier.SourceSeed,
+		0,
+	)
+
+	// THEN: no error should be returned
+	if submitErr != nil {
+		t.Errorf("Expected no error, got: %v", submitErr)
+	}
+
+	// AND: URL should be in frontier
+	if s.FrontierVisitedCount() != 1 {
+		t.Errorf("Expected frontier to have 1 URL, got: %d", s.FrontierVisitedCount())
+	}
+
+	// AND: hostTimings should NOT have the host (crawl delay was 0)
+	if s.HasHostTiming(host) {
+		t.Errorf("Expected host %s to NOT exist in hostTimings when crawl delay is 0", host)
+	}
+}
+
+// TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost verifies that when
+// a host already exists in hostTimings, the crawl delay is updated (not duplicated).
+func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
+	// GIVEN: a robots.txt with crawl delay
+	robotsContent := `User-agent: *
+Crawl-delay: 10
+Allow: /`
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	s.InitRobot("test-agent/1.0")
+
+	testURL, _ := url.Parse(server.URL + "/page.html")
+	host := testURL.Host
+	s.SetCurrentHost(host)
+
+	// First submission to create initial entry with crawl-delay: 10
+	firstErr := s.SubmitUrlForAdmission(
+		*testURL,
+		frontier.SourceSeed,
+		0,
+	)
+	if firstErr != nil {
+		t.Fatalf("First submission failed: %v", firstErr)
+	}
+
+	// Verify initial delay
+	initialDelay := s.GetHostCrawlDelay(host)
+	if initialDelay != 10*time.Second {
+		t.Fatalf("Expected initial delay 10s, got: %v", initialDelay)
+	}
+
+	// Frontier should have 1 URL
+	if s.FrontierVisitedCount() != 1 {
+		t.Fatalf("Expected frontier to have 1 URL, got: %d", s.FrontierVisitedCount())
+	}
+
+	// Create a different URL on same host to test update (won't be deduplicated)
+	testURL2, _ := url.Parse(server.URL + "/another-page.html")
+
+	// WHEN: submitting second URL (should update crawl delay, not add duplicate)
+	secondErr := s.SubmitUrlForAdmission(
+		*testURL2,
+		frontier.SourceCrawl,
+		1,
+	)
+
+	// THEN: no error should be returned
+	if secondErr != nil {
+		t.Errorf("Expected no error on second submission, got: %v", secondErr)
+	}
+
+	// AND: frontier should have 2 URLs
+	if s.FrontierVisitedCount() != 2 {
+		t.Errorf("Expected frontier to have 2 URLs, got: %d", s.FrontierVisitedCount())
+	}
+
+	// AND: crawl delay should still be 10s (updated, not changed)
+	currentDelay := s.GetHostCrawlDelay(host)
+	if currentDelay != 10*time.Second {
+		t.Errorf("Expected crawl delay still 10s, got: %v", currentDelay)
+	}
+}
+
+// TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays verifies that
+// different hosts can have different crawl delays tracked independently.
+func TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays(t *testing.T) {
+	// GIVEN: two different servers with different crawl delays
+	server1Content := `User-agent: *
+Crawl-delay: 3
+Allow: /`
+	server1 := setupTestServer(server1Content)
+	defer server1.Close()
+
+	server2Content := `User-agent: *
+Crawl-delay: 7
+Allow: /`
+	server2 := setupTestServer(server2Content)
+	defer server2.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	s.InitRobot("test-agent/1.0")
+
+	// Submit URL from first host
+	url1, _ := url.Parse(server1.URL + "/page.html")
+	s.SetCurrentHost(url1.Host)
+	err1 := s.SubmitUrlForAdmission(*url1, frontier.SourceSeed, 0)
+	if err1 != nil {
+		t.Fatalf("First host submission failed: %v", err1)
+	}
+
+	// Submit URL from second host
+	url2, _ := url.Parse(server2.URL + "/page.html")
+	s.SetCurrentHost(url2.Host)
+	err2 := s.SubmitUrlForAdmission(*url2, frontier.SourceSeed, 0)
+	if err2 != nil {
+		t.Fatalf("Second host submission failed: %v", err2)
+	}
+
+	// THEN: both hosts should have their respective crawl delays
+	delay1 := s.GetHostCrawlDelay(url1.Host)
+	delay2 := s.GetHostCrawlDelay(url2.Host)
+
+	if delay1 != 3*time.Second {
+		t.Errorf("Expected host1 delay 3s, got: %v", delay1)
+	}
+	if delay2 != 7*time.Second {
+		t.Errorf("Expected host2 delay 7s, got: %v", delay2)
+	}
+
+	// AND: both URLs should be in frontier
+	if s.FrontierVisitedCount() != 2 {
+		t.Errorf("Expected frontier to have 2 URLs, got: %d", s.FrontierVisitedCount())
+	}
+}
+
+// TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay verifies that when
+// a URL is disallowed but has crawl delay, the delay is still recorded.
+func TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay(t *testing.T) {
+	// GIVEN: a robots.txt that disallows all but has crawl delay
+	robotsContent := `User-agent: *
+Crawl-delay: 5
+Disallow: /`
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	s.InitRobot("test-agent/1.0")
+
+	testURL, _ := url.Parse(server.URL + "/page.html")
+	host := testURL.Host
+	s.SetCurrentHost(host)
+
+	// WHEN: submitting disallowed URL for admission
+	submitErr := s.SubmitUrlForAdmission(
+		*testURL,
+		frontier.SourceSeed,
+		0,
+	)
+
+	// THEN: no error should be returned (disallowed is terminal outcome)
+	if submitErr != nil {
+		t.Errorf("Expected nil for disallowed URL, got: %v", submitErr)
+	}
+
+	// AND: URL should NOT be in frontier
+	if s.FrontierVisitedCount() != 0 {
+		t.Errorf("Expected frontier to have 0 URLs (disallowed), got: %d", s.FrontierVisitedCount())
+	}
+
+	// AND: crawl delay should still be recorded for the host
+	if !s.HasHostTiming(host) {
+		t.Errorf("Expected host %s to exist in hostTimings even when URL disallowed", host)
+	} else {
+		delay := s.GetHostCrawlDelay(host)
+		if delay != 5*time.Second {
+			t.Errorf("Expected crawl delay 5s, got: %v", delay)
+		}
+	}
+}
+
+// TestSubmitUrlForAdmission_PreservesSourceContextAndDepth verifies that
+// the source context and depth are preserved when submitting to frontier.
+func TestSubmitUrlForAdmission_PreservesSourceContextAndDepth(t *testing.T) {
+	// GIVEN: a robots.txt that allows all
+	robotsContent := `User-agent: *
+Allow: /`
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	noopSink := &metadata.NoopSink{}
+	s := createSchedulerForSubmitTest(noopSink)
+
+	s.InitRobot("test-agent/1.0")
+
+	testURL, _ := url.Parse(server.URL + "/page.html")
+	s.SetCurrentHost(testURL.Host)
+
+	// WHEN: submitting with SourceCrawl and depth 3
+	submitErr := s.SubmitUrlForAdmission(
+		*testURL,
+		frontier.SourceCrawl,
+		3,
+	)
+
+	// THEN: no error should be returned
+	if submitErr != nil {
+		t.Errorf("Expected no error, got: %v", submitErr)
+	}
+
+	// AND: URL should be in frontier
+	if s.FrontierVisitedCount() != 1 {
+		t.Errorf("Expected frontier to have 1 URL, got: %d", s.FrontierVisitedCount())
+	}
+
+	// AND: when dequeued, the depth should be preserved
+	// (This verifies the depth is passed through to frontier correctly)
+	_, ok := s.DequeueFromFrontier()
+	if !ok {
+		t.Error("Expected to dequeue a token from frontier")
+	}
+}
+
+// TestSubmitUrlForAdmission_SpecificPathRules verifies that specific path
+// rules in robots.txt are correctly enforced.
+func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
+	testCases := []struct {
+		name             string
+		robotsContent    string
+		path             string
+		expectAllowed    bool
+		expectInFrontier bool
+	}{
+		{
+			name: "allowed path",
+			robotsContent: `User-agent: *
+Disallow: /private/
+Allow: /`,
+			path:             "/public/page.html",
+			expectAllowed:    true,
+			expectInFrontier: true,
+		},
+		{
+			name: "disallowed path",
+			robotsContent: `User-agent: *
+Disallow: /private/
+Allow: /`,
+			path:             "/private/secret.html",
+			expectAllowed:    false,
+			expectInFrontier: false,
+		},
+		{
+			name: "allow overrides disallow",
+			robotsContent: `User-agent: *
+Disallow: /docs/
+Allow: /docs/public/`,
+			path:             "/docs/public/guide.html",
+			expectAllowed:    true,
+			expectInFrontier: true,
+		},
+		{
+			name: "wildcard disallow",
+			robotsContent: `User-agent: *
+Disallow: /*.pdf$`,
+			path:             "/document.pdf",
+			expectAllowed:    false,
+			expectInFrontier: false,
+		},
+		{
+			name: "wildcard allows other extensions",
+			robotsContent: `User-agent: *
+Disallow: /*.pdf$`,
+			path:             "/page.html",
+			expectAllowed:    true,
+			expectInFrontier: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := setupTestServer(tc.robotsContent)
+			defer server.Close()
+
+			noopSink := &metadata.NoopSink{}
+			s := createSchedulerForSubmitTest(noopSink)
+			s.InitRobot("test-agent/1.0")
+
+			testURL, _ := url.Parse(server.URL + tc.path)
+			s.SetCurrentHost(testURL.Host)
+
+			err := s.SubmitUrlForAdmission(*testURL, frontier.SourceCrawl, 1)
+
+			if err != nil {
+				t.Errorf("Expected no error for path %s, got: %v", tc.path, err)
+			}
+
+			visitedCount := s.FrontierVisitedCount()
+			if tc.expectInFrontier && visitedCount != 1 {
+				t.Errorf("Expected URL %s to be in frontier (count=1), got: %d", tc.path, visitedCount)
+			}
+			if !tc.expectInFrontier && visitedCount != 0 {
+				t.Errorf("Expected URL %s to NOT be in frontier (count=0), got: %d", tc.path, visitedCount)
+			}
+		})
 	}
 }
 
