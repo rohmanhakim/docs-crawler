@@ -27,6 +27,14 @@ type ruleSet struct {
 	// Metadata / observability
 	fetchedAt time.Time
 	sourceURL string
+
+	// matchedGroup indicates if a user-agent group was matched in robots.txt
+	// This is false when no group matches (not even wildcard *)
+	matchedGroup bool
+
+	// hasGroups indicates if the robots.txt file had any user-agent groups at all
+	// This is false when the response had no groups (e.g., 404 or empty file)
+	hasGroups bool
 }
 
 type DecisionReason string
@@ -34,8 +42,9 @@ type DecisionReason string
 const (
 	AllowedByRobots     DecisionReason = "allowed_by_robots"
 	DisallowedByRobots  DecisionReason = "disallowed_by_robots"
-	NoRobotsFile        DecisionReason = "no_robots_file"
 	UserAgentNotMatched DecisionReason = "user_agent_not_matched"
+	EmptyRuleSet        DecisionReason = "empty_rule_set"
+	NoMatchingRules     DecisionReason = "no_matching_rules"
 )
 
 type Decision struct {

@@ -153,6 +153,7 @@ func NewAttr(key AttributeKey, val string) Attribute {
 type AttributeKey string
 
 const (
+	AttrTime       AttributeKey = "time"
 	AttrURL        AttributeKey = "url"
 	AttrHost       AttributeKey = "host"
 	AttrPath       AttributeKey = "path"

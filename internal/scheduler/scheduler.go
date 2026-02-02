@@ -66,6 +66,8 @@ type Scheduler struct {
 	markdownConstraint     normalize.MarkdownConstraint
 	storageSink            storage.Sink
 	writeResults           []storage.WriteResult
+	currentHost            string
+	hostTimings            map[string]hostTiming
 }
 
 func NewScheduler() Scheduler {
@@ -140,12 +142,26 @@ func (s *Scheduler) SubmitUrlForAdmission(
 	url url.URL,
 	sourceContext frontier.SourceContext,
 	depth int,
-) error {
+) internal.ClassifiedError {
 	// Fetch robots.txt
-	robotsDecision, err := s.robot.Decide(url)
+	robotsDecision, robotsError := s.robot.Decide(url)
 	// Robots infrastructure failure → scheduler-level error
-	if err != nil {
-		return err
+	if robotsError != nil {
+		return robotsError
+	}
+
+	if robotsDecision.CrawlDelay != nil {
+		crawlDelay := *robotsDecision.CrawlDelay
+		if crawlDelay > time.Duration(0) {
+			currentHostTiming, exists := s.hostTimings[s.currentHost]
+			if exists {
+				currentHostTiming.crawlDelay = crawlDelay
+			} else {
+				s.hostTimings[s.currentHost] = hostTiming{
+					crawlDelay: crawlDelay,
+				}
+			}
+		}
 	}
 
 	// Robots explicitly disallowed → normal, terminal outcome
@@ -229,10 +245,12 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		return CrawlingExecution{}, err
 	}
 
-	// 1.1 Initialize Frontier
+	// 1.1 Initialize Robots and Frontier
+	s.robot.Init(cfg.UserAgent())
 	s.frontier.Init(cfg)
 
 	// 2. Fetch robots.txt & decide the crawling policy for this hostname based on that
+	s.currentHost = cfg.SeedURLs()[0].Host
 	err = s.SubmitUrlForAdmission(cfg.SeedURLs()[0], frontier.SourceSeed, 0)
 	if err != nil {
 		return CrawlingExecution{}, err
@@ -329,4 +347,67 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	return CrawlingExecution{
 		WriteResults: s.writeResults,
 	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// Test Helper Methods
+// These methods are exported to enable testing of SubmitUrlForAdmission()
+// and other scheduler internals. They are not part of the public API.
+// ---------------------------------------------------------------------------
+
+// InitRobot initializes the robot with the given user agent.
+// This is a test helper method.
+func (s *Scheduler) InitRobot(userAgent string) {
+	s.robot.Init(userAgent)
+}
+
+// SetCurrentHost sets the current host for hostTimings tracking.
+// This is a test helper method to simulate the host context.
+func (s *Scheduler) SetCurrentHost(host string) {
+	s.currentHost = host
+	// Initialize hostTimings map if not already done
+	if s.hostTimings == nil {
+		s.hostTimings = make(map[string]hostTiming)
+	}
+}
+
+// FrontierVisitedCount returns the number of URLs in the frontier's visited set.
+// This is a test helper method to verify frontier state.
+func (s *Scheduler) FrontierVisitedCount() int {
+	if s.frontier == nil {
+		return 0
+	}
+	return s.frontier.VisitedCount()
+}
+
+// HasHostTiming reports whether the given host exists in hostTimings.
+// This is a test helper method.
+func (s *Scheduler) HasHostTiming(host string) bool {
+	if s.hostTimings == nil {
+		return false
+	}
+	_, exists := s.hostTimings[host]
+	return exists
+}
+
+// GetHostCrawlDelay returns the crawl delay for the given host.
+// Returns 0 if the host does not exist in hostTimings.
+// This is a test helper method.
+func (s *Scheduler) GetHostCrawlDelay(host string) time.Duration {
+	if s.hostTimings == nil {
+		return 0
+	}
+	if timing, exists := s.hostTimings[host]; exists {
+		return timing.crawlDelay
+	}
+	return 0
+}
+
+// DequeueFromFrontier dequeues a token from the frontier.
+// This is a test helper method to verify frontier contents.
+func (s *Scheduler) DequeueFromFrontier() (frontier.CrawlToken, bool) {
+	if s.frontier == nil {
+		return frontier.CrawlToken{}, false
+	}
+	return s.frontier.Dequeue()
 }
