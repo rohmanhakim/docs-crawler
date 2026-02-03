@@ -17,6 +17,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
 )
 
 /*
@@ -49,7 +50,6 @@ import (
 	- abort
  TODO:
 	- Introduce worker-scoped recorders when concurrency exists
-	- Apply robots crawl-delay inside scheduler timing logic
 */
 
 type Scheduler struct {
@@ -67,7 +67,7 @@ type Scheduler struct {
 	storageSink            storage.Sink
 	writeResults           []storage.WriteResult
 	currentHost            string
-	hostTimings            map[string]hostTiming
+	rateLimiter            limiter.RateLimiter
 }
 
 func NewScheduler() Scheduler {
@@ -81,6 +81,7 @@ func NewScheduler() Scheduler {
 	resolver := assets.NewResolver(&recorder)
 	markdownConstraint := normalize.NewMarkdownConstraint(&recorder)
 	storageSink := storage.NewSink(&recorder)
+	rateLimiter := limiter.NewConcurrentRateLimiter()
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
@@ -93,6 +94,7 @@ func NewScheduler() Scheduler {
 		assetResolver:          resolver,
 		markdownConstraint:     markdownConstraint,
 		storageSink:            storageSink,
+		rateLimiter:            rateLimiter,
 	}
 }
 
@@ -102,8 +104,9 @@ func NewScheduler() Scheduler {
 func NewSchedulerWithDeps(
 	crawlFinalizer metadata.CrawlFinalizer,
 	metadataSink metadata.MetadataSink,
+	rateLimiter limiter.RateLimiter,
+	robot robots.Robot,
 ) Scheduler {
-	robot := robots.NewRobot(metadataSink)
 	frontier := frontier.NewFrontier()
 	fetcher := fetcher.NewHtmlFetcher(metadataSink)
 	extractor := extractor.NewDomExtractor(metadataSink)
@@ -124,6 +127,7 @@ func NewSchedulerWithDeps(
 		assetResolver:          resolver,
 		markdownConstraint:     markdownConstraint,
 		storageSink:            storageSink,
+		rateLimiter:            rateLimiter,
 	}
 }
 
@@ -150,17 +154,15 @@ func (s *Scheduler) SubmitUrlForAdmission(
 		return robotsError
 	}
 
+	// Reset backoff after successful robots request
+	if s.rateLimiter != nil {
+		s.rateLimiter.ResetBackoff(url.Host)
+	}
+
 	if robotsDecision.CrawlDelay != nil {
 		crawlDelay := *robotsDecision.CrawlDelay
-		if crawlDelay > time.Duration(0) {
-			currentHostTiming, exists := s.hostTimings[s.currentHost]
-			if exists {
-				currentHostTiming.crawlDelay = crawlDelay
-			} else {
-				s.hostTimings[s.currentHost] = hostTiming{
-					crawlDelay: crawlDelay,
-				}
-			}
+		if crawlDelay > time.Duration(0) && s.rateLimiter != nil {
+			s.rateLimiter.SetCrawlDelay(s.currentHost, crawlDelay)
 		}
 	}
 
@@ -171,10 +173,7 @@ func (s *Scheduler) SubmitUrlForAdmission(
 		// - NO retry
 		// - NO abort
 		// - NO frontier submission
-
-		// TODO: if had CrawlDelay, postpone the downstream activity (real implementation)
-		// for now (for illustrative purposes) just continue
-		s.robotsCrawlDelay = robotsDecision.CrawlDelay
+		// TODO: record to metadataSink that robots explcitly disallowed the URL
 		return nil
 	}
 
@@ -245,7 +244,12 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		return CrawlingExecution{}, err
 	}
 
-	// 1.1 Initialize Robots and Frontier
+	// 1.1 Initialize rate limiter
+	s.rateLimiter.SetBaseDelay(cfg.BaseDelay())
+	s.rateLimiter.SetJitter(cfg.Jitter())
+	s.rateLimiter.SetRandomSeed(cfg.RandomSeed())
+
+	// 1.2 Initialize Robots and Frontier
 	s.robot.Init(cfg.UserAgent())
 	s.frontier.Init(cfg)
 
@@ -253,8 +257,14 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	s.currentHost = cfg.SeedURLs()[0].Host
 	err = s.SubmitUrlForAdmission(cfg.SeedURLs()[0], frontier.SourceSeed, 0)
 	if err != nil {
+		// Check if this is a robots error that requires backoff
+		if robotsErr, ok := err.(*robots.RobotsError); ok {
+			s.recordRobotsErrorAndBackoff(robotsErr, cfg.SeedURLs()[0])
+		}
 		return CrawlingExecution{}, err
 	}
+
+	// TODO: Call limiter.ResolveDelay here and sleep based on the returned value
 
 	// If frontier still has URL to be crawl...
 	for {
@@ -298,6 +308,10 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		for _, discoveredurl := range sanitizedHtml.GetDiscoveredURLs() {
 			submissionErr := s.SubmitUrlForAdmission(discoveredurl, frontier.SourceCrawl, nextCrawlToken.Depth()+1)
 			if submissionErr != nil {
+				// Check if this is a robots error that requires backoff
+				if robotsErr, ok := submissionErr.(*robots.RobotsError); ok {
+					s.recordRobotsErrorAndBackoff(robotsErr, discoveredurl)
+				}
 				// Submission errors are scheduler-level errors, count them
 				totalErrors++
 				// Continue processing other URLs, don't abort the crawl
@@ -341,6 +355,8 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			continue
 		}
 		s.writeResults = append(s.writeResults, writeResult)
+
+		// TODO: Call limiter.ResolveDelay here and sleep based on the returned value
 	}
 
 	// Stats are recorded by defer - return successful execution result
@@ -349,26 +365,52 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	}, nil
 }
 
+// recordRobotsErrorAndBackoff records a robots error using metadataSink and
+// triggers exponential backoff on the rate limiter if the error cause warrants it.
+// This method handles ErrCauseHttpTooManyRequests (429) and ErrCauseHttpServerError (5xx)
+// by recording the error and applying backoff to the current host.
+func (s *Scheduler) recordRobotsErrorAndBackoff(robotsErr *robots.RobotsError, targetURL url.URL) {
+	// Only record and backoff for specific HTTP error causes
+	if robotsErr.Cause == robots.ErrCauseHttpTooManyRequests ||
+		robotsErr.Cause == robots.ErrCauseHttpServerError {
+		s.metadataSink.RecordError(
+			time.Now(),
+			"scheduler",
+			"SubmitUrlForAdmission",
+			metadata.CauseNetworkFailure,
+			robotsErr.Error(),
+			[]metadata.Attribute{
+				metadata.NewAttr(metadata.AttrURL, targetURL.String()),
+				metadata.NewAttr(metadata.AttrHost, targetURL.Host),
+				metadata.NewAttr(metadata.AttrPath, targetURL.Path),
+			},
+		)
+		if s.rateLimiter != nil {
+			s.rateLimiter.Backoff(targetURL.Host)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Test Helper Methods
 // These methods are exported to enable testing of SubmitUrlForAdmission()
 // and other scheduler internals. They are not part of the public API.
 // ---------------------------------------------------------------------------
 
-// InitRobot initializes the robot with the given user agent.
+// InitWith initializes the dependencies with the given data.
 // This is a test helper method.
-func (s *Scheduler) InitRobot(userAgent string) {
+func (s *Scheduler) InitWith(userAgent string, baseDelay time.Duration, jitter time.Duration, randomSeed int64) {
 	s.robot.Init(userAgent)
+	s.rateLimiter.SetBaseDelay(baseDelay)
+	s.rateLimiter.SetJitter(jitter)
+	s.rateLimiter.SetRandomSeed(randomSeed)
 }
 
-// SetCurrentHost sets the current host for hostTimings tracking.
+// SetCurrentHost sets the current host.
 // This is a test helper method to simulate the host context.
 func (s *Scheduler) SetCurrentHost(host string) {
 	s.currentHost = host
-	// Initialize hostTimings map if not already done
-	if s.hostTimings == nil {
-		s.hostTimings = make(map[string]hostTiming)
-	}
+	// s.rateLimiter.RegisterHost(host)
 }
 
 // FrontierVisitedCount returns the number of URLs in the frontier's visited set.
@@ -378,29 +420,6 @@ func (s *Scheduler) FrontierVisitedCount() int {
 		return 0
 	}
 	return s.frontier.VisitedCount()
-}
-
-// HasHostTiming reports whether the given host exists in hostTimings.
-// This is a test helper method.
-func (s *Scheduler) HasHostTiming(host string) bool {
-	if s.hostTimings == nil {
-		return false
-	}
-	_, exists := s.hostTimings[host]
-	return exists
-}
-
-// GetHostCrawlDelay returns the crawl delay for the given host.
-// Returns 0 if the host does not exist in hostTimings.
-// This is a test helper method.
-func (s *Scheduler) GetHostCrawlDelay(host string) time.Duration {
-	if s.hostTimings == nil {
-		return 0
-	}
-	if timing, exists := s.hostTimings[host]; exists {
-		return timing.crawlDelay
-	}
-	return 0
 }
 
 // DequeueFromFrontier dequeues a token from the frontier.
