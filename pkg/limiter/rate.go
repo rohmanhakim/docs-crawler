@@ -1,7 +1,6 @@
 package limiter
 
 import (
-	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -28,19 +27,32 @@ type RateLimiter interface {
 }
 
 type ConcurrentRateLimiter struct {
-	mu          sync.RWMutex
-	rngMu       sync.Mutex
-	baseDelay   time.Duration
-	jitter      time.Duration
-	hostTimings map[string]hostTiming
-	rng         *rand.Rand
+	mu           sync.RWMutex
+	rngMu        sync.Mutex
+	baseDelay    time.Duration
+	jitter       time.Duration
+	hostTimings  map[string]hostTiming
+	rng          *rand.Rand
+	backoffParam timeutil.BackoffParam
 }
 
 func NewConcurrentRateLimiter() *ConcurrentRateLimiter {
 	return &ConcurrentRateLimiter{
 		hostTimings: make(map[string]hostTiming),
 		rng:         rand.New(rand.NewSource(time.Now().UnixNano())),
+		backoffParam: timeutil.NewBackoffParam(
+			1*time.Second,
+			2.0,
+			30*time.Second,
+		),
 	}
+}
+
+func (r *ConcurrentRateLimiter) SetBackoffParam(backoffParam timeutil.BackoffParam) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.backoffParam = backoffParam
 }
 
 func (r *ConcurrentRateLimiter) SetBaseDelay(baseDelay time.Duration) {
@@ -87,19 +99,20 @@ func (r *ConcurrentRateLimiter) Backoff(host string) {
 	defer r.mu.Unlock()
 
 	currentHostTiming, exists := r.hostTimings[host]
+
 	r.rngMu.Lock()
 	if r.rng == nil {
 		r.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
 	if exists {
 		currentHostTiming.backoffCount++
-		currentHostTiming.backoffDelay = exponentialBackoffDelay(currentHostTiming.backoffCount, r.jitter, *r.rng)
+		currentHostTiming.backoffDelay = timeutil.ExponentialBackoffDelay(currentHostTiming.backoffCount, r.jitter, *r.rng, r.backoffParam)
 		r.hostTimings[host] = currentHostTiming
 	} else {
 		// Initialize with backoffCount=1
 		r.hostTimings[host] = hostTiming{
 			backoffCount: 1,
-			backoffDelay: exponentialBackoffDelay(1, r.jitter, *r.rng),
+			backoffDelay: timeutil.ExponentialBackoffDelay(1, r.jitter, *r.rng, r.backoffParam),
 		}
 	}
 	r.rngMu.Unlock()
@@ -169,7 +182,7 @@ func (r *ConcurrentRateLimiter) ResolveDelay(host string) time.Duration {
 	if r.rng == nil {
 		r.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
-	finalDelay += computeJitter(jitter, *r.rng)
+	finalDelay += timeutil.ComputeJitter(jitter, *r.rng)
 	r.rngMu.Unlock()
 
 	elapsed := time.Since(currentHostTiming.lastFetchAt)
@@ -181,44 +194,6 @@ func (r *ConcurrentRateLimiter) ResolveDelay(host string) time.Duration {
 	}
 
 	return time.Duration(0)
-}
-
-// Compute jitter for the given max duration
-// Returns a pseudo-random duration between 0 and max (inclusive)
-func computeJitter(max time.Duration, rng rand.Rand) time.Duration {
-	if max <= 0 {
-		return 0
-	}
-
-	//rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	// Safe to call Int63n under lock since we hold rngMu
-	return time.Duration(rng.Int63n(int64(max)))
-}
-
-// exponentialBackoffDelay computes exponential backoff based on count
-// Does NOT take lock; caller must hold r.mu (RLock or Lock)
-func exponentialBackoffDelay(backoffCount int, jitter time.Duration, rng rand.Rand) time.Duration {
-	// Exponential backoff parameters
-	initialBackoff := 1 * time.Second // Start with 1s
-	multiplier := 2.0                 // Double each time
-	maxBackoff := 30 * time.Second    // Cap at 30s
-
-	// Compute exponential: initial * (multiplier ^ (count - 1))
-	// First backoff (count=1): initialBackoff
-	exponent := float64(backoffCount - 1)
-	delay := float64(initialBackoff) * math.Pow(multiplier, exponent)
-	if delay > float64(maxBackoff) {
-		delay = float64(maxBackoff)
-	}
-
-	// Add jitter only if configured jitter > 0
-	if jitter > 0 {
-		jitterValue := computeJitter(jitter, rng)
-		delay += float64(jitterValue)
-	}
-
-	return time.Duration(delay)
 }
 
 func (r *ConcurrentRateLimiter) BaseDelay() time.Duration {
@@ -249,28 +224,4 @@ func (r *ConcurrentRateLimiter) HostTimings() map[string]hostTiming {
 		copyMap[k] = v
 	}
 	return copyMap
-}
-
-// timing-related data used to track when to fetch host during crawling
-type hostTiming struct {
-	lastFetchAt  time.Time
-	backoffDelay time.Duration
-	crawlDelay   time.Duration
-	backoffCount int
-}
-
-func (h *hostTiming) CrawlDelay() time.Duration {
-	return h.crawlDelay
-}
-
-func (h *hostTiming) BackOffDelay() time.Duration {
-	return h.backoffDelay
-}
-
-func (h *hostTiming) LastFetchAt() time.Time {
-	return h.lastFetchAt
-}
-
-func (h *hostTiming) BackoffCount() int {
-	return h.backoffCount
 }

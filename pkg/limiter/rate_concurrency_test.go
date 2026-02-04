@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
+	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
 // TestConcurrentAccessRateLimiter is a stress test for thread-safety of ConcurrentRateLimiter.
@@ -51,7 +52,7 @@ func TestConcurrentAccessRateLimiter(t *testing.T) {
 			// Each goroutine has its own RNG to avoid contention on per-goroutine randomness
 			r := rand.New(rand.NewSource(int64(id) + time.Now().UnixNano()))
 			for j := 0; j < opsPerWorker; j++ {
-				switch r.Intn(12) {
+				switch r.Intn(13) {
 				case 0:
 					// Setter: Modify global base delay
 					rl.SetBaseDelay(time.Duration(r.Intn(300)) * time.Millisecond)
@@ -76,14 +77,22 @@ func TestConcurrentAccessRateLimiter(t *testing.T) {
 				case 6:
 					// Setter: Inject a custom RNG (tests SetRNG under high contention)
 					rl.SetRNG(rand.New(rand.NewSource(int64(r.Intn(1e6)))))
-				case 7, 8:
+				case 7:
+					// Setter: Update backoff parameters (tests SetBackoffParam under contention)
+					customParam := timeutil.NewBackoffParam(
+						time.Duration(r.Intn(2000))*time.Millisecond,
+						2.0,
+						30*time.Second,
+					)
+					rl.SetBackoffParam(customParam)
+				case 8, 9:
 					// Getters: Read global configuration (read lock operations)
 					_ = rl.BaseDelay()
 					_ = rl.Jitter()
-				case 9:
+				case 10:
 					// Getter: Read the RNG instance (protected by rngMu)
 					_ = rl.RNG()
-				case 10:
+				case 11:
 					// Getter: Read the host timings map (read lock, returns copy)
 					_ = rl.HostTimings()
 				default:

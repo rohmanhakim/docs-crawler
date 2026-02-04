@@ -1,6 +1,8 @@
 package timeutil
 
 import (
+	"math"
+	"math/rand"
 	"slices"
 	"time"
 )
@@ -39,4 +41,43 @@ func MaxDuration(durations []time.Duration) time.Duration {
 
 	// return the highest (first) one
 	return d[0]
+}
+
+// Compute jitter for the given max duration
+// Returns a pseudo-random duration between 0 and max (inclusive)
+func ComputeJitter(max time.Duration, rng rand.Rand) time.Duration {
+	if max <= 0 {
+		return 0
+	}
+
+	return time.Duration(rng.Int63n(int64(max)))
+}
+
+// Computes exponential backoff based on count
+func ExponentialBackoffDelay(
+	backoffCount int,
+	jitter time.Duration,
+	rng rand.Rand,
+	backOffParam BackoffParam,
+) time.Duration {
+	// Exponential backoff parameters
+	initialBackoff := backOffParam.InitialDuration()
+	multiplier := backOffParam.Multiplier()
+	maxBackoff := backOffParam.MaxDuration()
+
+	// Compute exponential: initial * (multiplier ^ (count - 1))
+	// First backoff (count=1): initialBackoff
+	exponent := float64(backoffCount - 1)
+	delay := float64(initialBackoff) * math.Pow(multiplier, exponent)
+	if delay > float64(maxBackoff) {
+		delay = float64(maxBackoff)
+	}
+
+	// Add jitter only if jitter > 0
+	if jitter > 0 {
+		jitterValue := ComputeJitter(jitter, rng)
+		delay += float64(jitterValue)
+	}
+
+	return time.Duration(delay)
 }

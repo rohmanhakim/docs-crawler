@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
+	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
 func TestNewConcurrentRateLimiter(t *testing.T) {
@@ -177,6 +178,88 @@ func TestRateLimiter_ResolveDelay_BaseDelayOnly(t *testing.T) {
 	// Allow small margin for elapsed time
 	if delay < 490*time.Millisecond || delay > 500*time.Millisecond {
 		t.Errorf("ResolveDelay = %v, want approximately 500ms", delay)
+	}
+}
+
+func TestNewConcurrentRateLimiter_Defaults(t *testing.T) {
+	rl := limiter.NewConcurrentRateLimiter()
+
+	if rl == nil {
+		t.Fatal("NewConcurrentRateLimiter returned nil")
+	}
+
+	// Check default values
+	if rl.BaseDelay() != 0 {
+		t.Errorf("default baseDelay = %v, want 0", rl.BaseDelay())
+	}
+	if rl.Jitter() != 0 {
+		t.Errorf("default jitter = %v, want 0", rl.Jitter())
+	}
+	if rl.RNG() == nil {
+		t.Error("default rng not initialized")
+	}
+	if rl.HostTimings() == nil {
+		t.Error("hostTimings map not initialized")
+	}
+
+	// Verify backoffParam default: initial backoff should be 1s
+	host := "example.com"
+	rl.SetJitter(0)             // disable jitter for deterministic backoff
+	rl.SetRandomSeed(42)        // deterministic RNG
+	rl.MarkLastFetchAsNow(host) // set last fetch to now
+	rl.Backoff(host)
+	timing := rl.HostTimings()[host]
+	if timing.BackOffDelay() != 1*time.Second {
+		t.Errorf("default backoff initial delay = %v, want 1s", timing.BackOffDelay())
+	}
+}
+
+func TestConcurrentRateLimiter_SetBackoffParam(t *testing.T) {
+	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetJitter(0)
+	rl.SetRandomSeed(42)
+	host := "example.com"
+
+	// Set custom backoff parameters: initial=2s, multiplier=3.0, max=60s
+	customParam := timeutil.NewBackoffParam(2*time.Second, 3.0, 60*time.Second)
+	rl.SetBackoffParam(customParam)
+
+	// Verify exponential growth with custom parameters
+	rl.MarkLastFetchAsNow(host)
+
+	rl.Backoff(host)
+	timing1 := rl.HostTimings()[host]
+	expected1 := 2 * time.Second
+	if timing1.BackOffDelay() != expected1 {
+		t.Errorf("backoff after SetBackoffParam: count=1, got %v, want %v", timing1.BackOffDelay(), expected1)
+	}
+
+	rl.Backoff(host)
+	timing2 := rl.HostTimings()[host]
+	expected2 := 6 * time.Second // 2 * 3^1
+	if timing2.BackOffDelay() != expected2 {
+		t.Errorf("backoff after SetBackoffParam: count=2, got %v, want %v", timing2.BackOffDelay(), expected2)
+	}
+
+	rl.Backoff(host)
+	timing3 := rl.HostTimings()[host]
+	expected3 := 18 * time.Second // 2 * 3^2
+	if timing3.BackOffDelay() != expected3 {
+		t.Errorf("backoff after SetBackoffParam: count=3, got %v, want %v", timing3.BackOffDelay(), expected3)
+	}
+
+	rl.Backoff(host)
+	timing4 := rl.HostTimings()[host]
+	expected4 := 54 * time.Second // 2 * 3^3
+	if timing4.BackOffDelay() != expected4 {
+		t.Errorf("backoff after SetBackoffParam: count=4, got %v, want %v", timing4.BackOffDelay(), expected4)
+	}
+
+	rl.Backoff(host)
+	timing5 := rl.HostTimings()[host]
+	expected5 := 60 * time.Second // capped at max
+	if timing5.BackOffDelay() != expected5 {
+		t.Errorf("backoff after SetBackoffParam: count=5 (capped), got %v, want %v", timing5.BackOffDelay(), expected5)
 	}
 }
 
