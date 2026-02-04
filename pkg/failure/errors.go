@@ -1,11 +1,11 @@
 package failure
 
-type Severity int
+type Severity string
 
 // scheduler control flow
 const (
-	SeverityFatal Severity = iota
-	SeverityRecoverable
+	SeverityFatal       = "fatal"
+	SeverityRecoverable = "recoverable"
 )
 
 type ClassifiedError interface {
