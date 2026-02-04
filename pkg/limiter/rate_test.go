@@ -534,3 +534,57 @@ func TestRateLimiter_BackoffOnNewHost(t *testing.T) {
 		t.Errorf("lastFetchAt for new host should be zero, got %v", timing.GetLastFetchAt())
 	}
 }
+
+func TestRateLimiter_Backoff_WithNilRng(t *testing.T) {
+	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetBaseDelay(1 * time.Second)
+	rl.SetJitter(0)
+
+	// Set r.rng to nil using SetRNG with a nil *rand.Rand
+	var nilRng *rand.Rand = nil
+	rl.SetRNG(nilRng)
+
+	host := "example.com"
+
+	// This should not panic and should initialize r.rng
+	rl.Backoff(host)
+
+	// After Backoff, r.rng should be initialized (non-nil)
+	if rl.GetRng() == nil {
+		t.Error("rng should be initialized after Backoff with nil rng")
+	}
+
+	timing := rl.GetHostTimings()[host]
+	if timing.GetBackoffCount() != 1 {
+		t.Errorf("backoffCount = %d, want 1", timing.GetBackoffCount())
+	}
+	if timing.GetBackOffDelay() != 1*time.Second {
+		t.Errorf("backoffDelay = %v, want 1s", timing.GetBackOffDelay())
+	}
+}
+
+func TestRateLimiter_ResolveDelay_WithNilRng(t *testing.T) {
+	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetBaseDelay(500 * time.Millisecond)
+	rl.SetJitter(0)
+
+	// Set r.rng to nil
+	var nilRng *rand.Rand = nil
+	rl.SetRNG(nilRng)
+
+	host := "example.com"
+	rl.MarkLastFetchAsNow(host)
+
+	// This should not panic and should initialize r.rng
+	delay := rl.ResolveDelay(host)
+
+	// After ResolveDelay, r.rng should be initialized
+	if rl.GetRng() == nil {
+		t.Error("rng should be initialized after ResolveDelay with nil rng")
+	}
+
+	// Should return baseDelay approximately (since no crawlDelay/backoff)
+	if delay < 490*time.Millisecond || delay > 500*time.Millisecond {
+		t.Errorf("ResolveDelay = %v, want approximately 500ms", delay)
+	}
+}

@@ -80,31 +80,6 @@ func (r *ConcurrentRateLimiter) SetCrawlDelay(host string, delay time.Duration) 
 	}
 }
 
-// exponentialBackoffDelay computes exponential backoff based on count
-// Does NOT take lock; caller must hold r.mu (RLock or Lock)
-func (r *ConcurrentRateLimiter) exponentialBackoffDelay(backoffCount int) time.Duration {
-	// Exponential backoff parameters
-	initialBackoff := 1 * time.Second // Start with 1s
-	multiplier := 2.0                 // Double each time
-	maxBackoff := 30 * time.Second    // Cap at 30s
-
-	// Compute exponential: initial * (multiplier ^ (count - 1))
-	// First backoff (count=1): initialBackoff
-	exponent := float64(backoffCount - 1)
-	delay := float64(initialBackoff) * math.Pow(multiplier, exponent)
-	if delay > float64(maxBackoff) {
-		delay = float64(maxBackoff)
-	}
-
-	// Add jitter only if configured jitter > 0
-	if r.jitter > 0 {
-		jitterValue := r.computeJitter(r.jitter)
-		delay += float64(jitterValue)
-	}
-
-	return time.Duration(delay)
-}
-
 // Backoff triggers exponential backoff for the given host.
 // It increments the backoff counter and computes the delay.
 func (r *ConcurrentRateLimiter) Backoff(host string) {
@@ -112,17 +87,22 @@ func (r *ConcurrentRateLimiter) Backoff(host string) {
 	defer r.mu.Unlock()
 
 	currentHostTiming, exists := r.hostTimings[host]
+	r.rngMu.Lock()
+	if r.rng == nil {
+		r.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
 	if exists {
 		currentHostTiming.backoffCount++
-		currentHostTiming.backoffDelay = r.exponentialBackoffDelay(currentHostTiming.backoffCount)
+		currentHostTiming.backoffDelay = exponentialBackoffDelay(currentHostTiming.backoffCount, r.jitter, *r.rng)
 		r.hostTimings[host] = currentHostTiming
 	} else {
 		// Initialize with backoffCount=1
 		r.hostTimings[host] = hostTiming{
 			backoffCount: 1,
-			backoffDelay: r.exponentialBackoffDelay(1),
+			backoffDelay: exponentialBackoffDelay(1, r.jitter, *r.rng),
 		}
 	}
+	r.rngMu.Unlock()
 }
 
 // ResetBackoff resets the backoff counter for the given host.
@@ -155,24 +135,6 @@ func (r *ConcurrentRateLimiter) MarkLastFetchAsNow(host string) {
 	}
 }
 
-// Compute jitter for the given max duration
-// Returns a pseudo-random duration between 0 and max (inclusive)
-func (r *ConcurrentRateLimiter) computeJitter(max time.Duration) time.Duration {
-	if max <= 0 {
-		return 0
-	}
-
-	r.rngMu.Lock()
-	defer r.rngMu.Unlock()
-
-	if r.rng == nil {
-		r.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-	}
-
-	// Safe to call Int63n under lock since we hold rngMu
-	return time.Duration(r.rng.Int63n(int64(max)))
-}
-
 // SetRNG allows injecting a custom random number generator for testing
 func (r *ConcurrentRateLimiter) SetRNG(rng interface{}) {
 	if randImpl, ok := rng.(*rand.Rand); ok {
@@ -202,8 +164,13 @@ func (r *ConcurrentRateLimiter) ResolveDelay(host string) time.Duration {
 	// compute the highest delay between BaseDelay, crawlDelay, and BackoffDelay
 	finalDelay := timeutil.MaxDuration(delays)
 
+	r.rngMu.Lock()
 	// add jitter to the final delay (computeJitter protects rng)
-	finalDelay += r.computeJitter(jitter)
+	if r.rng == nil {
+		r.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+	finalDelay += computeJitter(jitter, *r.rng)
+	r.rngMu.Unlock()
 
 	elapsed := time.Since(currentHostTiming.lastFetchAt)
 
@@ -214,6 +181,44 @@ func (r *ConcurrentRateLimiter) ResolveDelay(host string) time.Duration {
 	}
 
 	return time.Duration(0)
+}
+
+// Compute jitter for the given max duration
+// Returns a pseudo-random duration between 0 and max (inclusive)
+func computeJitter(max time.Duration, rng rand.Rand) time.Duration {
+	if max <= 0 {
+		return 0
+	}
+
+	//rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	// Safe to call Int63n under lock since we hold rngMu
+	return time.Duration(rng.Int63n(int64(max)))
+}
+
+// exponentialBackoffDelay computes exponential backoff based on count
+// Does NOT take lock; caller must hold r.mu (RLock or Lock)
+func exponentialBackoffDelay(backoffCount int, jitter time.Duration, rng rand.Rand) time.Duration {
+	// Exponential backoff parameters
+	initialBackoff := 1 * time.Second // Start with 1s
+	multiplier := 2.0                 // Double each time
+	maxBackoff := 30 * time.Second    // Cap at 30s
+
+	// Compute exponential: initial * (multiplier ^ (count - 1))
+	// First backoff (count=1): initialBackoff
+	exponent := float64(backoffCount - 1)
+	delay := float64(initialBackoff) * math.Pow(multiplier, exponent)
+	if delay > float64(maxBackoff) {
+		delay = float64(maxBackoff)
+	}
+
+	// Add jitter only if configured jitter > 0
+	if jitter > 0 {
+		jitterValue := computeJitter(jitter, rng)
+		delay += float64(jitterValue)
+	}
+
+	return time.Duration(delay)
 }
 
 func (r *ConcurrentRateLimiter) GetBaseDelay() time.Duration {
