@@ -4,9 +4,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 /*
@@ -36,7 +36,7 @@ func NewResolver(
 
 func (r *Resolver) Resolve(
 	markdownDoc mdconvert.MarkdownDoc,
-) (AssetfulMarkdownDoc, internal.ClassifiedError) {
+) (AssetfulMarkdownDoc, failure.ClassifiedError) {
 	assetfulMarkdownDoc, err := resolve()
 	if err != nil {
 		var assetsError *AssetsError

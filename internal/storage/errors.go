@@ -3,8 +3,8 @@ package storage
 import (
 	"fmt"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 type StorageErrorCause string
@@ -24,11 +24,11 @@ func (e *StorageError) Error() string {
 	return fmt.Sprintf("storage error: %s", e.Cause)
 }
 
-func (e *StorageError) Severity() internal.Severity {
+func (e *StorageError) Severity() failure.Severity {
 	if e.Retryable {
-		return internal.SeverityRecoverable
+		return failure.SeverityRecoverable
 	}
-	return internal.SeverityFatal
+	return failure.SeverityFatal
 }
 
 // mapStorageErrorToMetadataCause maps storage-local error semantics

@@ -13,9 +13,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 type HtmlSanitizer struct {
@@ -30,7 +30,7 @@ func NewHTMLSanitizer(metadataSink metadata.MetadataSink) HtmlSanitizer {
 
 func (h *HtmlSanitizer) Sanitize(
 	extractionResult extractor.ExtractionResult,
-) (SanitizedHTMLDoc, internal.ClassifiedError) {
+) (SanitizedHTMLDoc, failure.ClassifiedError) {
 	sanitizedHtmlDoc, err := sanitize()
 	if err != nil {
 		var sanitizationError *SanitizationError

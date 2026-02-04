@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 /*
@@ -42,7 +42,7 @@ func NewMarkdownConstraint(
 
 func (m *MarkdownConstraint) Normalize(
 	assetfulMarkdownDoc assets.AssetfulMarkdownDoc,
-) (NormalizedMarkdownDoc, internal.ClassifiedError) {
+) (NormalizedMarkdownDoc, failure.ClassifiedError) {
 	normalizedMarkdown, err := normalize()
 	if err != nil {
 		var normalizationError *NormalizationError

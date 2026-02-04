@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 /*
@@ -42,7 +42,7 @@ func NewHtmlFetcher(
 
 func (h *HtmlFetcher) Fetch(
 	url url.URL,
-) (FetchResult, internal.ClassifiedError) {
+) (FetchResult, failure.ClassifiedError) {
 	h.metadataSink.RecordFetch(
 		"https://my-fetch-url-exaple",
 		200,

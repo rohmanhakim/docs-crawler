@@ -3,8 +3,8 @@ package extractor
 import (
 	"fmt"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 type ExtractionErrorCause string
@@ -23,11 +23,11 @@ func (e *ExtractionError) Error() string {
 	return fmt.Sprintf("extraction error: %s", e.Cause)
 }
 
-func (e *ExtractionError) Severity() internal.Severity {
+func (e *ExtractionError) Severity() failure.Severity {
 	if e.Retryable {
-		return internal.SeverityRecoverable
+		return failure.SeverityRecoverable
 	}
-	return internal.SeverityFatal
+	return failure.SeverityFatal
 }
 
 // mapExtractionErrorToMetadataCause maps extractor-local error semantics

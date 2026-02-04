@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/config"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
@@ -17,6 +16,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
 )
 
@@ -146,7 +146,7 @@ func (s *Scheduler) SubmitUrlForAdmission(
 	url url.URL,
 	sourceContext frontier.SourceContext,
 	depth int,
-) internal.ClassifiedError {
+) failure.ClassifiedError {
 	// Fetch robots.txt
 	robotsDecision, robotsError := s.robot.Decide(url)
 	// Robots infrastructure failure → scheduler-level error
@@ -276,7 +276,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		// 3. Fetch Page URL
 		fetchResult, err := s.htmlFetcher.Fetch(nextCrawlToken.URL())
 		if err != nil {
-			if err.Severity() == internal.SeverityFatal {
+			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
 			// recoverable → log already done → count error
@@ -287,7 +287,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		// 4. Extract HTML DOM
 		extractionResult, err := s.domExtractor.Extract(fetchResult)
 		if err != nil {
-			if err.Severity() == internal.SeverityFatal {
+			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
 			totalErrors++
@@ -297,7 +297,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		// 5. Sanitize extracted HTML
 		sanitizedHtml, err := s.htmlSanitizer.Sanitize(extractionResult)
 		if err != nil {
-			if err.Severity() == internal.SeverityFatal {
+			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
 			totalErrors++
@@ -324,7 +324,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		// 7. Assets Resolution
 		assetfulMarkdown, err := s.assetResolver.Resolve(markdownDoc)
 		if err != nil {
-			if err.Severity() == internal.SeverityFatal {
+			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
 			totalErrors++
@@ -337,7 +337,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		// 8. Markdown Normalization
 		normalizedMarkdown, err := s.markdownConstraint.Normalize(assetfulMarkdown)
 		if err != nil {
-			if err.Severity() == internal.SeverityFatal {
+			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
 			totalErrors++
@@ -347,7 +347,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		// 9. Write Artifact
 		writeResult, err := s.storageSink.Write(normalizedMarkdown)
 		if err != nil {
-			if err.Severity() == internal.SeverityFatal {
+			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
 			}
 			// recoverable → log already done → count error

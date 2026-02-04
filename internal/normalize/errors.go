@@ -3,8 +3,8 @@ package normalize
 import (
 	"fmt"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 type NormalizationErrorCause string
@@ -23,11 +23,11 @@ func (e *NormalizationError) Error() string {
 	return fmt.Sprintf("normalization error: %s", e.Cause)
 }
 
-func (e *NormalizationError) Severity() internal.Severity {
+func (e *NormalizationError) Severity() failure.Severity {
 	if e.Retryable {
-		return internal.SeverityRecoverable
+		return failure.SeverityRecoverable
 	}
-	return internal.SeverityFatal
+	return failure.SeverityFatal
 }
 
 // mapNormalizationErrorToMetadataCause maps normalize-local error semantics

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 /*
@@ -47,7 +47,7 @@ func NewDomExtractor(
 
 func (d *DomExtractor) Extract(
 	fetchResult fetcher.FetchResult,
-) (ExtractionResult, internal.ClassifiedError) {
+) (ExtractionResult, failure.ClassifiedError) {
 	result, err := extract()
 	if err != nil {
 		var extractionError *ExtractionError

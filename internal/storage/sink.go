@@ -4,9 +4,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/normalize"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 /*
@@ -35,7 +35,7 @@ func NewSink(
 
 func (s *Sink) Write(
 	normalizedDoc normalize.NormalizedMarkdownDoc,
-) (WriteResult, internal.ClassifiedError) {
+) (WriteResult, failure.ClassifiedError) {
 	writeResult, err := write()
 	if err != nil {
 		var storageError *StorageError

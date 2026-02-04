@@ -3,8 +3,8 @@ package sanitizer
 import (
 	"fmt"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 type SanitizationErrorCause string
@@ -23,11 +23,11 @@ func (e *SanitizationError) Error() string {
 	return fmt.Sprintf("sanitization error: %s", e.Cause)
 }
 
-func (e *SanitizationError) Severity() internal.Severity {
+func (e *SanitizationError) Severity() failure.Severity {
 	if e.Retryable {
-		return internal.SeverityRecoverable
+		return failure.SeverityRecoverable
 	}
-	return internal.SeverityFatal
+	return failure.SeverityFatal
 }
 
 // mapSanitizationErrorToMetadataCause maps sanitizer-local error semantics

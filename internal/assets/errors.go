@@ -3,8 +3,8 @@ package assets
 import (
 	"fmt"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 type AssetsErrorCause string
@@ -23,11 +23,11 @@ func (e *AssetsError) Error() string {
 	return fmt.Sprintf("assets error: %s", e.Cause)
 }
 
-func (e *AssetsError) Severity() internal.Severity {
+func (e *AssetsError) Severity() failure.Severity {
 	if e.Retryable {
-		return internal.SeverityRecoverable
+		return failure.SeverityRecoverable
 	}
-	return internal.SeverityFatal
+	return failure.SeverityFatal
 }
 
 // mapAssetsErrorToMetadataCause maps assets-local error semantics

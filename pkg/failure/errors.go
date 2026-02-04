@@ -1,4 +1,4 @@
-package internal
+package failure
 
 type Severity int
 

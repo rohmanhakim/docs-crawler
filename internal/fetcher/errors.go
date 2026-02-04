@@ -3,8 +3,8 @@ package fetcher
 import (
 	"fmt"
 
-	"github.com/rohmanhakim/docs-crawler/internal"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
 type FetchErrorCause string
@@ -30,11 +30,11 @@ func (e *FetchError) Error() string {
 	return fmt.Sprintf("fetcher error: %s", e.Cause)
 }
 
-func (e *FetchError) Severity() internal.Severity {
+func (e *FetchError) Severity() failure.Severity {
 	if e.Retryable {
-		return internal.SeverityRecoverable
+		return failure.SeverityRecoverable
 	}
-	return internal.SeverityFatal
+	return failure.SeverityFatal
 }
 
 // mapFetchErrorToMetadataCause maps fetcher-local error semantics
