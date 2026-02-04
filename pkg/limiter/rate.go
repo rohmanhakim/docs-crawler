@@ -221,25 +221,25 @@ func exponentialBackoffDelay(backoffCount int, jitter time.Duration, rng rand.Ra
 	return time.Duration(delay)
 }
 
-func (r *ConcurrentRateLimiter) GetBaseDelay() time.Duration {
+func (r *ConcurrentRateLimiter) BaseDelay() time.Duration {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.baseDelay
 }
 
-func (r *ConcurrentRateLimiter) GetJitter() time.Duration {
+func (r *ConcurrentRateLimiter) Jitter() time.Duration {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.jitter
 }
 
-func (r *ConcurrentRateLimiter) GetRng() *rand.Rand {
+func (r *ConcurrentRateLimiter) RNG() *rand.Rand {
 	r.rngMu.Lock()
 	defer r.rngMu.Unlock()
 	return r.rng
 }
 
-func (r *ConcurrentRateLimiter) GetHostTimings() map[string]hostTiming {
+func (r *ConcurrentRateLimiter) HostTimings() map[string]hostTiming {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -259,18 +259,18 @@ type hostTiming struct {
 	backoffCount int
 }
 
-func (h *hostTiming) GetCrawlDelay() time.Duration {
+func (h *hostTiming) CrawlDelay() time.Duration {
 	return h.crawlDelay
 }
 
-func (h *hostTiming) GetBackOffDelay() time.Duration {
+func (h *hostTiming) BackOffDelay() time.Duration {
 	return h.backoffDelay
 }
 
-func (h *hostTiming) GetLastFetchAt() time.Time {
+func (h *hostTiming) LastFetchAt() time.Time {
 	return h.lastFetchAt
 }
 
-func (h *hostTiming) GetBackoffCount() int {
+func (h *hostTiming) BackoffCount() int {
 	return h.backoffCount
 }

@@ -78,14 +78,14 @@ func TestConcurrentAccessRateLimiter(t *testing.T) {
 					rl.SetRNG(rand.New(rand.NewSource(int64(r.Intn(1e6)))))
 				case 7, 8:
 					// Getters: Read global configuration (read lock operations)
-					_ = rl.GetBaseDelay()
-					_ = rl.GetJitter()
+					_ = rl.BaseDelay()
+					_ = rl.Jitter()
 				case 9:
 					// Getter: Read the RNG instance (protected by rngMu)
-					_ = rl.GetRng()
+					_ = rl.RNG()
 				case 10:
 					// Getter: Read the host timings map (read lock, returns copy)
-					_ = rl.GetHostTimings()
+					_ = rl.HostTimings()
 				default:
 					// Compute: Complex operation that reads multiple fields, calls computeJitter, and performs arithmetic
 					// This tests coordination between r.mu (read) and rngMu locking patterns
@@ -99,7 +99,7 @@ func TestConcurrentAccessRateLimiter(t *testing.T) {
 
 	// Sanity check: verify final state is valid
 
-	if rl.GetHostTimings() == nil {
+	if rl.HostTimings() == nil {
 		t.Fatal("GetHostTimings returned nil map")
 	}
 }

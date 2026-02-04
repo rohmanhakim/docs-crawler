@@ -22,19 +22,19 @@ func TestNewConcurrentRateLimiter(t *testing.T) {
 		t.Fatal("NewRateLimiter returned nil")
 	}
 
-	if rl.GetBaseDelay() != baseDelay {
-		t.Errorf("baseDelay = %v, want %v", rl.GetBaseDelay(), baseDelay)
+	if rl.BaseDelay() != baseDelay {
+		t.Errorf("baseDelay = %v, want %v", rl.BaseDelay(), baseDelay)
 	}
 
-	if rl.GetJitter() != jitter {
-		t.Errorf("jitter = %v, want %v", rl.GetJitter(), jitter)
+	if rl.Jitter() != jitter {
+		t.Errorf("jitter = %v, want %v", rl.Jitter(), jitter)
 	}
 
-	if rl.GetHostTimings() == nil {
+	if rl.HostTimings() == nil {
 		t.Error("hostTimings map not initialized")
 	}
 
-	if rl.GetRng() == nil {
+	if rl.RNG() == nil {
 		t.Error("rng not initialized")
 	}
 }
@@ -49,9 +49,9 @@ func TestRateLimiter_SetCrawlDelay(t *testing.T) {
 
 	rl.SetCrawlDelay(host, newDelay)
 
-	timing := rl.GetHostTimings()[host]
-	if timing.GetCrawlDelay() != newDelay {
-		t.Errorf("crawlDelay = %v, want %v", timing.GetCrawlDelay(), newDelay)
+	timing := rl.HostTimings()[host]
+	if timing.CrawlDelay() != newDelay {
+		t.Errorf("crawlDelay = %v, want %v", timing.CrawlDelay(), newDelay)
 	}
 }
 
@@ -64,36 +64,36 @@ func TestRateLimiter_Backoff(t *testing.T) {
 
 	// First backoff
 	rl.Backoff(host)
-	timing1 := rl.GetHostTimings()[host]
-	if timing1.GetBackoffCount() != 1 {
-		t.Errorf("backoffCount after first Backoff = %d, want 1", timing1.GetBackoffCount())
+	timing1 := rl.HostTimings()[host]
+	if timing1.BackoffCount() != 1 {
+		t.Errorf("backoffCount after first Backoff = %d, want 1", timing1.BackoffCount())
 	}
-	if timing1.GetBackOffDelay() != 1*time.Second {
-		t.Errorf("backoffDelay after first Backoff = %v, want 1s", timing1.GetBackOffDelay())
+	if timing1.BackOffDelay() != 1*time.Second {
+		t.Errorf("backoffDelay after first Backoff = %v, want 1s", timing1.BackOffDelay())
 	}
 
 	// Second backoff
 	rl.Backoff(host)
-	timing2 := rl.GetHostTimings()[host]
-	if timing2.GetBackoffCount() != 2 {
-		t.Errorf("backoffCount after second Backoff = %d, want 2", timing2.GetBackoffCount())
+	timing2 := rl.HostTimings()[host]
+	if timing2.BackoffCount() != 2 {
+		t.Errorf("backoffCount after second Backoff = %d, want 2", timing2.BackoffCount())
 	}
 	// 1s * 2^1 = 2s
 	expected2 := 2 * time.Second
-	if timing2.GetBackOffDelay() != expected2 {
-		t.Errorf("backoffDelay after second Backoff = %v, want %v", timing2.GetBackOffDelay(), expected2)
+	if timing2.BackOffDelay() != expected2 {
+		t.Errorf("backoffDelay after second Backoff = %v, want %v", timing2.BackOffDelay(), expected2)
 	}
 
 	// Third backoff
 	rl.Backoff(host)
-	timing3 := rl.GetHostTimings()[host]
-	if timing3.GetBackoffCount() != 3 {
-		t.Errorf("backoffCount after third Backoff = %d, want 3", timing3.GetBackoffCount())
+	timing3 := rl.HostTimings()[host]
+	if timing3.BackoffCount() != 3 {
+		t.Errorf("backoffCount after third Backoff = %d, want 3", timing3.BackoffCount())
 	}
 	// 1s * 2^2 = 4s
 	expected3 := 4 * time.Second
-	if timing3.GetBackOffDelay() != expected3 {
-		t.Errorf("backoffDelay after third Backoff = %v, want %v", timing3.GetBackOffDelay(), expected3)
+	if timing3.BackOffDelay() != expected3 {
+		t.Errorf("backoffDelay after third Backoff = %v, want %v", timing3.BackOffDelay(), expected3)
 	}
 }
 
@@ -110,10 +110,10 @@ func TestRateLimiter_Backoff_MaxCap(t *testing.T) {
 		rl.Backoff(host)
 	}
 
-	timing := rl.GetHostTimings()[host]
+	timing := rl.HostTimings()[host]
 	// After enough backoffs, should be capped at 30s
-	if timing.GetBackOffDelay() > 30*time.Second+100*time.Millisecond {
-		t.Errorf("backoffDelay after many backoffs = %v, want capped at ~30s", timing.GetBackOffDelay())
+	if timing.BackOffDelay() > 30*time.Second+100*time.Millisecond {
+		t.Errorf("backoffDelay after many backoffs = %v, want capped at ~30s", timing.BackOffDelay())
 	}
 }
 
@@ -126,26 +126,26 @@ func TestRateLimiter_ResetBackoff(t *testing.T) {
 	// Trigger backoff
 	rl.Backoff(host)
 	rl.Backoff(host)
-	timing1 := rl.GetHostTimings()[host]
-	if timing1.GetBackoffCount() != 2 {
-		t.Fatalf("setup: backoffCount = %d, want 2", timing1.GetBackoffCount())
+	timing1 := rl.HostTimings()[host]
+	if timing1.BackoffCount() != 2 {
+		t.Fatalf("setup: backoffCount = %d, want 2", timing1.BackoffCount())
 	}
 
 	// Reset backoff
 	rl.ResetBackoff(host)
-	timing2 := rl.GetHostTimings()[host]
-	if timing2.GetBackoffCount() != 0 {
-		t.Errorf("backoffCount after ResetBackoff = %d, want 0", timing2.GetBackoffCount())
+	timing2 := rl.HostTimings()[host]
+	if timing2.BackoffCount() != 0 {
+		t.Errorf("backoffCount after ResetBackoff = %d, want 0", timing2.BackoffCount())
 	}
-	if timing2.GetBackOffDelay() != time.Duration(0) {
-		t.Errorf("backoffDelay after ResetBackoff = %v, want 0", timing2.GetBackOffDelay())
+	if timing2.BackOffDelay() != time.Duration(0) {
+		t.Errorf("backoffDelay after ResetBackoff = %v, want 0", timing2.BackOffDelay())
 	}
 
 	// After reset, next Backoff should start from count=1 again
 	rl.Backoff(host)
-	timing3 := rl.GetHostTimings()[host]
-	if timing3.GetBackoffCount() != 1 {
-		t.Errorf("backoffCount after reset and new Backoff = %d, want 1", timing3.GetBackoffCount())
+	timing3 := rl.HostTimings()[host]
+	if timing3.BackoffCount() != 1 {
+		t.Errorf("backoffCount after reset and new Backoff = %d, want 1", timing3.BackoffCount())
 	}
 }
 
@@ -274,7 +274,7 @@ func TestRateLimiter_ResolveDelay_Jitter(t *testing.T) {
 			got := rl.ResolveDelay(host)
 
 			// derive computed jitter by subtracting baseDelay (ResolveDelay returns base + jitter - elapsed)
-			derived := got - rl.GetBaseDelay()
+			derived := got - rl.BaseDelay()
 
 			const tolerance = 5 * time.Millisecond
 			if tt.max <= 0 {
@@ -348,7 +348,7 @@ func TestRateLimiter_SetRNG(t *testing.T) {
 
 	rl.SetRNG(newRng)
 
-	if rl.GetRng() != newRng {
+	if rl.RNG() != newRng {
 		t.Error("SetRNG did not set rng correctly")
 	}
 }
@@ -438,8 +438,8 @@ func TestRateLimiter_BackoffExponentialGrowth(t *testing.T) {
 
 	for i, expected := range expectedDelays {
 		rl.Backoff(host)
-		timing := rl.GetHostTimings()[host]
-		actual := timing.GetBackOffDelay()
+		timing := rl.HostTimings()[host]
+		actual := timing.BackOffDelay()
 		if actual != expected {
 			t.Errorf("Backoff %d: got %v, want %v", i+1, actual, expected)
 		}
@@ -457,24 +457,24 @@ func TestRateLimiter_ResetBackoffClearsState(t *testing.T) {
 	}
 
 	// Verify state exists
-	timingBefore := rl.GetHostTimings()[host]
-	if timingBefore.GetBackoffCount() != 3 {
-		t.Fatalf("setup: backoffCount = %d, want 3", timingBefore.GetBackoffCount())
+	timingBefore := rl.HostTimings()[host]
+	if timingBefore.BackoffCount() != 3 {
+		t.Fatalf("setup: backoffCount = %d, want 3", timingBefore.BackoffCount())
 	}
-	if timingBefore.GetBackOffDelay() != 4*time.Second {
-		t.Fatalf("setup: backoffDelay = %v, want 4s", timingBefore.GetBackOffDelay())
+	if timingBefore.BackOffDelay() != 4*time.Second {
+		t.Fatalf("setup: backoffDelay = %v, want 4s", timingBefore.BackOffDelay())
 	}
 
 	// Reset
 	rl.ResetBackoff(host)
 
 	// Verify state cleared
-	timingAfter := rl.GetHostTimings()[host]
-	if timingAfter.GetBackoffCount() != 0 {
-		t.Errorf("After reset: backoffCount = %d, want 0", timingAfter.GetBackoffCount())
+	timingAfter := rl.HostTimings()[host]
+	if timingAfter.BackoffCount() != 0 {
+		t.Errorf("After reset: backoffCount = %d, want 0", timingAfter.BackoffCount())
 	}
-	if timingAfter.GetBackOffDelay() != 0 {
-		t.Errorf("After reset: backoffDelay = %v, want 0", timingAfter.GetBackOffDelay())
+	if timingAfter.BackOffDelay() != 0 {
+		t.Errorf("After reset: backoffDelay = %v, want 0", timingAfter.BackOffDelay())
 	}
 }
 
@@ -485,12 +485,12 @@ func TestRateLimiter_BackoffWithJitter(t *testing.T) {
 	host := "example.com"
 
 	rl.Backoff(host)
-	timing := rl.GetHostTimings()[host]
+	timing := rl.HostTimings()[host]
 
 	// backoffDelay should be 1s + jitter (0-50ms)
 	baseExpected := 1 * time.Second
-	if timing.GetBackOffDelay() < baseExpected || timing.GetBackOffDelay() > baseExpected+60*time.Millisecond {
-		t.Errorf("Backoff with jitter = %v, want between %v and %v", timing.GetBackOffDelay(), baseExpected, baseExpected+60*time.Millisecond)
+	if timing.BackOffDelay() < baseExpected || timing.BackOffDelay() > baseExpected+60*time.Millisecond {
+		t.Errorf("Backoff with jitter = %v, want between %v and %v", timing.BackOffDelay(), baseExpected, baseExpected+60*time.Millisecond)
 	}
 }
 
@@ -522,16 +522,16 @@ func TestRateLimiter_BackoffOnNewHost(t *testing.T) {
 	// Backoff on a host that doesn't exist yet
 	rl.Backoff(host)
 
-	timing := rl.GetHostTimings()[host]
-	if timing.GetBackoffCount() != 1 {
-		t.Errorf("backoffCount for new host = %d, want 1", timing.GetBackoffCount())
+	timing := rl.HostTimings()[host]
+	if timing.BackoffCount() != 1 {
+		t.Errorf("backoffCount for new host = %d, want 1", timing.BackoffCount())
 	}
-	if timing.GetBackOffDelay() != 1*time.Second {
-		t.Errorf("backoffDelay for new host = %v, want 1s", timing.GetBackOffDelay())
+	if timing.BackOffDelay() != 1*time.Second {
+		t.Errorf("backoffDelay for new host = %v, want 1s", timing.BackOffDelay())
 	}
 	// lastFetchAt should be zero value since we didn't mark it
-	if !timing.GetLastFetchAt().IsZero() {
-		t.Errorf("lastFetchAt for new host should be zero, got %v", timing.GetLastFetchAt())
+	if !timing.LastFetchAt().IsZero() {
+		t.Errorf("lastFetchAt for new host should be zero, got %v", timing.LastFetchAt())
 	}
 }
 
@@ -550,16 +550,16 @@ func TestRateLimiter_Backoff_WithNilRng(t *testing.T) {
 	rl.Backoff(host)
 
 	// After Backoff, r.rng should be initialized (non-nil)
-	if rl.GetRng() == nil {
+	if rl.RNG() == nil {
 		t.Error("rng should be initialized after Backoff with nil rng")
 	}
 
-	timing := rl.GetHostTimings()[host]
-	if timing.GetBackoffCount() != 1 {
-		t.Errorf("backoffCount = %d, want 1", timing.GetBackoffCount())
+	timing := rl.HostTimings()[host]
+	if timing.BackoffCount() != 1 {
+		t.Errorf("backoffCount = %d, want 1", timing.BackoffCount())
 	}
-	if timing.GetBackOffDelay() != 1*time.Second {
-		t.Errorf("backoffDelay = %v, want 1s", timing.GetBackOffDelay())
+	if timing.BackOffDelay() != 1*time.Second {
+		t.Errorf("backoffDelay = %v, want 1s", timing.BackOffDelay())
 	}
 }
 
@@ -579,7 +579,7 @@ func TestRateLimiter_ResolveDelay_WithNilRng(t *testing.T) {
 	delay := rl.ResolveDelay(host)
 
 	// After ResolveDelay, r.rng should be initialized
-	if rl.GetRng() == nil {
+	if rl.RNG() == nil {
 		t.Error("rng should be initialized after ResolveDelay with nil rng")
 	}
 
