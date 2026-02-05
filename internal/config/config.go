@@ -245,6 +245,26 @@ func (c *Config) WithRandomSeed(seed int64) *Config {
 	return c
 }
 
+func (c *Config) WithMaxAttempt(attempts int) *Config {
+	c.maxAttempt = attempts
+	return c
+}
+
+func (c *Config) WithBackoffInitialDuration(duration time.Duration) *Config {
+	c.backoffInitialDuration = duration
+	return c
+}
+
+func (c *Config) WithBackoffMultiplier(multiplier float64) *Config {
+	c.backoffMultiplier = multiplier
+	return c
+}
+
+func (c *Config) WithBackoffMaxDuration(duration time.Duration) *Config {
+	c.backoffMaxDuration = duration
+	return c
+}
+
 func (c *Config) WithTimeout(timeout time.Duration) *Config {
 	c.timeout = timeout
 	return c

@@ -83,6 +83,20 @@ func TestWithDefault(t *testing.T) {
 	if builtCfg.RandomSeed() == 0 {
 		t.Error("expected RandomSeed to be set, got 0")
 	}
+
+	// Verify backoff and retry fields
+	if builtCfg.MaxAttempt() != 10 {
+		t.Errorf("expected MaxAttempt 10, got %d", builtCfg.MaxAttempt())
+	}
+	if builtCfg.BackoffInitialDuration() != 100*time.Millisecond {
+		t.Errorf("expected BackoffInitialDuration 100ms, got %v", builtCfg.BackoffInitialDuration())
+	}
+	if builtCfg.BackoffMultiplier() != 2.0 {
+		t.Errorf("expected BackoffMultiplier 2.0, got %f", builtCfg.BackoffMultiplier())
+	}
+	if builtCfg.BackoffMaxDuration() != 10*time.Second {
+		t.Errorf("expected BackoffMaxDuration 10s, got %v", builtCfg.BackoffMaxDuration())
+	}
 }
 
 func TestWithDefault_EmptySeedUrls(t *testing.T) {
@@ -299,6 +313,54 @@ func TestWithRandomSeed(t *testing.T) {
 	}
 }
 
+func TestWithMaxAttempt(t *testing.T) {
+	testAttempts := 5
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithMaxAttempt(testAttempts).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.MaxAttempt() != testAttempts {
+		t.Errorf("expected MaxAttempt %d, got %d", testAttempts, cfg.MaxAttempt())
+	}
+}
+
+func TestWithBackoffInitialDuration(t *testing.T) {
+	testDuration := 200 * time.Millisecond
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithBackoffInitialDuration(testDuration).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.BackoffInitialDuration() != testDuration {
+		t.Errorf("expected BackoffInitialDuration %v, got %v", testDuration, cfg.BackoffInitialDuration())
+	}
+}
+
+func TestWithBackoffMultiplier(t *testing.T) {
+	testMultiplier := 1.5
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithBackoffMultiplier(testMultiplier).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.BackoffMultiplier() != testMultiplier {
+		t.Errorf("expected BackoffMultiplier %f, got %f", testMultiplier, cfg.BackoffMultiplier())
+	}
+}
+
+func TestWithBackoffMaxDuration(t *testing.T) {
+	testDuration := 30 * time.Second
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithBackoffMaxDuration(testDuration).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.BackoffMaxDuration() != testDuration {
+		t.Errorf("expected BackoffMaxDuration %v, got %v", testDuration, cfg.BackoffMaxDuration())
+	}
+}
+
 func TestWithTimeout(t *testing.T) {
 	testTimeout := 30 * time.Second
 	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
@@ -445,6 +507,20 @@ func TestWithConfigFile_ValidCompleteConfig(t *testing.T) {
 	}
 	if !loadedConfig.DryRun() {
 		t.Errorf("expected DryRun true, got %v", loadedConfig.DryRun())
+	}
+
+	// Verify backoff and retry fields from complete config
+	if loadedConfig.MaxAttempt() != 15 {
+		t.Errorf("expected MaxAttempt 15, got %d", loadedConfig.MaxAttempt())
+	}
+	if loadedConfig.BackoffInitialDuration() != 200*time.Millisecond {
+		t.Errorf("expected BackoffInitialDuration 200ms, got %v", loadedConfig.BackoffInitialDuration())
+	}
+	if loadedConfig.BackoffMultiplier() != 2.5 {
+		t.Errorf("expected BackoffMultiplier 2.5, got %f", loadedConfig.BackoffMultiplier())
+	}
+	if loadedConfig.BackoffMaxDuration() != 20*time.Second {
+		t.Errorf("expected BackoffMaxDuration 20s, got %v", loadedConfig.BackoffMaxDuration())
 	}
 }
 
@@ -610,6 +686,10 @@ func completeConfigJson() string {
     "baseDelay": 2000000000,
     "jitter": 1000000000,
     "randomSeed": 42,
+    "maxAttempt": 15,
+    "backoffInitialDuration": 200000000,
+    "backoffMultiplier": 2.5,
+    "backoffMaxDuration": 20000000000,
     "timeout": 30000000000,
     "userAgent": "TestBot/1.0",
     "outputDir": "test_output",
