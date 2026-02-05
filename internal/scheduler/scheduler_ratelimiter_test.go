@@ -1,6 +1,7 @@
 package scheduler_test
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,9 +16,11 @@ import (
 
 // TestRateLimiter_SetBaseDelay_Called verifies SetBaseDelay is called during initialization.
 func TestRateLimiter_SetBaseDelay_Called(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	// Expect these methods to be called during crawl initialization
 	mockLimiter.On("SetBaseDelay", mock.Anything).Return()
@@ -26,7 +29,7 @@ func TestRateLimiter_SetBaseDelay_Called(t *testing.T) {
 	mockLimiter.On("SetCrawlDelay", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResetBackoff", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -61,15 +64,17 @@ Allow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	// Expect these methods to be called
 	mockLimiter.On("SetCrawlDelay", mock.Anything, 8*time.Second).Return()
 	mockLimiter.On("ResetBackoff", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -89,9 +94,11 @@ Allow: /`
 // TestRateLimiter_SetJitter_CalledWithConfigValue verifies SetJitter is called
 // with the jitter value from config.
 func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	// Expect these methods to be called during initialization
 	mockLimiter.On("SetBaseDelay", mock.Anything).Return()
@@ -100,7 +107,7 @@ func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
 	mockLimiter.On("SetCrawlDelay", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResetBackoff", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -128,19 +135,20 @@ func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
 // TestRateLimiter_SetRandomSeed_CalledWithConfigValue verifies SetRandomSeed is called
 // with the random seed value from config.
 func TestRateLimiter_SetRandomSeed_CalledWithConfigValue(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	// Expect these methods to be called during initialization
 	mockLimiter.On("SetBaseDelay", mock.Anything).Return()
 	mockLimiter.On("SetJitter", mock.Anything).Return()
 	mockLimiter.On("SetRandomSeed", int64(42)).Return()
-	mockLimiter.On("RegisterHost", mock.Anything).Return()
 	mockLimiter.On("SetCrawlDelay", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResetBackoff", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -172,9 +180,11 @@ func TestBackoff_TriggersOnTooManyRequests(t *testing.T) {
 	server := setupTestServerWithStatus(t, http.StatusTooManyRequests, "")
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	errorSink := &errorRecordingSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -185,7 +195,7 @@ func TestBackoff_TriggersOnTooManyRequests(t *testing.T) {
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("Backoff", host).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, errorSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission (simulating the call from ExecuteCrawling)
@@ -215,9 +225,11 @@ func TestBackoff_TriggersOnServerError(t *testing.T) {
 	server := setupTestServerWithStatus(t, http.StatusServiceUnavailable, "")
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	errorSink := &errorRecordingSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -228,7 +240,7 @@ func TestBackoff_TriggersOnServerError(t *testing.T) {
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("Backoff", host).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, errorSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission
@@ -253,9 +265,11 @@ func TestBackoff_DoesNotTriggerOnOtherErrors(t *testing.T) {
 	server := setupTestServerWithStatus(t, http.StatusForbidden, "")
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	errorSink := &errorRecordingSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -267,7 +281,7 @@ func TestBackoff_DoesNotTriggerOnOtherErrors(t *testing.T) {
 	mockLimiter.On("ResetBackoff", host).Return()
 	// NOTE: Backoff should NOT be called for 403
 
-	s := createSchedulerForTest(t, mockFinalizer, errorSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission
@@ -289,9 +303,11 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 	server := setupTestServerWithStatus(t, http.StatusTooManyRequests, "")
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	errorSink := &errorRecordingSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	host := server.URL[7:] // Remove "http://" prefix
 
@@ -302,7 +318,7 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 	// Backoff should be called for the host when 429 is received
 	mockLimiter.On("Backoff", host).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, errorSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -343,9 +359,11 @@ Allow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	errorSink := &errorRecordingSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -357,7 +375,7 @@ Allow: /`
 	// ResetBackoff should be called after successful robots request
 	mockLimiter.On("ResetBackoff", host).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, errorSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission (successful robots request)
@@ -382,9 +400,11 @@ func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 	server := setupTestServerWithStatus(t, http.StatusTooManyRequests, "")
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	errorSink := &errorRecordingSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -397,7 +417,7 @@ func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 	// Backoff WILL be called via recordRobotsErrorAndBackoff
 	mockLimiter.On("Backoff", host).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, errorSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission (failed robots request)
@@ -419,9 +439,11 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 	server := setupTestServerWithStatus(t, http.StatusServiceUnavailable, "")
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	errorSink := &errorRecordingSink{}
 	mockLimiter := new(rateLimiterMock)
+	mockFetcher := newFetcherMockForTest(t)
 
 	host := server.URL[7:] // Remove "http://" prefix
 
@@ -432,7 +454,7 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 	// Backoff should be called for the host when 503 is received
 	mockLimiter.On("Backoff", host).Return()
 
-	s := createSchedulerForTest(t, mockFinalizer, errorSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

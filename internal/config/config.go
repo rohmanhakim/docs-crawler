@@ -40,6 +40,14 @@ type Config struct {
 	jitter time.Duration
 	// Controls the random number generator
 	randomSeed int64
+	// maximum attempt during retry
+	maxAttempt int
+	// initial delay for backoff
+	backoffInitialDuration time.Duration
+	// multiplier during exponential backoff
+	backoffMultiplier float64
+	// capped maximum delay for backoff to stop exponential multiplication
+	backoffMaxDuration time.Duration
 
 	//===============
 	// Fetch
@@ -60,19 +68,23 @@ type Config struct {
 }
 
 type configDTO struct {
-	SeedURLs          []url.URL           `json:"seedUrls"`
-	AllowedHosts      map[string]struct{} `json:"allowedHosts,omitempty"`
-	AllowedPathPrefix []string            `json:"allowedPathPrefix,omitempty"`
-	MaxDepth          int                 `json:"maxDepth,omitempty"`
-	MaxPages          int                 `json:"maxPages,omitempty"`
-	Concurrency       int                 `json:"concurrency,omitempty"`
-	BaseDelay         time.Duration       `json:"baseDelay,omitempty"`
-	Jitter            time.Duration       `json:"jitter,omitempty"`
-	RandomSeed        int64               `json:"randomSeed,omitempty"`
-	Timeout           time.Duration       `json:"timeout,omitempty"`
-	UserAgent         string              `json:"userAgent,omitempty"`
-	OutputDir         string              `json:"outputDir,omitempty"`
-	DryRun            bool                `json:"dryRun,omitempty"`
+	SeedURLs               []url.URL           `json:"seedUrls"`
+	AllowedHosts           map[string]struct{} `json:"allowedHosts,omitempty"`
+	AllowedPathPrefix      []string            `json:"allowedPathPrefix,omitempty"`
+	MaxDepth               int                 `json:"maxDepth,omitempty"`
+	MaxPages               int                 `json:"maxPages,omitempty"`
+	Concurrency            int                 `json:"concurrency,omitempty"`
+	BaseDelay              time.Duration       `json:"baseDelay,omitempty"`
+	Jitter                 time.Duration       `json:"jitter,omitempty"`
+	RandomSeed             int64               `json:"randomSeed,omitempty"`
+	MaxAttempt             int                 `json:"maxAttempt,omitempty"`
+	BackoffInitialDuration time.Duration       `json:"backoffInitialDuration,omitempty"`
+	BackoffMultiplier      float64             `json:"backoffMultiplier,omitempty"`
+	BackoffMaxDuration     time.Duration       `json:"backoffMaxDuration,omitempty"`
+	Timeout                time.Duration       `json:"timeout,omitempty"`
+	UserAgent              string              `json:"userAgent,omitempty"`
+	OutputDir              string              `json:"outputDir,omitempty"`
+	DryRun                 bool                `json:"dryRun,omitempty"`
 }
 
 func newConfigFromDTO(dto configDTO) (Config, error) {
@@ -110,6 +122,19 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	if dto.RandomSeed != 0 {
 		cfg.randomSeed = dto.RandomSeed
 	}
+	if dto.MaxAttempt != 0 {
+		cfg.maxAttempt = dto.MaxAttempt
+	}
+	if dto.BackoffInitialDuration != 0 {
+		cfg.backoffInitialDuration = dto.BackoffInitialDuration
+	}
+	if dto.BackoffMultiplier != 0 {
+		cfg.backoffMultiplier = dto.BackoffMultiplier
+	}
+	if dto.BackoffMaxDuration != 0 {
+		cfg.backoffMaxDuration = dto.BackoffMaxDuration
+	}
+
 	if dto.Timeout != 0 {
 		cfg.timeout = dto.Timeout
 	}
@@ -157,16 +182,20 @@ func WithDefault(seedUrls []url.URL) *Config {
 		allowedPathPrefix: []string{
 			"/",
 		},
-		maxDepth:    3,
-		maxPages:    100,
-		concurrency: 10,
-		baseDelay:   time.Second,
-		jitter:      time.Millisecond * 500,
-		randomSeed:  time.Now().UnixNano(),
-		timeout:     time.Second * 10,
-		userAgent:   "docs-crawler/1.0",
-		outputDir:   "output",
-		dryRun:      false,
+		maxDepth:               3,
+		maxPages:               100,
+		concurrency:            10,
+		baseDelay:              time.Second,
+		jitter:                 time.Millisecond * 500,
+		randomSeed:             time.Now().UnixNano(),
+		maxAttempt:             10,
+		backoffInitialDuration: 100 * time.Millisecond,
+		backoffMultiplier:      2.0,
+		backoffMaxDuration:     10 * time.Second,
+		timeout:                time.Second * 10,
+		userAgent:              "docs-crawler/1.0",
+		outputDir:              "output",
+		dryRun:                 false,
 	}
 	return &defaultConfig
 }
@@ -312,4 +341,20 @@ func (c Config) OutputDir() string {
 
 func (c Config) DryRun() bool {
 	return c.dryRun
+}
+
+func (c Config) MaxAttempt() int {
+	return c.maxAttempt
+}
+
+func (c Config) BackoffInitialDuration() time.Duration {
+	return c.backoffInitialDuration
+}
+
+func (c Config) BackoffMultiplier() float64 {
+	return c.backoffMultiplier
+}
+
+func (c Config) BackoffMaxDuration() time.Duration {
+	return c.backoffMaxDuration
 }

@@ -61,6 +61,7 @@ func NewRobotsFetcher(
 	cache cache.Cache,
 ) *RobotsFetcher {
 	return &RobotsFetcher{
+		// TODO: Make Timeout be provider from config
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		userAgent:  userAgent,
 		cache:      cache,

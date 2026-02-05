@@ -1,6 +1,7 @@
 package scheduler_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,12 +15,14 @@ import (
 // is empty (no URLs to process), final statistics reflect an empty crawl.
 func TestScheduler_FinalStats_AccurateEmptyFrontier(t *testing.T) {
 	// GIVEN a scheduler with a mock finalizer
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
 	// Create a scheduler with minimal config that results in empty frontier
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	// Create a temp config file with seed URL
 	tmpDir := t.TempDir()
@@ -78,11 +81,13 @@ func TestScheduler_FinalStats_AccurateEmptyFrontier(t *testing.T) {
 // TestScheduler_FinalStats_RecordsExactlyOnce verifies that RecordFinalCrawlStats
 // is called exactly once per crawl execution.
 func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	// Create a temp config file
 	tmpDir := t.TempDir()
@@ -118,11 +123,13 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 // TestScheduler_FinalStats_DurationNonNegative verifies that recorded duration
 // is always non-negative, even for very short crawls.
 func TestScheduler_FinalStats_DurationNonNegative(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -164,11 +171,13 @@ func TestScheduler_FinalStats_DurationNonNegative(t *testing.T) {
 // TestScheduler_GracefulShutdown_ConfigError verifies that the scheduler
 // handles config file errors gracefully without panicking.
 func TestScheduler_GracefulShutdown_ConfigError(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	// Try to execute with non-existent config
 	_, err := s.ExecuteCrawling("/nonexistent/path/config.json")
@@ -185,11 +194,13 @@ func TestScheduler_GracefulShutdown_ConfigError(t *testing.T) {
 
 // TestScheduler_GracefulShutdown_InvalidConfig verifies handling of invalid config.
 func TestScheduler_GracefulShutdown_InvalidConfig(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.json")
@@ -210,11 +221,13 @@ func TestScheduler_GracefulShutdown_InvalidConfig(t *testing.T) {
 
 // TestScheduler_GracefulShutdown_MissingSeedUrls verifies handling of config without seed URLs.
 func TestScheduler_GracefulShutdown_MissingSeedUrls(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "empty.json")
@@ -236,11 +249,13 @@ func TestScheduler_GracefulShutdown_MissingSeedUrls(t *testing.T) {
 // TestScheduler_StatsAccuracy_PagesTracked verifies that totalPages reflects
 // the number of URLs submitted to the frontier.
 func TestScheduler_StatsAccuracy_PagesTracked(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -279,11 +294,13 @@ func TestScheduler_StatsAccuracy_PagesTracked(t *testing.T) {
 // TestScheduler_StatsAccuracy_ErrorsTracked verifies that totalErrors is tracked
 // correctly during the crawl.
 func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -316,11 +333,13 @@ func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
 
 // TestScheduler_StatsAccuracy_AssetsTracked verifies that totalAssets is tracked.
 func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -353,11 +372,13 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 // TestScheduler_FinalStatsContract_CalledAfterTermination verifies the contract
 // that RecordFinalCrawlStats is called only after crawl termination.
 func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -392,11 +413,13 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 // TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors verifies that
 // even when errors occur during crawling, final stats are still recorded.
 func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -429,11 +452,13 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 // TestScheduler_StatsConsistency_AllFieldsNonNegative verifies that all
 // stat fields are non-negative.
 func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -473,11 +498,13 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 // TestScheduler_ErrorCounting_ConsistentWithMetadata verifies that the
 // error count in final stats is consistent with errors recorded to metadata sink.
 func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	errorSink := &errorRecordingSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, errorSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

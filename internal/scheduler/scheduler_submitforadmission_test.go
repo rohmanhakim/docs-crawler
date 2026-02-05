@@ -1,7 +1,7 @@
 package scheduler_test
 
 import (
-	"net/http"
+	"context"
 	"net/url"
 	"testing"
 	"time"
@@ -19,10 +19,13 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 Allow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
+
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	// Set current host
 	testURL, _ := url.Parse(server.URL + "/page.html")
@@ -58,10 +61,12 @@ Disallow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -91,13 +96,15 @@ Disallow: /`
 // encounters an infrastructure error, it returns the error and does not submit to frontier.
 func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 	// GIVEN: a server that returns 500 for robots.txt (infrastructure error)
-	server := setupTestServerWithStatus(t, http.StatusInternalServerError, "")
+	server := setupTestServerWithStatus(t, 500, "")
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -133,10 +140,12 @@ Allow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -174,10 +183,12 @@ Allow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -214,10 +225,12 @@ Allow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -276,10 +289,12 @@ Allow: /`
 	server2 := setupTestServer(t, server2Content)
 	defer server2.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	// Submit URL from first host
 	url1, _ := url.Parse(server1.URL + "/page.html")
@@ -317,10 +332,12 @@ Disallow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	host := testURL.Host
@@ -356,10 +373,12 @@ Allow: /`
 	server := setupTestServer(t, robotsContent)
 	defer server.Close()
 
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	mockFetcher := newFetcherMockForTest(t)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -451,10 +470,12 @@ Disallow: /*.pdf$`,
 			server := setupTestServer(t, tc.robotsContent)
 			defer server.Close()
 
+			ctx := context.Background()
 			mockFinalizer := newMockFinalizer(t)
 			noopSink := &metadata.NoopSink{}
 			mockLimiter := newRateLimiterMockForTest(t)
-			s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+			mockFetcher := newFetcherMockForTest(t)
+			s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 			testURL, _ := url.Parse(server.URL + tc.path)
 			s.SetCurrentHost(testURL.Host)

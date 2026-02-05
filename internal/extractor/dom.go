@@ -59,7 +59,7 @@ func (d *DomExtractor) Extract(
 			mapExtractionErrorToMetadataCause(extractionError),
 			err.Error(),
 			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrURL, fmt.Sprintf("%v", fetchResult.GetFetchURL())),
+				metadata.NewAttr(metadata.AttrURL, fmt.Sprintf("%v", fetchResult.URL())),
 			},
 		)
 		return ExtractionResult{}, extractionError

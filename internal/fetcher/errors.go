@@ -12,6 +12,7 @@ type FetchErrorCause string
 const (
 	ErrCauseTimeout               = "timeout"
 	ErrCauseNetworkFailure        = "network issues"
+	ErrCauseReadResponseBodyError = "failed to read response body"
 	ErrCauseContentTypeInvalid    = "non-HTML content"
 	ErrCauseRedirectLimitExceeded = "reached redirect limit"
 	ErrCauseRequestPageForbidden  = "forbidden"
@@ -35,6 +36,11 @@ func (e *FetchError) Severity() failure.Severity {
 		return failure.SeverityRecoverable
 	}
 	return failure.SeverityFatal
+}
+
+// IsRetryable returns whether this error is retryable
+func (e *FetchError) IsRetryable() bool {
+	return e.Retryable
 }
 
 // mapFetchErrorToMetadataCause maps fetcher-local error semantics

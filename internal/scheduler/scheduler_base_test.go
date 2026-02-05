@@ -1,6 +1,7 @@
 package scheduler_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,11 +17,13 @@ var _ metadata.MetadataSink = (*errorRecordingSink)(nil)
 // TestScheduler_ConfigurationImmutability verifies that the scheduler
 // uses the configuration as provided and doesn't modify it.
 func TestScheduler_ConfigurationImmutability(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -55,11 +58,13 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 // TestScheduler_GracefulShutdown_InvalidSeedURL verifies handling of
 // malformed seed URLs in config.
 func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -91,11 +96,13 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 // TestScheduler_MultipleExecutions_Sequential verifies that the scheduler
 // can be reused for multiple sequential executions.
 func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
+	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
 
-	s := createSchedulerForTest(t, mockFinalizer, noopSink, mockLimiter)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
 
 	tmpDir := t.TempDir()
 
