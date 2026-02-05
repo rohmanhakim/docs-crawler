@@ -127,6 +127,7 @@ const (
 	CauseContentInvalid
 	CauseStorageFailure
 	CauseInvariantViolation
+	CauseRetryFailure
 )
 
 type ErrorRecord struct {
@@ -162,4 +163,5 @@ const (
 	AttrHTTPStatus AttributeKey = "http_status"
 	AttrAssetURL   AttributeKey = "asset_url"
 	AttrWritePath  AttributeKey = "write_path"
+	AttrMessage    AttributeKey = "message"
 )

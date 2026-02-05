@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"time"
@@ -18,6 +19,8 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
+	"github.com/rohmanhakim/docs-crawler/pkg/retry"
+	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
 /*
@@ -53,12 +56,13 @@ import (
 */
 
 type Scheduler struct {
+	ctx                    context.Context
 	metadataSink           metadata.MetadataSink
 	crawlFinalizer         metadata.CrawlFinalizer
 	robot                  robots.Robot
 	robotsCrawlDelay       *time.Duration
 	frontier               *frontier.Frontier
-	htmlFetcher            fetcher.HtmlFetcher
+	htmlFetcher            fetcher.Fetcher
 	domExtractor           extractor.DomExtractor
 	htmlSanitizer          sanitizer.HtmlSanitizer
 	markdownConversionRule mdconvert.Rule
@@ -87,7 +91,7 @@ func NewScheduler() Scheduler {
 		crawlFinalizer:         &recorder,
 		robot:                  robot,
 		frontier:               &frontier,
-		htmlFetcher:            fetcher,
+		htmlFetcher:            &fetcher,
 		domExtractor:           extractor,
 		htmlSanitizer:          sanitizer,
 		markdownConversionRule: conversionRule,
@@ -102,13 +106,14 @@ func NewScheduler() Scheduler {
 // This constructor allows tests to provide mock implementations of metadata interfaces
 // to verify behavior without relying on real infrastructure.
 func NewSchedulerWithDeps(
+	ctx context.Context,
 	crawlFinalizer metadata.CrawlFinalizer,
 	metadataSink metadata.MetadataSink,
 	rateLimiter limiter.RateLimiter,
+	fetcher fetcher.Fetcher,
 	robot robots.Robot,
 ) Scheduler {
 	frontier := frontier.NewFrontier()
-	fetcher := fetcher.NewHtmlFetcher(metadataSink)
 	extractor := extractor.NewDomExtractor(metadataSink)
 	sanitizer := sanitizer.NewHTMLSanitizer(metadataSink)
 	conversionRule := mdconvert.NewRule()
@@ -116,6 +121,7 @@ func NewSchedulerWithDeps(
 	markdownConstraint := normalize.NewMarkdownConstraint(metadataSink)
 	storageSink := storage.NewSink(metadataSink)
 	return Scheduler{
+		ctx:                    ctx,
 		metadataSink:           metadataSink,
 		crawlFinalizer:         crawlFinalizer,
 		robot:                  robot,
@@ -230,6 +236,12 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		return CrawlingExecution{}, err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout())
+	defer cancel()
+	if s.ctx == nil {
+		s.ctx = ctx
+	}
+
 	// Validate that at least one seed URL exists
 	if len(cfg.SeedURLs()) == 0 {
 		err := fmt.Errorf("no seed URLs configured")
@@ -274,7 +286,11 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 3. Fetch Page URL
-		fetchResult, err := s.htmlFetcher.Fetch(nextCrawlToken.URL())
+		fetchParam := fetcher.NewFetchParam(
+			nextCrawlToken.URL(),
+			cfg.UserAgent(),
+		)
+		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), fetchParam, RetryParam(cfg))
 		if err != nil {
 			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
@@ -389,6 +405,20 @@ func (s *Scheduler) recordRobotsErrorAndBackoff(robotsErr *robots.RobotsError, t
 			s.rateLimiter.Backoff(targetURL.Host)
 		}
 	}
+}
+
+func RetryParam(cfg config.Config) retry.RetryParam {
+	return retry.NewRetryParam(
+		cfg.BaseDelay(),
+		cfg.Jitter(),
+		cfg.RandomSeed(),
+		cfg.MaxAttempt(),
+		timeutil.NewBackoffParam(
+			cfg.BackoffInitialDuration(),
+			cfg.BackoffMultiplier(),
+			cfg.BackoffMaxDuration(),
+		),
+	)
 }
 
 // ---------------------------------------------------------------------------
