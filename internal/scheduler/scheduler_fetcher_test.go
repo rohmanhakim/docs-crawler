@@ -55,7 +55,7 @@ Allow: /`
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 	s.SetCurrentHost(testURL.Host)
 
 	// Submit URL for admission
@@ -93,7 +93,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 			receivedContext = args.Get(0).(context.Context)
 		}).Return(fetcher.FetchResult{}, nil).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -127,6 +127,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -134,6 +135,8 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Clear default expectation and setup fetcher mock to return recoverable error
 	mockFetcher.ExpectedCalls = nil
@@ -144,7 +147,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, recoverableErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -172,6 +175,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -179,6 +183,8 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Clear default expectation and setup fetcher mock to return fatal error
 	mockFetcher.ExpectedCalls = nil
@@ -189,7 +195,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, fatalErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -239,7 +245,7 @@ Allow: /`
 			receivedDepth = args.Get(1).(int)
 		}).Return(fetcher.FetchResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -269,7 +275,7 @@ func TestScheduler_Fetcher_PassesFetchParam(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -303,7 +309,7 @@ func TestScheduler_Fetcher_ContextHandling(t *testing.T) {
 
 	// Create scheduler without context (nil)
 	var nilCtx context.Context
-	s := createSchedulerForTest(t, nilCtx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, nilCtx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -330,6 +336,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -337,6 +344,8 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Clear default expectation and setup fetcher mock with valid HTML response
 	mockFetcher.ExpectedCalls = nil
@@ -359,7 +368,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -386,6 +395,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -393,6 +403,8 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Clear default expectation and setup fetcher mock with non-HTML response
 	mockFetcher.ExpectedCalls = nil
@@ -409,7 +421,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -447,6 +459,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			mockLimiter := newRateLimiterMockForTest(t)
 			mockFetcher := newFetcherMockForTest(t)
 			mockRobot := NewRobotsMockForTest(t)
+			mockSleeper := newSleeperMock(t)
 
 			mockRobot.On("Init", mock.Anything).Return()
 			mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -454,6 +467,8 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 				Reason:     robots.EmptyRuleSet,
 				CrawlDelay: 0,
 			}, nil).Once()
+
+			mockSleeper.On("Sleep", mock.Anything).Return()
 
 			// Clear default expectation and setup fetcher mock with HTTP error response
 			mockFetcher.ExpectedCalls = nil
@@ -469,7 +484,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(fetchResult, nil)
 
-			s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+			s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 			tmpDir := t.TempDir()
 			configPath := filepath.Join(tmpDir, "config.json")
@@ -497,6 +512,7 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -504,6 +520,8 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Clear default expectation and setup fetcher mock to track call count
 	mockFetcher.ExpectedCalls = nil
@@ -513,7 +531,7 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 			callCount++
 		}).Return(fetcher.FetchResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -540,6 +558,7 @@ func TestScheduler_Fetcher_ContextCancellation_Handled(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -548,10 +567,12 @@ func TestScheduler_Fetcher_ContextCancellation_Handled(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	// Cancel context immediately
 	cancel()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

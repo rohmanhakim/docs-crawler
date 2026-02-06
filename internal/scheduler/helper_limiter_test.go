@@ -68,3 +68,19 @@ func (m *rateLimiterMock) ResolveDelay(host string) time.Duration {
 	args := m.Called(host)
 	return args.Get(0).(time.Duration)
 }
+
+// sleeperMock is a testify mock for the Sleeper interface
+type sleeperMock struct {
+	mock.Mock
+}
+
+// newSleeperMock creates a new sleeper mock
+func newSleeperMock(t *testing.T) *sleeperMock {
+	t.Helper()
+	m := new(sleeperMock)
+	return m
+}
+
+func (m *sleeperMock) Sleep(duration time.Duration) {
+	m.Called(duration)
+}

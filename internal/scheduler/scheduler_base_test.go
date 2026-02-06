@@ -25,7 +25,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-
+	mockSleeper := newSleeperMock(t)
 	// Set up robot expectations
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -33,8 +33,9 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -75,6 +76,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	// Set up robot expectations - Init is always called
 	mockRobot.On("Init", mock.Anything).Return()
@@ -85,8 +87,9 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 		Reason:     robots.DisallowedByRobots,
 		CrawlDelay: 0,
 	}, nil).Maybe()
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -124,6 +127,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	// Set up robot expectations - Init is called once per execution
 	mockRobot.On("Init", mock.Anything).Return().Maybe()
@@ -133,8 +137,9 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
 
 	tmpDir := t.TempDir()
 

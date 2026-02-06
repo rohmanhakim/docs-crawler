@@ -71,6 +71,7 @@ type Scheduler struct {
 	writeResults           []storage.WriteResult
 	currentHost            string
 	rateLimiter            limiter.RateLimiter
+	sleeper                timeutil.Sleeper
 }
 
 func NewScheduler() Scheduler {
@@ -85,6 +86,7 @@ func NewScheduler() Scheduler {
 	markdownConstraint := normalize.NewMarkdownConstraint(&recorder)
 	storageSink := storage.NewSink(&recorder)
 	rateLimiter := limiter.NewConcurrentRateLimiter()
+	sleeper := timeutil.NewRealSleeper()
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
@@ -98,6 +100,7 @@ func NewScheduler() Scheduler {
 		markdownConstraint:     markdownConstraint,
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
+		sleeper:                &sleeper,
 	}
 }
 
@@ -111,6 +114,7 @@ func NewSchedulerWithDeps(
 	rateLimiter limiter.RateLimiter,
 	fetcher fetcher.Fetcher,
 	robot robots.Robot,
+	sleeper timeutil.Sleeper,
 ) Scheduler {
 	frontier := frontier.NewFrontier()
 	extractor := extractor.NewDomExtractor(metadataSink)
@@ -133,6 +137,7 @@ func NewSchedulerWithDeps(
 		markdownConstraint:     markdownConstraint,
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
+		sleeper:                sleeper,
 	}
 }
 
@@ -272,7 +277,9 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		return CrawlingExecution{}, err
 	}
 
-	// TODO: Call limiter.ResolveDelay here and sleep based on the returned value
+	// Apply rate limiting delay after successful robots check
+	delay := s.rateLimiter.ResolveDelay(s.currentHost)
+	s.sleeper.Sleep(delay)
 
 	// If frontier still has URL to be crawl...
 	for {
@@ -368,7 +375,9 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 		s.writeResults = append(s.writeResults, writeResult)
 
-		// TODO: Call limiter.ResolveDelay here and sleep based on the returned value
+		// Apply rate limiting delay at the end of the crawl loop
+		delay := s.rateLimiter.ResolveDelay(s.currentHost)
+		s.sleeper.Sleep(delay)
 	}
 
 	// Stats are recorded by defer - return successful execution result

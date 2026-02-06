@@ -10,6 +10,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
 // createSchedulerForTest creates a scheduler with test-specific initialization
@@ -22,9 +23,10 @@ func createSchedulerForTest(
 	mockLimiter *rateLimiterMock,
 	mockRobot *robotsMock,
 	mockFetcher *fetcherMock,
+	mockSleeper timeutil.Sleeper,
 ) *scheduler.Scheduler {
 	t.Helper()
-	s := scheduler.NewSchedulerWithDeps(ctx, mockFinalizer, metadataSink, mockLimiter, mockFetcher, mockRobot)
+	s := scheduler.NewSchedulerWithDeps(ctx, mockFinalizer, metadataSink, mockLimiter, mockFetcher, mockRobot, mockSleeper)
 	return &s
 }
 

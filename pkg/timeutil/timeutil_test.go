@@ -380,3 +380,57 @@ func TestExponentialBackoffDelay_EdgeCases(t *testing.T) {
 		})
 	}
 }
+
+func TestRealSleeper_Sleep(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+	}{
+		{
+			name:     "sleep for 1 millisecond",
+			duration: 1 * time.Millisecond,
+		},
+		{
+			name:     "sleep for 5 milliseconds",
+			duration: 5 * time.Millisecond,
+		},
+		{
+			name:     "sleep for zero duration",
+			duration: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sleeper := NewRealSleeper()
+
+			start := time.Now()
+			sleeper.Sleep(tt.duration)
+			elapsed := time.Since(start)
+
+			// Verify that sleep took at least the requested duration
+			// Allow for some scheduling variance (e.g., 1ms for short sleeps)
+			tolerance := 10 * time.Millisecond
+			if tt.duration > 0 {
+				if elapsed < tt.duration {
+					t.Errorf("Sleep() elapsed = %v, want at least %v", elapsed, tt.duration)
+				}
+				// Also verify it's not excessively long (within reasonable tolerance)
+				maxExpected := tt.duration + tolerance
+				if elapsed > maxExpected {
+					t.Errorf("Sleep() elapsed = %v, want less than %v (duration + tolerance)", elapsed, maxExpected)
+				}
+			}
+		})
+	}
+}
+
+// func TestRealSleeper_Sleep_VerifyInterface(t *testing.T) {
+// 	// Verify that RealSleeper implements the Sleeper interface
+// 	var _ Sleeper = (*RealSleeper)(nil)
+
+// 	sleeper := NewRealSleeper()
+// 	if sleeper == nil {
+// 		t.Error("NewRealSleeper() returned nil")
+// 	}
+// }

@@ -28,7 +28,7 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	// Set current host
 	testURL, _ := url.Parse("https://example.com/page.html")
@@ -71,7 +71,7 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -114,7 +114,7 @@ func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -157,7 +157,7 @@ func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	host := testURL.Host
@@ -200,7 +200,7 @@ func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay(t *testin
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	host := testURL.Host
@@ -254,7 +254,7 @@ func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	host := testURL1.Host
 	s.SetCurrentHost(host)
@@ -316,7 +316,7 @@ func TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	// Submit URL from first host
 	s.SetCurrentHost(host1)
@@ -359,7 +359,7 @@ func TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	host := testURL.Host
@@ -402,7 +402,7 @@ func TestSubmitUrlForAdmission_PreservesSourceContextAndDepth(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -492,7 +492,7 @@ func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
 			noopSink := &metadata.NoopSink{}
 			mockLimiter := newRateLimiterMockForTest(t)
 			mockFetcher := newFetcherMockForTest(t)
-			s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
+			s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
 
 			s.SetCurrentHost(testURL.Host)
 

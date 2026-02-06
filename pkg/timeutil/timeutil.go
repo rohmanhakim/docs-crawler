@@ -7,6 +7,25 @@ import (
 	"time"
 )
 
+// Sleeper is an interface for sleeping/delays, allowing for test mocking.
+// This abstraction enables tests to verify delay behavior without actual time delays.
+type Sleeper interface {
+	Sleep(duration time.Duration)
+}
+
+// RealSleeper is the production implementation that calls time.Sleep().
+type RealSleeper struct{}
+
+// NewRealSleeper creates a new RealSleeper instance.
+func NewRealSleeper() RealSleeper {
+	return RealSleeper{}
+}
+
+// Sleep implements the Sleeper interface by calling time.Sleep().
+func (s *RealSleeper) Sleep(duration time.Duration) {
+	time.Sleep(duration)
+}
+
 // durationPtr is a helper function to create a pointer to a time.Duration
 func DurationPtr(d time.Duration) *time.Duration {
 	return &d
