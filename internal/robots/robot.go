@@ -27,23 +27,28 @@ Split robots API into:
 */
 
 // Robot handles robots.txt fetching and decision making for URL crawling permissions.
-type Robot struct {
+type Robot interface {
+	Init(userAgent string)
+	Decide(targetURL url.URL) (Decision, *RobotsError)
+}
+
+type CachedRobot struct {
 	metadataSink metadata.MetadataSink
 	fetcher      *RobotsFetcher
 	userAgent    string
 }
 
-// NewRobot creates a new empty Robot instance.
+// NewCachedRobot creates a new empty Robot instance.
 // Use Init() to initialize the robot with a user-agent.
-func NewRobot(metadataSink metadata.MetadataSink) Robot {
-	return Robot{
+func NewCachedRobot(metadataSink metadata.MetadataSink) CachedRobot {
+	return CachedRobot{
 		metadataSink: metadataSink,
 	}
 }
 
 // Init initializes the Robot with a user-agent.
 // The RobotsFetcher is created internally with a memory cache.
-func (r *Robot) Init(userAgent string) {
+func (r *CachedRobot) Init(userAgent string) {
 	// Create an in-memory cache for robots.txt files
 	memCache := cache.NewMemoryCache()
 
@@ -56,7 +61,7 @@ func (r *Robot) Init(userAgent string) {
 
 // InitWithCache initializes the Robot with the given user-agent and a custom cache implementation.
 // This is useful for testing with mock caches.
-func (r *Robot) InitWithCache(userAgent string, cacheImpl cache.Cache) {
+func (r *CachedRobot) InitWithCache(userAgent string, cacheImpl cache.Cache) {
 	fetcher := NewRobotsFetcher(r.metadataSink, userAgent, cacheImpl)
 
 	r.fetcher = fetcher
@@ -66,7 +71,7 @@ func (r *Robot) InitWithCache(userAgent string, cacheImpl cache.Cache) {
 // Decide determines whether a URL is allowed to be crawled based on robots.txt rules.
 // It fetches the robots.txt for the URL's host, maps it to a ruleSet, and makes a decision.
 // This is the exported entry point that handles error classification and metadata recording.
-func (r *Robot) Decide(targetURL url.URL) (Decision, *RobotsError) {
+func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 	// Fetch robots.txt for the host
 	ctx := context.Background()
 	fetchResult, err := r.fetcher.Fetch(ctx, targetURL.Scheme, targetURL.Host)

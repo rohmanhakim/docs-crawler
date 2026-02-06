@@ -60,7 +60,6 @@ type Scheduler struct {
 	metadataSink           metadata.MetadataSink
 	crawlFinalizer         metadata.CrawlFinalizer
 	robot                  robots.Robot
-	robotsCrawlDelay       *time.Duration
 	frontier               *frontier.Frontier
 	htmlFetcher            fetcher.Fetcher
 	domExtractor           extractor.DomExtractor
@@ -76,7 +75,7 @@ type Scheduler struct {
 
 func NewScheduler() Scheduler {
 	recorder := metadata.NewRecorder("sample-single-sync-worker")
-	robot := robots.NewRobot(&recorder)
+	cachedRobot := robots.NewCachedRobot(&recorder)
 	frontier := frontier.NewFrontier()
 	fetcher := fetcher.NewHtmlFetcher(&recorder)
 	extractor := extractor.NewDomExtractor(&recorder)
@@ -89,7 +88,7 @@ func NewScheduler() Scheduler {
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
-		robot:                  robot,
+		robot:                  &cachedRobot,
 		frontier:               &frontier,
 		htmlFetcher:            &fetcher,
 		domExtractor:           extractor,

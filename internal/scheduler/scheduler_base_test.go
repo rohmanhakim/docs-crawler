@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/stretchr/testify/mock"
 )
 
 // compile-time interface checks
@@ -22,8 +24,17 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	// Set up robot expectations
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -63,8 +74,19 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	// Set up robot expectations - Init is always called
+	mockRobot.On("Init", mock.Anything).Return()
+	// The malformed URL may cause an error before reaching Decide, or the URL parsing may fail.
+	// Set up a permissive Decode expectation that allows any call
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    false,
+		Reason:     robots.DisallowedByRobots,
+		CrawlDelay: nil,
+	}, nil).Maybe()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -101,8 +123,18 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	// Set up robot expectations - Init is called once per execution
+	mockRobot.On("Init", mock.Anything).Return().Maybe()
+	// Expect Decide for both example1.com and example2.com
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Maybe()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 

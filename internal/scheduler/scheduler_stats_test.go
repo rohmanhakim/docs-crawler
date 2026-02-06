@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -20,9 +21,17 @@ func TestScheduler_FinalStats_AccurateEmptyFrontier(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
+
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
 
 	// Create a scheduler with minimal config that results in empty frontier
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	// Create a temp config file with seed URL
 	tmpDir := t.TempDir()
@@ -86,8 +95,16 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	// Create a temp config file
 	tmpDir := t.TempDir()
@@ -128,8 +145,16 @@ func TestScheduler_FinalStats_DurationNonNegative(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -176,8 +201,16 @@ func TestScheduler_GracefulShutdown_ConfigError(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	// Try to execute with non-existent config
 	_, err := s.ExecuteCrawling("/nonexistent/path/config.json")
@@ -199,8 +232,16 @@ func TestScheduler_GracefulShutdown_InvalidConfig(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.json")
@@ -226,8 +267,16 @@ func TestScheduler_GracefulShutdown_MissingSeedUrls(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "empty.json")
@@ -254,8 +303,16 @@ func TestScheduler_StatsAccuracy_PagesTracked(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -299,8 +356,16 @@ func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -338,8 +403,16 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -377,8 +450,16 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -418,8 +499,16 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -457,8 +546,16 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -503,8 +600,16 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	errorSink := &errorRecordingSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFetcher)
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: nil,
+	}, nil).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
