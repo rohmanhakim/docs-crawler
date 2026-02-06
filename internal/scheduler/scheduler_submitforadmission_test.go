@@ -20,7 +20,7 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil)
 
 	ctx := context.Background()
@@ -63,7 +63,7 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    false,
 		Reason:     robots.DisallowedByRobots,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil)
 
 	ctx := context.Background()
@@ -149,7 +149,7 @@ func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: &fiveSeconds,
+		CrawlDelay: fiveSeconds,
 	}, nil)
 
 	ctx := context.Background()
@@ -192,7 +192,7 @@ func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay(t *testin
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil)
 
 	ctx := context.Background()
@@ -241,12 +241,12 @@ func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
 	mockRobot.OnDecide(*testURL1, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: &tenSeconds,
+		CrawlDelay: tenSeconds,
 	}, nil).Once()
 	mockRobot.OnDecide(*testURL2, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: &tenSeconds,
+		CrawlDelay: tenSeconds,
 	}, nil).Once()
 
 	ctx := context.Background()
@@ -303,12 +303,12 @@ func TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays(t *testing.T) {
 	mockRobot.OnDecide(*url1, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: &threeSeconds,
+		CrawlDelay: threeSeconds,
 	}, nil).Once()
 	mockRobot.OnDecide(*url2, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: &sevenSeconds,
+		CrawlDelay: sevenSeconds,
 	}, nil).Once()
 
 	ctx := context.Background()
@@ -351,7 +351,7 @@ func TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    false,
 		Reason:     robots.DisallowedByRobots,
-		CrawlDelay: &fiveSeconds,
+		CrawlDelay: fiveSeconds,
 	}, nil)
 
 	ctx := context.Background()
@@ -394,7 +394,7 @@ func TestSubmitUrlForAdmission_PreservesSourceContextAndDepth(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil)
 
 	ctx := context.Background()
@@ -440,37 +440,37 @@ func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
 	testCases := []struct {
 		name             string
 		allowed          bool
-		crawlDelay       *time.Duration
+		crawlDelay       time.Duration
 		expectInFrontier bool
 	}{
 		{
 			name:             "allowed path",
 			allowed:          true,
-			crawlDelay:       nil,
+			crawlDelay:       0,
 			expectInFrontier: true,
 		},
 		{
 			name:             "disallowed path",
 			allowed:          false,
-			crawlDelay:       nil,
+			crawlDelay:       0,
 			expectInFrontier: false,
 		},
 		{
 			name:             "allow overrides disallow",
 			allowed:          true,
-			crawlDelay:       nil,
+			crawlDelay:       0,
 			expectInFrontier: true,
 		},
 		{
 			name:             "wildcard disallow",
 			allowed:          false,
-			crawlDelay:       nil,
+			crawlDelay:       0,
 			expectInFrontier: false,
 		},
 		{
 			name:             "wildcard allows other extensions",
 			allowed:          true,
-			crawlDelay:       nil,
+			crawlDelay:       0,
 			expectInFrontier: true,
 		},
 	}
@@ -496,8 +496,8 @@ func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
 
 			s.SetCurrentHost(testURL.Host)
 
-			// Verify limiter SetCrawlDelay should not have been called if crawlDelay is nil
-			if tc.crawlDelay == nil {
+			// Verify limiter SetCrawlDelay should not have been called if crawlDelay is 0
+			if tc.crawlDelay == 0 {
 				mockLimiter.AssertNotCalled(t, "SetCrawlDelay", testURL.Host)
 			}
 

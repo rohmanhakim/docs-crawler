@@ -164,11 +164,8 @@ func (s *Scheduler) SubmitUrlForAdmission(
 		s.rateLimiter.ResetBackoff(url.Host)
 	}
 
-	if robotsDecision.CrawlDelay != nil {
-		crawlDelay := *robotsDecision.CrawlDelay
-		if crawlDelay > time.Duration(0) && s.rateLimiter != nil {
-			s.rateLimiter.SetCrawlDelay(s.currentHost, crawlDelay)
-		}
+	if robotsDecision.CrawlDelay > 0 && s.rateLimiter != nil {
+		s.rateLimiter.SetCrawlDelay(s.currentHost, robotsDecision.CrawlDelay)
 	}
 
 	// Robots explicitly disallowed → normal, terminal outcome

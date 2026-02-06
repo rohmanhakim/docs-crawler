@@ -59,7 +59,7 @@ func setupTestServerWithStatus(t *testing.T, statusCode int, robotsContent strin
 }
 
 // Helper function to create a robots decision with crawl delay
-func newRobotsDecision(allowed bool, crawlDelay *time.Duration) robots.Decision {
+func newRobotsDecision(allowed bool, crawlDelay time.Duration) robots.Decision {
 	return robots.Decision{
 		Allowed:    allowed,
 		Reason:     robots.EmptyRuleSet,

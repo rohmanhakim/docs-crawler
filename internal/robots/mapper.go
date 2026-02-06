@@ -132,13 +132,12 @@ func (r ruleSet) SourceURL() string {
 	return r.sourceURL
 }
 
-// CrawlDelay returns the crawl delay if specified, or nil.
-func (r ruleSet) CrawlDelay() *time.Duration {
+// CrawlDelay returns the crawl delay if specified, or 0 if not set.
+func (r ruleSet) CrawlDelay() time.Duration {
 	if r.crawlDelay == nil {
-		return nil
+		return 0
 	}
-	delay := *r.crawlDelay
-	return &delay
+	return *r.crawlDelay
 }
 
 // AllowRules returns a copy of the allow rules.

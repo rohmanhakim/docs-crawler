@@ -31,7 +31,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -83,7 +83,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    false,
 		Reason:     robots.DisallowedByRobots,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Maybe()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -131,7 +131,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Maybe()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)

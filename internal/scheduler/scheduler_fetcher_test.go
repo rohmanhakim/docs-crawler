@@ -37,7 +37,7 @@ Allow: /`
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Clear default expectation and setup fetcher mock to return successful response
@@ -82,7 +82,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Clear default expectation and setup fetcher mock to capture the context
@@ -132,7 +132,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Clear default expectation and setup fetcher mock to return recoverable error
@@ -177,7 +177,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Clear default expectation and setup fetcher mock to return fatal error
@@ -228,7 +228,7 @@ Allow: /`
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Clear default expectation and setup fetcher mock to capture crawl depth
@@ -266,7 +266,7 @@ func TestScheduler_Fetcher_PassesFetchParam(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -298,7 +298,7 @@ func TestScheduler_Fetcher_ContextHandling(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Create scheduler without context (nil)
@@ -335,7 +335,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Clear default expectation and setup fetcher mock with valid HTML response
@@ -391,7 +391,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Clear default expectation and setup fetcher mock with non-HTML response
@@ -452,7 +452,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			mockRobot.OnDecide(mock.Anything, robots.Decision{
 				Allowed:    true,
 				Reason:     robots.EmptyRuleSet,
-				CrawlDelay: nil,
+				CrawlDelay: 0,
 			}, nil).Once()
 
 			// Clear default expectation and setup fetcher mock with HTTP error response
@@ -502,7 +502,7 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Clear default expectation and setup fetcher mock to track call count
@@ -545,7 +545,7 @@ func TestScheduler_Fetcher_ContextCancellation_Handled(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Cancel context immediately

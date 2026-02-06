@@ -165,7 +165,7 @@ func TestMapResponseToRuleSet(t *testing.T) {
 				t.Errorf("expected %d disallow rules, got %d", tt.expectedDisallows, len(disallows))
 			}
 
-			hasCrawlDelay := rs.CrawlDelay() != nil
+			hasCrawlDelay := rs.CrawlDelay() != 0
 			if hasCrawlDelay != tt.expectedCrawlDelay {
 				t.Errorf("expected crawl delay %v, got %v", tt.expectedCrawlDelay, hasCrawlDelay)
 			}
@@ -312,18 +312,16 @@ func TestRuleSetImmutability(t *testing.T) {
 
 	rs := MapResponseToRuleSet(response, "TestBot", fetchTime)
 
-	t.Run("CrawlDelay returns copy", func(t *testing.T) {
+	t.Run("CrawlDelay returns correct value", func(t *testing.T) {
 		delay1 := rs.CrawlDelay()
-		if delay1 == nil {
+		if delay1 == 0 {
 			t.Fatal("expected crawl delay")
 		}
 
-		// Modify the returned pointer
-		*delay1 = 20 * time.Second
-
-		delay2 := rs.CrawlDelay()
-		if *delay2 != 10*time.Second {
-			t.Error("CrawlDelay() returned mutable pointer")
+		// Since CrawlDelay now returns a value type, not a pointer,
+		// we just verify the value is correct
+		if delay1 != 10*time.Second {
+			t.Errorf("expected crawl delay 10s, got %v", delay1)
 		}
 	})
 
@@ -398,9 +396,9 @@ func TestRuleSetGetters(t *testing.T) {
 		t.Errorf("SourceURL() = %q, expected %q", rs.SourceURL(), expectedSourceURL)
 	}
 
-	// Test with no crawl delay
-	if rs.CrawlDelay() != nil {
-		t.Error("CrawlDelay() should be nil when not set")
+	// Test with no crawl delay (should return 0 when not set)
+	if rs.CrawlDelay() != 0 {
+		t.Errorf("CrawlDelay() should be 0 when not set, got %v", rs.CrawlDelay())
 	}
 }
 

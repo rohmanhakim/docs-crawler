@@ -27,7 +27,7 @@ func TestScheduler_FinalStats_AccurateEmptyFrontier(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	// Create a scheduler with minimal config that results in empty frontier
@@ -101,7 +101,7 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -151,7 +151,7 @@ func TestScheduler_FinalStats_DurationNonNegative(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -207,7 +207,7 @@ func TestScheduler_GracefulShutdown_ConfigError(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -238,7 +238,7 @@ func TestScheduler_GracefulShutdown_InvalidConfig(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -273,7 +273,7 @@ func TestScheduler_GracefulShutdown_MissingSeedUrls(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -309,7 +309,7 @@ func TestScheduler_StatsAccuracy_PagesTracked(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -362,7 +362,7 @@ func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -409,7 +409,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -456,7 +456,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -505,7 +505,7 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -552,7 +552,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher)
@@ -606,7 +606,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: nil,
+		CrawlDelay: 0,
 	}, nil).Once()
 
 	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher)

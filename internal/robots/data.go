@@ -55,6 +55,7 @@ type Decision struct {
 	// Why this decision was made (for logging/debugging)
 	Reason DecisionReason
 
-	// Optional delay override (robots crawl-delay)
-	CrawlDelay *time.Duration
+	// Optional delay override (robots crawl-delay).
+	// Zero value means no crawl delay specified.
+	CrawlDelay time.Duration
 }

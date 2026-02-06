@@ -382,10 +382,10 @@ Allow: /`
 		t.Error("Expected URL to be allowed")
 	}
 
-	if decision.CrawlDelay == nil {
+	if decision.CrawlDelay == 0 {
 		t.Error("Expected crawl delay to be set")
-	} else if *decision.CrawlDelay != 5*time.Second {
-		t.Errorf("Expected crawl delay of 5s, got: %v", *decision.CrawlDelay)
+	} else if decision.CrawlDelay != 5*time.Second {
+		t.Errorf("Expected crawl delay of 5s, got: %v", decision.CrawlDelay)
 	}
 }
 

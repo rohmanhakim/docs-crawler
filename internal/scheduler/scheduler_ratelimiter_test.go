@@ -65,7 +65,7 @@ func TestRateLimiter_SetCrawlDelay_CalledWithCorrectDelay(t *testing.T) {
 	decision := robots.Decision{
 		Allowed:    true,
 		Reason:     robots.AllowedByRobots,
-		CrawlDelay: &crawlDelay,
+		CrawlDelay: crawlDelay,
 	}
 
 	ctx := context.Background()
