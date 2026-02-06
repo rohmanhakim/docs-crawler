@@ -39,14 +39,17 @@ Only content relevant to the document body may pass through.
 */
 
 type DomExtractor struct {
-	metadataSink metadata.MetadataSink
+	metadataSink    metadata.MetadataSink
+	customSelectors []string
 }
 
 func NewDomExtractor(
 	metadataSink metadata.MetadataSink,
+	customSelectors ...string,
 ) DomExtractor {
 	return DomExtractor{
-		metadataSink: metadataSink,
+		metadataSink:    metadataSink,
+		customSelectors: customSelectors,
 	}
 }
 
@@ -93,20 +96,30 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 		}
 	}
 
-	// Extract semantic container (first heuristic layer)
+	// Layer 1: Extract semantic container (main, article, [role="main"])
 	contentNode := extractSemanticContainer(doc)
-	if contentNode == nil {
-		return ExtractionResult{}, &ExtractionError{
-			Message:   "no meaningful semantic container found",
-			Retryable: false,
-			Cause:     ErrCauseNoContent,
-		}
+	if contentNode != nil {
+		return ExtractionResult{
+			DocumentRoot: doc,
+			ContentNode:  contentNode,
+		}, nil
 	}
 
-	return ExtractionResult{
-		DocumentRoot: doc,
-		ContentNode:  contentNode,
-	}, nil
+	// Layer 2: Try known documentation container selectors
+	contentNode = d.extractKnownDocContainer(doc)
+	if contentNode != nil {
+		return ExtractionResult{
+			DocumentRoot: doc,
+			ContentNode:  contentNode,
+		}, nil
+	}
+
+	// All layers failed to find meaningful content
+	return ExtractionResult{}, &ExtractionError{
+		Message:   "no meaningful content container found",
+		Retryable: false,
+		Cause:     ErrCauseNoContent,
+	}
 }
 
 // isValidHTML checks if the parsed document has a proper HTML structure
@@ -152,6 +165,32 @@ func extractSemanticContainer(doc *html.Node) *html.Node {
 	if roleMain := gqDoc.Find("[role='main']").First(); roleMain.Length() > 0 {
 		if node := roleMain.Nodes[0]; isMeaningful(node) {
 			return node
+		}
+	}
+
+	return nil
+}
+
+// extractKnownDocContainer applies the second heuristic layer:
+// Known documentation container selectors from popular frameworks.
+// Combines default selectors with user-provided custom selectors (deduplicated).
+// Returns the first meaningful match, or nil if none found.
+func (d *DomExtractor) extractKnownDocContainer(doc *html.Node) *html.Node {
+	// Get all default selectors
+	defaultSelectors := getAllSelectors()
+
+	// Merge with custom selectors, deduplicating
+	allSelectors := mergeSelectors(defaultSelectors, d.customSelectors)
+
+	// Use goquery as convenience wrapper
+	gqDoc := goquery.NewDocumentFromNode(doc)
+
+	// Try each selector in priority order
+	for _, selector := range allSelectors {
+		if elem := gqDoc.Find(selector).First(); elem.Length() > 0 {
+			if node := elem.Nodes[0]; isMeaningful(node) {
+				return node
+			}
 		}
 	}
 

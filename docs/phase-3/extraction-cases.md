@@ -28,7 +28,7 @@ These are the **minimum, sufficient, industry-aligned cases** we should implemen
 
 ## 1. Semantic container — valid (must pass)
 
-### Case 3.1-A: `<main>` with meaningful content
+### Case A: `<main>` with meaningful content
 
 * `<main>` contains:
 
@@ -43,7 +43,7 @@ These are the **minimum, sufficient, industry-aligned cases** we should implemen
 
 ## 2. Semantic container — invalid → fallback
 
-### Case 3.1-B: `<main>` exists but empty
+### Case B: `<main>` exists but empty
 
 ```html
 <main></main>
@@ -55,7 +55,7 @@ These are the **minimum, sufficient, industry-aligned cases** we should implemen
 
 ---
 
-### Case 3.1-C: `<main>` contains only navigation
+### Case C: `<main>` contains only navigation
 
 ```html
 <main>
@@ -70,7 +70,7 @@ These are the **minimum, sufficient, industry-aligned cases** we should implemen
 
 ## 3. Secondary container heuristic
 
-### Case 3.1-D: `<main>` invalid, `<article>` valid
+### Case D: `<main>` invalid, `<article>` valid
 
 ```html
 <main></main>
@@ -86,7 +86,7 @@ These are the **minimum, sufficient, industry-aligned cases** we should implemen
 
 ## 4. No semantic containers → text-density fallback
 
-### Case 3.1-E: No `<main>` / `<article>`
+### Case E: No `<main>` / `<article>`
 
 * One large text-heavy `<div>`
 
@@ -102,7 +102,7 @@ These are the **minimum, sufficient, industry-aligned cases** we should implemen
 
 ## 5. Code-heavy documentation (important)
 
-### Case 3.1-F: Code-dominant content
+### Case F: Code-dominant content
 
 ```html
 <article>
@@ -119,7 +119,7 @@ These are the **minimum, sufficient, industry-aligned cases** we should implemen
 
 ## 6. Total failure case (must error)
 
-### Case 3.1-G: No meaningful content anywhere
+### Case G: No meaningful content anywhere
 
 * Only nav, links, placeholders
 

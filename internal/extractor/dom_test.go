@@ -42,9 +42,9 @@ func (m *mockMetadataSink) RecordError(
 	})
 }
 
-func setupExtractor() (*extractor.DomExtractor, *mockMetadataSink) {
+func setupExtractor(customSelectors ...string) (*extractor.DomExtractor, *mockMetadataSink) {
 	sink := &mockMetadataSink{}
-	ext := extractor.NewDomExtractor(sink)
+	ext := extractor.NewDomExtractor(sink, customSelectors...)
 	return &ext, sink
 }
 
@@ -195,4 +195,180 @@ func TestExtract_Case_I_NotHTML_Text(t *testing.T) {
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
 	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+}
+
+// TestExtract_Case_E_KnownDocContainer tests: No semantic containers, known doc container present
+// Expected: Extraction succeeds, known doc container chosen (Layer 2 heuristic)
+func TestExtract_Case_E_KnownDocContainer(t *testing.T) {
+	ext, _ := setupExtractor()
+	sourceURL := mustParseURL(t, "https://example.com/known-doc")
+	htmlBytes := loadFixture(t, "case_e_known_doc_container.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.NoError(t, err, "Expected successful extraction via Layer 2 heuristic")
+	assert.NotNil(t, result.DocumentRoot, "DocumentRoot should not be nil")
+	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+	// The fixture has .markdown-body which should be selected
+	assert.Equal(t, "div", result.ContentNode.Data, "ContentNode should be <div> element")
+	// Verify it has the correct class by checking an attribute
+	var hasClass bool
+	for _, attr := range result.ContentNode.Attr {
+		if attr.Key == "class" && attr.Val == "markdown-body" {
+			hasClass = true
+			break
+		}
+	}
+	assert.True(t, hasClass, "ContentNode should have class 'markdown-body'")
+}
+
+// TestExtract_Case_B_MainFallback tests: <main> empty, known doc container has content
+// Expected: Falls back to Layer 2 and extracts from known doc container
+func TestExtract_Case_B_MainFallback(t *testing.T) {
+	ext, _ := setupExtractor()
+	sourceURL := mustParseURL(t, "https://example.com/main-fallback")
+	htmlBytes := loadFixture(t, "case_b_main_fallback.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.NoError(t, err, "Expected successful extraction via Layer 2 fallback")
+	assert.NotNil(t, result.DocumentRoot, "DocumentRoot should not be nil")
+	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+	// The fixture has .content which should be selected
+	assert.Equal(t, "div", result.ContentNode.Data, "ContentNode should be <div> element")
+	// Verify it has the correct class
+	var hasClass bool
+	for _, attr := range result.ContentNode.Attr {
+		if attr.Key == "class" && attr.Val == "content" {
+			hasClass = true
+			break
+		}
+	}
+	assert.True(t, hasClass, "ContentNode should have class 'content'")
+}
+
+// TestExtract_Case_C_MainFallback tests: <main> nav-only, known doc container has content
+// Expected: Falls back to Layer 2 and extracts from known doc container
+func TestExtract_Case_C_MainFallback(t *testing.T) {
+	ext, _ := setupExtractor()
+	sourceURL := mustParseURL(t, "https://example.com/main-nav-fallback")
+	htmlBytes := loadFixture(t, "case_c_main_fallback.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.NoError(t, err, "Expected successful extraction via Layer 2 fallback")
+	assert.NotNil(t, result.DocumentRoot, "DocumentRoot should not be nil")
+	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+	// The fixture has .doc-content which should be selected
+	assert.Equal(t, "div", result.ContentNode.Data, "ContentNode should be <div> element")
+	// Verify it has the correct class
+	var hasClass bool
+	for _, attr := range result.ContentNode.Attr {
+		if attr.Key == "class" && attr.Val == "doc-content" {
+			hasClass = true
+			break
+		}
+	}
+	assert.True(t, hasClass, "ContentNode should have class 'doc-content'")
+}
+
+// TestExtract_Case_Layer2Empty tests: Semantic container empty, known doc container also empty
+// Expected: Returns ErrCauseNoContent
+func TestExtract_Case_Layer2Empty(t *testing.T) {
+	ext, sink := setupExtractor()
+	sourceURL := mustParseURL(t, "https://example.com/layer2-empty")
+	htmlBytes := loadFixture(t, "case_layer2_empty.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.Error(t, err, "Expected extraction to fail when both layers find no meaningful content")
+	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
+
+	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()))
+
+	require.Len(t, sink.errors, 1, "Should have recorded one error")
+	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+}
+
+// TestExtract_Case_Layer2NavOnly tests: Semantic container nav-only, known doc container also nav-only
+// Expected: Returns ErrCauseNoContent
+func TestExtract_Case_Layer2NavOnly(t *testing.T) {
+	ext, sink := setupExtractor()
+	sourceURL := mustParseURL(t, "https://example.com/layer2-nav-only")
+	htmlBytes := loadFixture(t, "case_layer2_nav_only.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.Error(t, err, "Expected extraction to fail when both layers find only navigation")
+	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
+
+	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()))
+
+	require.Len(t, sink.errors, 1, "Should have recorded one error")
+	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+}
+
+// TestExtract_CustomSelector tests: Using custom selector provided via constructor
+// Expected: Custom selector is considered alongside defaults
+func TestExtract_CustomSelector(t *testing.T) {
+	// Use a custom selector that's not in the defaults
+	htmlContent := `<!DOCTYPE html>
+<html>
+<head><title>Custom Selector Test</title></head>
+<body>
+<nav><a href="/">Home</a></nav>
+<div class="custom-docs-container">
+<h1>Custom Container</h1>
+<p>This is in a custom container that should be selected.</p>
+</div>
+<footer><p>Copyright</p></footer>
+</body>
+</html>`
+
+	// Pass custom selector to the extractor
+	ext, _ := setupExtractor(".custom-docs-container")
+	sourceURL := mustParseURL(t, "https://example.com/custom")
+
+	result, err := ext.Extract(sourceURL, []byte(htmlContent))
+
+	require.NoError(t, err, "Expected successful extraction with custom selector")
+	assert.NotNil(t, result.DocumentRoot, "DocumentRoot should not be nil")
+	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+	assert.Equal(t, "div", result.ContentNode.Data, "ContentNode should be <div> element")
+	var hasClass bool
+	for _, attr := range result.ContentNode.Attr {
+		if attr.Key == "class" && attr.Val == "custom-docs-container" {
+			hasClass = true
+			break
+		}
+	}
+	assert.True(t, hasClass, "ContentNode should have class 'custom-docs-container'")
+}
+
+// TestExtract_CustomSelectorDeduplication tests: Custom selector duplicates default
+// Expected: Duplicate is ignored, no error occurs
+func TestExtract_CustomSelectorDeduplication(t *testing.T) {
+	// .markdown-body is in the default selectors
+	htmlContent := `<!DOCTYPE html>
+<html>
+<head><title>Deduplication Test</title></head>
+<body>
+<nav><a href="/">Home</a></nav>
+<div class="markdown-body">
+<h1>Markdown Body</h1>
+<p>This container should be selected even with duplicate selector.</p>
+</div>
+<footer><p>Copyright</p></footer>
+</body>
+</html>`
+
+	// Pass a duplicate selector (already in defaults)
+	ext, _ := setupExtractor(".markdown-body")
+	sourceURL := mustParseURL(t, "https://example.com/dedup")
+
+	result, err := ext.Extract(sourceURL, []byte(htmlContent))
+
+	require.NoError(t, err, "Expected successful extraction without duplicate errors")
+	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+	assert.Equal(t, "div", result.ContentNode.Data, "ContentNode should be <div> element")
 }

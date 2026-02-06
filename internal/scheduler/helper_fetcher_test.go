@@ -31,14 +31,31 @@ func (f *fetcherMock) Fetch(
 	return result, err
 }
 
+// defaultValidHTML is a minimal valid HTML document with meaningful content
+// for extractor tests that ensures Layer 1 or Layer 2 heuristics succeed.
+const defaultValidHTML = `<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<main>
+<h1>Test Content</h1>
+<p>This is meaningful content that passes the extraction heuristics.</p>
+</main>
+</body>
+</html>`
+
 // newFetcherMockForTest creates a properly configured fetcher mock for crawl tests
 func newFetcherMockForTest(t *testing.T) *fetcherMock {
 	t.Helper()
 	m := new(fetcherMock)
-	// Set up default expectation to return empty result (no error)
-	// Tests can override this by setting their own expectations
+	// Set up default expectation to return valid HTML with meaningful content
+	// This ensures the extractor won't fail with "no content" errors
+	testURL, _ := url.Parse("https://example.com/test")
+	result := fetcher.NewFetchResultForTest(*testURL, []byte(defaultValidHTML), 200, "text/html", uint64(len(defaultValidHTML)), map[string]string{
+		"Content-Type": "text/html",
+	})
 	m.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(fetcher.FetchResult{}, nil)
+		Return(result, nil)
 	return m
 }
 
