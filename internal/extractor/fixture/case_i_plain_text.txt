@@ -1,0 +1,4 @@
+This is just plain text content.
+It has multiple lines.
+But it is not HTML at all.
+Just regular text that might be served with wrong content type.

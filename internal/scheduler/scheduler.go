@@ -304,7 +304,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 4. Extract HTML DOM
-		extractionResult, err := s.domExtractor.Extract(fetchResult)
+		extractionResult, err := s.domExtractor.Extract(fetchResult.URL(), fetchResult.Body())
 		if err != nil {
 			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err

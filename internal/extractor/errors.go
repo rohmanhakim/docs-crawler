@@ -11,6 +11,7 @@ type ExtractionErrorCause string
 
 const (
 	ErrCauseNoContent = "no content"
+	ErrCauseNotHTML   = "not an HTML content"
 )
 
 type ExtractionError struct {

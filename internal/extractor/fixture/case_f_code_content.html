@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Code Content Test</title>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+    </nav>
+    <article>
+        <h1>Installation Guide</h1>
+        <pre><code>
+func main() {
+    // Initialize the client with your API key
+    client := NewClient("your-api-key")
+    
+    // Make a request
+    response, err := client.Get("/api/v1/resources")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Println(response)
+}
+        </code></pre>
+    </article>
+    <footer>
+        <p>Copyright 2024</p>
+    </footer>
+</body>
+</html>
