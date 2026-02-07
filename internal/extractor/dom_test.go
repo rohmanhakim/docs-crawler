@@ -44,7 +44,8 @@ func (m *mockMetadataSink) RecordError(
 
 func setupExtractor(customSelectors ...string) (*extractor.DomExtractor, *mockMetadataSink) {
 	sink := &mockMetadataSink{}
-	ext := extractor.NewDomExtractor(sink, customSelectors...)
+	params := extractor.DefaultExtractParam()
+	ext := extractor.NewDomExtractor(sink, params, customSelectors...)
 	return &ext, sink
 }
 

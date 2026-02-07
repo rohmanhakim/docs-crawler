@@ -79,7 +79,7 @@ func NewScheduler() Scheduler {
 	cachedRobot := robots.NewCachedRobot(&recorder)
 	frontier := frontier.NewFrontier()
 	fetcher := fetcher.NewHtmlFetcher(&recorder)
-	extractor := extractor.NewDomExtractor(&recorder)
+	ext := extractor.NewDomExtractor(&recorder, extractor.DefaultExtractParam())
 	sanitizer := sanitizer.NewHTMLSanitizer(&recorder)
 	conversionRule := mdconvert.NewRule()
 	resolver := assets.NewResolver(&recorder)
@@ -93,7 +93,7 @@ func NewScheduler() Scheduler {
 		robot:                  &cachedRobot,
 		frontier:               &frontier,
 		htmlFetcher:            &fetcher,
-		domExtractor:           extractor,
+		domExtractor:           ext,
 		htmlSanitizer:          sanitizer,
 		markdownConversionRule: conversionRule,
 		assetResolver:          resolver,
@@ -117,7 +117,7 @@ func NewSchedulerWithDeps(
 	sleeper timeutil.Sleeper,
 ) Scheduler {
 	frontier := frontier.NewFrontier()
-	extractor := extractor.NewDomExtractor(metadataSink)
+	ext := extractor.NewDomExtractor(metadataSink, extractor.DefaultExtractParam())
 	sanitizer := sanitizer.NewHTMLSanitizer(metadataSink)
 	conversionRule := mdconvert.NewRule()
 	resolver := assets.NewResolver(metadataSink)
@@ -130,7 +130,7 @@ func NewSchedulerWithDeps(
 		robot:                  robot,
 		frontier:               &frontier,
 		htmlFetcher:            fetcher,
-		domExtractor:           extractor,
+		domExtractor:           ext,
 		htmlSanitizer:          sanitizer,
 		markdownConversionRule: conversionRule,
 		assetResolver:          resolver,
