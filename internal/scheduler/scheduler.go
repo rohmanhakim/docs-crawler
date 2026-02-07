@@ -266,6 +266,26 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	s.robot.Init(cfg.UserAgent())
 	s.frontier.Init(cfg)
 
+	// 1.3 Configure DOM Extractor with extraction parameters from config
+	extractParam := extractor.ExtractParam{
+		BodySpecificityBias:  cfg.BodySpecificityBias(),
+		LinkDensityThreshold: cfg.LinkDensityThreshold(),
+		ScoreMultiplier: extractor.ContentScoreMultiplier{
+			NonWhitespaceDivisor: cfg.ScoreMultiplierNonWhitespaceDivisor(),
+			Paragraphs:           cfg.ScoreMultiplierParagraphs(),
+			Headings:             cfg.ScoreMultiplierHeadings(),
+			CodeBlocks:           cfg.ScoreMultiplierCodeBlocks(),
+			ListItems:            cfg.ScoreMultiplierListItems(),
+		},
+		Threshold: extractor.MeaningfulThreshold{
+			MinNonWhitespace:    cfg.ThresholdMinNonWhitespace(),
+			MinHeadings:         cfg.ThresholdMinHeadings(),
+			MinParagraphsOrCode: cfg.ThresholdMinParagraphsOrCode(),
+			MaxLinkDensity:      cfg.ThresholdMaxLinkDensity(),
+		},
+	}
+	s.domExtractor.SetExtractParam(extractParam)
+
 	// 2. Fetch robots.txt & decide the crawling policy for this hostname based on that
 	s.currentHost = cfg.SeedURLs()[0].Host
 	err = s.SubmitUrlForAdmission(cfg.SeedURLs()[0], frontier.SourceSeed, 0)
