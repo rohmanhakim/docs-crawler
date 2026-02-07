@@ -97,6 +97,41 @@ func TestWithDefault(t *testing.T) {
 	if builtCfg.BackoffMaxDuration() != 10*time.Second {
 		t.Errorf("expected BackoffMaxDuration 10s, got %v", builtCfg.BackoffMaxDuration())
 	}
+
+	// Verify extraction parameter defaults
+	if builtCfg.BodySpecificityBias() != 0.75 {
+		t.Errorf("expected BodySpecificityBias 0.75, got %f", builtCfg.BodySpecificityBias())
+	}
+	if builtCfg.LinkDensityThreshold() != 0.80 {
+		t.Errorf("expected LinkDensityThreshold 0.80, got %f", builtCfg.LinkDensityThreshold())
+	}
+	if builtCfg.ScoreMultiplierNonWhitespaceDivisor() != 50.0 {
+		t.Errorf("expected ScoreMultiplierNonWhitespaceDivisor 50.0, got %f", builtCfg.ScoreMultiplierNonWhitespaceDivisor())
+	}
+	if builtCfg.ScoreMultiplierParagraphs() != 5.0 {
+		t.Errorf("expected ScoreMultiplierParagraphs 5.0, got %f", builtCfg.ScoreMultiplierParagraphs())
+	}
+	if builtCfg.ScoreMultiplierHeadings() != 10.0 {
+		t.Errorf("expected ScoreMultiplierHeadings 10.0, got %f", builtCfg.ScoreMultiplierHeadings())
+	}
+	if builtCfg.ScoreMultiplierCodeBlocks() != 15.0 {
+		t.Errorf("expected ScoreMultiplierCodeBlocks 15.0, got %f", builtCfg.ScoreMultiplierCodeBlocks())
+	}
+	if builtCfg.ScoreMultiplierListItems() != 2.0 {
+		t.Errorf("expected ScoreMultiplierListItems 2.0, got %f", builtCfg.ScoreMultiplierListItems())
+	}
+	if builtCfg.ThresholdMinNonWhitespace() != 50 {
+		t.Errorf("expected ThresholdMinNonWhitespace 50, got %d", builtCfg.ThresholdMinNonWhitespace())
+	}
+	if builtCfg.ThresholdMinHeadings() != 0 {
+		t.Errorf("expected ThresholdMinHeadings 0, got %d", builtCfg.ThresholdMinHeadings())
+	}
+	if builtCfg.ThresholdMinParagraphsOrCode() != 1 {
+		t.Errorf("expected ThresholdMinParagraphsOrCode 1, got %d", builtCfg.ThresholdMinParagraphsOrCode())
+	}
+	if builtCfg.ThresholdMaxLinkDensity() != 0.8 {
+		t.Errorf("expected ThresholdMaxLinkDensity 0.8, got %f", builtCfg.ThresholdMaxLinkDensity())
+	}
 }
 
 func TestWithDefault_EmptySeedUrls(t *testing.T) {
@@ -522,6 +557,41 @@ func TestWithConfigFile_ValidCompleteConfig(t *testing.T) {
 	if loadedConfig.BackoffMaxDuration() != 20*time.Second {
 		t.Errorf("expected BackoffMaxDuration 20s, got %v", loadedConfig.BackoffMaxDuration())
 	}
+
+	// Verify extraction parameters from complete config
+	if loadedConfig.BodySpecificityBias() != 0.85 {
+		t.Errorf("expected BodySpecificityBias 0.85, got %f", loadedConfig.BodySpecificityBias())
+	}
+	if loadedConfig.LinkDensityThreshold() != 0.90 {
+		t.Errorf("expected LinkDensityThreshold 0.90, got %f", loadedConfig.LinkDensityThreshold())
+	}
+	if loadedConfig.ScoreMultiplierNonWhitespaceDivisor() != 60.0 {
+		t.Errorf("expected ScoreMultiplierNonWhitespaceDivisor 60.0, got %f", loadedConfig.ScoreMultiplierNonWhitespaceDivisor())
+	}
+	if loadedConfig.ScoreMultiplierParagraphs() != 6.0 {
+		t.Errorf("expected ScoreMultiplierParagraphs 6.0, got %f", loadedConfig.ScoreMultiplierParagraphs())
+	}
+	if loadedConfig.ScoreMultiplierHeadings() != 12.0 {
+		t.Errorf("expected ScoreMultiplierHeadings 12.0, got %f", loadedConfig.ScoreMultiplierHeadings())
+	}
+	if loadedConfig.ScoreMultiplierCodeBlocks() != 18.0 {
+		t.Errorf("expected ScoreMultiplierCodeBlocks 18.0, got %f", loadedConfig.ScoreMultiplierCodeBlocks())
+	}
+	if loadedConfig.ScoreMultiplierListItems() != 3.0 {
+		t.Errorf("expected ScoreMultiplierListItems 3.0, got %f", loadedConfig.ScoreMultiplierListItems())
+	}
+	if loadedConfig.ThresholdMinNonWhitespace() != 60 {
+		t.Errorf("expected ThresholdMinNonWhitespace 60, got %d", loadedConfig.ThresholdMinNonWhitespace())
+	}
+	if loadedConfig.ThresholdMinHeadings() != 1 {
+		t.Errorf("expected ThresholdMinHeadings 1, got %d", loadedConfig.ThresholdMinHeadings())
+	}
+	if loadedConfig.ThresholdMinParagraphsOrCode() != 2 {
+		t.Errorf("expected ThresholdMinParagraphsOrCode 2, got %d", loadedConfig.ThresholdMinParagraphsOrCode())
+	}
+	if loadedConfig.ThresholdMaxLinkDensity() != 0.9 {
+		t.Errorf("expected ThresholdMaxLinkDensity 0.9, got %f", loadedConfig.ThresholdMaxLinkDensity())
+	}
 }
 
 func TestWithConfigFile_PartialConfig(t *testing.T) {
@@ -654,6 +724,139 @@ func TestWithConfigFile_EmptyJSON(t *testing.T) {
 	}
 }
 
+// Test extraction parameter builder methods
+func TestWithBodySpecificityBias(t *testing.T) {
+	testBias := 0.90
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithBodySpecificityBias(testBias).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.BodySpecificityBias() != testBias {
+		t.Errorf("expected BodySpecificityBias %f, got %f", testBias, cfg.BodySpecificityBias())
+	}
+}
+
+func TestWithLinkDensityThreshold(t *testing.T) {
+	testThreshold := 0.95
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithLinkDensityThreshold(testThreshold).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.LinkDensityThreshold() != testThreshold {
+		t.Errorf("expected LinkDensityThreshold %f, got %f", testThreshold, cfg.LinkDensityThreshold())
+	}
+}
+
+func TestWithScoreMultiplierNonWhitespaceDivisor(t *testing.T) {
+	testDivisor := 75.0
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithScoreMultiplierNonWhitespaceDivisor(testDivisor).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ScoreMultiplierNonWhitespaceDivisor() != testDivisor {
+		t.Errorf("expected ScoreMultiplierNonWhitespaceDivisor %f, got %f", testDivisor, cfg.ScoreMultiplierNonWhitespaceDivisor())
+	}
+}
+
+func TestWithScoreMultiplierParagraphs(t *testing.T) {
+	testMultiplier := 8.0
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithScoreMultiplierParagraphs(testMultiplier).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ScoreMultiplierParagraphs() != testMultiplier {
+		t.Errorf("expected ScoreMultiplierParagraphs %f, got %f", testMultiplier, cfg.ScoreMultiplierParagraphs())
+	}
+}
+
+func TestWithScoreMultiplierHeadings(t *testing.T) {
+	testMultiplier := 15.0
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithScoreMultiplierHeadings(testMultiplier).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ScoreMultiplierHeadings() != testMultiplier {
+		t.Errorf("expected ScoreMultiplierHeadings %f, got %f", testMultiplier, cfg.ScoreMultiplierHeadings())
+	}
+}
+
+func TestWithScoreMultiplierCodeBlocks(t *testing.T) {
+	testMultiplier := 20.0
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithScoreMultiplierCodeBlocks(testMultiplier).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ScoreMultiplierCodeBlocks() != testMultiplier {
+		t.Errorf("expected ScoreMultiplierCodeBlocks %f, got %f", testMultiplier, cfg.ScoreMultiplierCodeBlocks())
+	}
+}
+
+func TestWithScoreMultiplierListItems(t *testing.T) {
+	testMultiplier := 4.0
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithScoreMultiplierListItems(testMultiplier).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ScoreMultiplierListItems() != testMultiplier {
+		t.Errorf("expected ScoreMultiplierListItems %f, got %f", testMultiplier, cfg.ScoreMultiplierListItems())
+	}
+}
+
+func TestWithThresholdMinNonWhitespace(t *testing.T) {
+	testMin := 100
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithThresholdMinNonWhitespace(testMin).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ThresholdMinNonWhitespace() != testMin {
+		t.Errorf("expected ThresholdMinNonWhitespace %d, got %d", testMin, cfg.ThresholdMinNonWhitespace())
+	}
+}
+
+func TestWithThresholdMinHeadings(t *testing.T) {
+	testMin := 2
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithThresholdMinHeadings(testMin).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ThresholdMinHeadings() != testMin {
+		t.Errorf("expected ThresholdMinHeadings %d, got %d", testMin, cfg.ThresholdMinHeadings())
+	}
+}
+
+func TestWithThresholdMinParagraphsOrCode(t *testing.T) {
+	testMin := 3
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithThresholdMinParagraphsOrCode(testMin).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ThresholdMinParagraphsOrCode() != testMin {
+		t.Errorf("expected ThresholdMinParagraphsOrCode %d, got %d", testMin, cfg.ThresholdMinParagraphsOrCode())
+	}
+}
+
+func TestWithThresholdMaxLinkDensity(t *testing.T) {
+	testMax := 0.95
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithThresholdMaxLinkDensity(testMax).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.ThresholdMaxLinkDensity() != testMax {
+		t.Errorf("expected ThresholdMaxLinkDensity %f, got %f", testMax, cfg.ThresholdMaxLinkDensity())
+	}
+}
+
 // Note: Zero values in JSON with `omitempty` tags are omitted during marshaling,
 // so they cannot override defaults. To set zero values, users must either:
 // 1. Modify the Config struct after loading, or
@@ -693,7 +896,18 @@ func completeConfigJson() string {
     "timeout": 30000000000,
     "userAgent": "TestBot/1.0",
     "outputDir": "test_output",
-    "dryRun": true
+    "dryRun": true,
+    "bodySpecificityBias": 0.85,
+    "linkDensityThreshold": 0.90,
+    "scoreMultiplierNonWhitespaceDivisor": 60.0,
+    "scoreMultiplierParagraphs": 6.0,
+    "scoreMultiplierHeadings": 12.0,
+    "scoreMultiplierCodeBlocks": 18.0,
+    "scoreMultiplierListItems": 3.0,
+    "thresholdMinNonWhitespace": 60,
+    "thresholdMinHeadings": 1,
+    "thresholdMinParagraphsOrCode": 2,
+    "thresholdMaxLinkDensity": 0.9
 }
 	`
 }

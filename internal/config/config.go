@@ -65,6 +65,50 @@ type Config struct {
 	// Whether the program will simulates what it would do without
 	// actually performing any irreversible or side-effecting actions
 	dryRun bool
+
+	//===============
+	// Extraction
+	//===============
+	// BodySpecificityBias is the threshold for preferring a child container over <body>.
+	// If a child node's score is >= BodySpecificityBias * bodyScore, the child is preferred.
+	// Default: 0.75 (75%)
+	bodySpecificityBias float64
+	// LinkDensityThreshold is the maximum ratio of link text to total text before
+	// applying a penalty. Higher values allow more link-heavy content.
+	// Default: 0.80 (80%)
+	linkDensityThreshold float64
+	// ScoreMultiplierNonWhitespaceDivisor is the divisor for calculating text score.
+	// Score gets +1 point per NonWhitespaceDivisor characters.
+	// Default: 50.0
+	scoreMultiplierNonWhitespaceDivisor float64
+	// ScoreMultiplierParagraphs is the score multiplier for each paragraph element.
+	// Default: 5.0
+	scoreMultiplierParagraphs float64
+	// ScoreMultiplierHeadings is the score multiplier for each heading element (h1-h3).
+	// Default: 10.0
+	scoreMultiplierHeadings float64
+	// ScoreMultiplierCodeBlocks is the score multiplier for each code block.
+	// Default: 15.0
+	scoreMultiplierCodeBlocks float64
+	// ScoreMultiplierListItems is the score multiplier for each list item.
+	// Default: 2.0
+	scoreMultiplierListItems float64
+	// ThresholdMinNonWhitespace is the minimum number of non-whitespace characters
+	// required for content to be considered meaningful.
+	// Default: 50
+	thresholdMinNonWhitespace int
+	// ThresholdMinHeadings is the minimum number of headings required.
+	// Headings are optional but valuable.
+	// Default: 0
+	thresholdMinHeadings int
+	// ThresholdMinParagraphsOrCode is the minimum number of paragraphs OR code blocks
+	// required for content to be considered meaningful.
+	// Default: 1
+	thresholdMinParagraphsOrCode int
+	// ThresholdMaxLinkDensity is the maximum ratio of link text to total text before
+	// content is considered navigation-only and rejected.
+	// Default: 0.8 (80%)
+	thresholdMaxLinkDensity float64
 }
 
 type configDTO struct {
@@ -85,6 +129,18 @@ type configDTO struct {
 	UserAgent              string              `json:"userAgent,omitempty"`
 	OutputDir              string              `json:"outputDir,omitempty"`
 	DryRun                 bool                `json:"dryRun,omitempty"`
+	// Extraction parameters
+	BodySpecificityBias                 float64 `json:"bodySpecificityBias,omitempty"`
+	LinkDensityThreshold                float64 `json:"linkDensityThreshold,omitempty"`
+	ScoreMultiplierNonWhitespaceDivisor float64 `json:"scoreMultiplierNonWhitespaceDivisor,omitempty"`
+	ScoreMultiplierParagraphs           float64 `json:"scoreMultiplierParagraphs,omitempty"`
+	ScoreMultiplierHeadings             float64 `json:"scoreMultiplierHeadings,omitempty"`
+	ScoreMultiplierCodeBlocks           float64 `json:"scoreMultiplierCodeBlocks,omitempty"`
+	ScoreMultiplierListItems            float64 `json:"scoreMultiplierListItems,omitempty"`
+	ThresholdMinNonWhitespace           int     `json:"thresholdMinNonWhitespace,omitempty"`
+	ThresholdMinHeadings                int     `json:"thresholdMinHeadings,omitempty"`
+	ThresholdMinParagraphsOrCode        int     `json:"thresholdMinParagraphsOrCode,omitempty"`
+	ThresholdMaxLinkDensity             float64 `json:"thresholdMaxLinkDensity,omitempty"`
 }
 
 func newConfigFromDTO(dto configDTO) (Config, error) {
@@ -147,6 +203,41 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	// DryRun is a boolean, check if explicitly set (we use the DTO value as-is since bool zero value is false)
 	cfg.dryRun = dto.DryRun
 
+	// Extraction parameters - only override if non-zero value is provided
+	// For float64, we check if value is not 0 (which is also the zero value)
+	if dto.BodySpecificityBias != 0 {
+		cfg.bodySpecificityBias = dto.BodySpecificityBias
+	}
+	if dto.LinkDensityThreshold != 0 {
+		cfg.linkDensityThreshold = dto.LinkDensityThreshold
+	}
+	if dto.ScoreMultiplierNonWhitespaceDivisor != 0 {
+		cfg.scoreMultiplierNonWhitespaceDivisor = dto.ScoreMultiplierNonWhitespaceDivisor
+	}
+	if dto.ScoreMultiplierParagraphs != 0 {
+		cfg.scoreMultiplierParagraphs = dto.ScoreMultiplierParagraphs
+	}
+	if dto.ScoreMultiplierHeadings != 0 {
+		cfg.scoreMultiplierHeadings = dto.ScoreMultiplierHeadings
+	}
+	if dto.ScoreMultiplierCodeBlocks != 0 {
+		cfg.scoreMultiplierCodeBlocks = dto.ScoreMultiplierCodeBlocks
+	}
+	if dto.ScoreMultiplierListItems != 0 {
+		cfg.scoreMultiplierListItems = dto.ScoreMultiplierListItems
+	}
+	if dto.ThresholdMinNonWhitespace != 0 {
+		cfg.thresholdMinNonWhitespace = dto.ThresholdMinNonWhitespace
+	}
+	// Note: ThresholdMinHeadings can be 0 (which is a valid value), so we don't check for non-zero
+	cfg.thresholdMinHeadings = dto.ThresholdMinHeadings
+	if dto.ThresholdMinParagraphsOrCode != 0 {
+		cfg.thresholdMinParagraphsOrCode = dto.ThresholdMinParagraphsOrCode
+	}
+	if dto.ThresholdMaxLinkDensity != 0 {
+		cfg.thresholdMaxLinkDensity = dto.ThresholdMaxLinkDensity
+	}
+
 	return cfg, nil
 }
 
@@ -196,6 +287,18 @@ func WithDefault(seedUrls []url.URL) *Config {
 		userAgent:              "docs-crawler/1.0",
 		outputDir:              "output",
 		dryRun:                 false,
+		// Extraction defaults
+		bodySpecificityBias:                 0.75,
+		linkDensityThreshold:                0.80,
+		scoreMultiplierNonWhitespaceDivisor: 50.0,
+		scoreMultiplierParagraphs:           5.0,
+		scoreMultiplierHeadings:             10.0,
+		scoreMultiplierCodeBlocks:           15.0,
+		scoreMultiplierListItems:            2.0,
+		thresholdMinNonWhitespace:           50,
+		thresholdMinHeadings:                0,
+		thresholdMinParagraphsOrCode:        1,
+		thresholdMaxLinkDensity:             0.8,
 	}
 	return &defaultConfig
 }
@@ -282,6 +385,61 @@ func (c *Config) WithOutputDir(outputDir string) *Config {
 
 func (c *Config) WithDryRun(dryRun bool) *Config {
 	c.dryRun = dryRun
+	return c
+}
+
+func (c *Config) WithBodySpecificityBias(bias float64) *Config {
+	c.bodySpecificityBias = bias
+	return c
+}
+
+func (c *Config) WithLinkDensityThreshold(threshold float64) *Config {
+	c.linkDensityThreshold = threshold
+	return c
+}
+
+func (c *Config) WithScoreMultiplierNonWhitespaceDivisor(divisor float64) *Config {
+	c.scoreMultiplierNonWhitespaceDivisor = divisor
+	return c
+}
+
+func (c *Config) WithScoreMultiplierParagraphs(multiplier float64) *Config {
+	c.scoreMultiplierParagraphs = multiplier
+	return c
+}
+
+func (c *Config) WithScoreMultiplierHeadings(multiplier float64) *Config {
+	c.scoreMultiplierHeadings = multiplier
+	return c
+}
+
+func (c *Config) WithScoreMultiplierCodeBlocks(multiplier float64) *Config {
+	c.scoreMultiplierCodeBlocks = multiplier
+	return c
+}
+
+func (c *Config) WithScoreMultiplierListItems(multiplier float64) *Config {
+	c.scoreMultiplierListItems = multiplier
+	return c
+}
+
+func (c *Config) WithThresholdMinNonWhitespace(min int) *Config {
+	c.thresholdMinNonWhitespace = min
+	return c
+}
+
+func (c *Config) WithThresholdMinHeadings(min int) *Config {
+	c.thresholdMinHeadings = min
+	return c
+}
+
+func (c *Config) WithThresholdMinParagraphsOrCode(min int) *Config {
+	c.thresholdMinParagraphsOrCode = min
+	return c
+}
+
+func (c *Config) WithThresholdMaxLinkDensity(max float64) *Config {
+	c.thresholdMaxLinkDensity = max
 	return c
 }
 
@@ -377,4 +535,48 @@ func (c Config) BackoffMultiplier() float64 {
 
 func (c Config) BackoffMaxDuration() time.Duration {
 	return c.backoffMaxDuration
+}
+
+func (c Config) BodySpecificityBias() float64 {
+	return c.bodySpecificityBias
+}
+
+func (c Config) LinkDensityThreshold() float64 {
+	return c.linkDensityThreshold
+}
+
+func (c Config) ScoreMultiplierNonWhitespaceDivisor() float64 {
+	return c.scoreMultiplierNonWhitespaceDivisor
+}
+
+func (c Config) ScoreMultiplierParagraphs() float64 {
+	return c.scoreMultiplierParagraphs
+}
+
+func (c Config) ScoreMultiplierHeadings() float64 {
+	return c.scoreMultiplierHeadings
+}
+
+func (c Config) ScoreMultiplierCodeBlocks() float64 {
+	return c.scoreMultiplierCodeBlocks
+}
+
+func (c Config) ScoreMultiplierListItems() float64 {
+	return c.scoreMultiplierListItems
+}
+
+func (c Config) ThresholdMinNonWhitespace() int {
+	return c.thresholdMinNonWhitespace
+}
+
+func (c Config) ThresholdMinHeadings() int {
+	return c.thresholdMinHeadings
+}
+
+func (c Config) ThresholdMinParagraphsOrCode() int {
+	return c.thresholdMinParagraphsOrCode
+}
+
+func (c Config) ThresholdMaxLinkDensity() float64 {
+	return c.thresholdMaxLinkDensity
 }

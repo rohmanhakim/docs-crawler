@@ -79,7 +79,7 @@ func NewScheduler() Scheduler {
 	cachedRobot := robots.NewCachedRobot(&recorder)
 	frontier := frontier.NewFrontier()
 	fetcher := fetcher.NewHtmlFetcher(&recorder)
-	extractor := extractor.NewDomExtractor(&recorder)
+	ext := extractor.NewDomExtractor(&recorder)
 	sanitizer := sanitizer.NewHTMLSanitizer(&recorder)
 	conversionRule := mdconvert.NewRule()
 	resolver := assets.NewResolver(&recorder)
@@ -93,7 +93,7 @@ func NewScheduler() Scheduler {
 		robot:                  &cachedRobot,
 		frontier:               &frontier,
 		htmlFetcher:            &fetcher,
-		domExtractor:           extractor,
+		domExtractor:           ext,
 		htmlSanitizer:          sanitizer,
 		markdownConversionRule: conversionRule,
 		assetResolver:          resolver,
@@ -117,7 +117,7 @@ func NewSchedulerWithDeps(
 	sleeper timeutil.Sleeper,
 ) Scheduler {
 	frontier := frontier.NewFrontier()
-	extractor := extractor.NewDomExtractor(metadataSink)
+	ext := extractor.NewDomExtractor(metadataSink)
 	sanitizer := sanitizer.NewHTMLSanitizer(metadataSink)
 	conversionRule := mdconvert.NewRule()
 	resolver := assets.NewResolver(metadataSink)
@@ -130,7 +130,7 @@ func NewSchedulerWithDeps(
 		robot:                  robot,
 		frontier:               &frontier,
 		htmlFetcher:            fetcher,
-		domExtractor:           extractor,
+		domExtractor:           ext,
 		htmlSanitizer:          sanitizer,
 		markdownConversionRule: conversionRule,
 		assetResolver:          resolver,
@@ -266,6 +266,26 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	s.robot.Init(cfg.UserAgent())
 	s.frontier.Init(cfg)
 
+	// 1.3 Configure DOM Extractor with extraction parameters from config
+	extractParam := extractor.ExtractParam{
+		BodySpecificityBias:  cfg.BodySpecificityBias(),
+		LinkDensityThreshold: cfg.LinkDensityThreshold(),
+		ScoreMultiplier: extractor.ContentScoreMultiplier{
+			NonWhitespaceDivisor: cfg.ScoreMultiplierNonWhitespaceDivisor(),
+			Paragraphs:           cfg.ScoreMultiplierParagraphs(),
+			Headings:             cfg.ScoreMultiplierHeadings(),
+			CodeBlocks:           cfg.ScoreMultiplierCodeBlocks(),
+			ListItems:            cfg.ScoreMultiplierListItems(),
+		},
+		Threshold: extractor.MeaningfulThreshold{
+			MinNonWhitespace:    cfg.ThresholdMinNonWhitespace(),
+			MinHeadings:         cfg.ThresholdMinHeadings(),
+			MinParagraphsOrCode: cfg.ThresholdMinParagraphsOrCode(),
+			MaxLinkDensity:      cfg.ThresholdMaxLinkDensity(),
+		},
+	}
+	s.domExtractor.SetExtractParam(extractParam)
+
 	// 2. Fetch robots.txt & decide the crawling policy for this hostname based on that
 	s.currentHost = cfg.SeedURLs()[0].Host
 	err = s.SubmitUrlForAdmission(cfg.SeedURLs()[0], frontier.SourceSeed, 0)
@@ -304,7 +324,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 4. Extract HTML DOM
-		extractionResult, err := s.domExtractor.Extract(fetchResult)
+		extractionResult, err := s.domExtractor.Extract(fetchResult.URL(), fetchResult.Body())
 		if err != nil {
 			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
