@@ -44,8 +44,14 @@ func (m *mockMetadataSink) RecordError(
 
 func setupExtractor(customSelectors ...string) (*extractor.DomExtractor, *mockMetadataSink) {
 	sink := &mockMetadataSink{}
-	params := extractor.DefaultExtractParam()
-	ext := extractor.NewDomExtractor(sink, params, customSelectors...)
+	ext := extractor.NewDomExtractor(sink, customSelectors...)
+	return &ext, sink
+}
+
+func setupExtractorWithParams(params extractor.ExtractParam, customSelectors ...string) (*extractor.DomExtractor, *mockMetadataSink) {
+	sink := &mockMetadataSink{}
+	ext := extractor.NewDomExtractor(sink, customSelectors...)
+	ext.SetExtractParam(params)
 	return &ext, sink
 }
 
@@ -372,4 +378,67 @@ func TestExtract_CustomSelectorDeduplication(t *testing.T) {
 	require.NoError(t, err, "Expected successful extraction without duplicate errors")
 	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
 	assert.Equal(t, "div", result.ContentNode.Data, "ContentNode should be <div> element")
+}
+
+// TestSetExtractParam tests that SetExtractParam correctly overrides default parameters
+// Expected: Custom parameters are applied to extraction behavior
+func TestSetExtractParam(t *testing.T) {
+	// Create HTML with content that meets default thresholds (at least 50 non-whitespace chars)
+	htmlContent := `<!DOCTYPE html>
+<html>
+<head><title>SetExtractParam Test</title></head>
+<body>
+<nav><a href="/">Home</a></nav>
+<div class="content">
+<h1>Main Content</h1>
+<p>This is a paragraph with enough text content to meet the default threshold requirements.</p>
+<p>Additional paragraph to ensure sufficient content for extraction.</p>
+</div>
+<footer><p>Copyright</p></footer>
+</body>
+</html>`
+
+	// Test with default params - should work
+	ext, _ := setupExtractor()
+	sourceURL := mustParseURL(t, "https://example.com/param-test")
+
+	result, err := ext.Extract(sourceURL, []byte(htmlContent))
+	require.NoError(t, err, "Expected successful extraction with default params")
+	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+
+	// Test with custom params via SetExtractParam - different thresholds to verify override works
+	customParams := extractor.ExtractParam{
+		BodySpecificityBias:  0.60, // Changed from default 0.75
+		LinkDensityThreshold: 0.85, // Changed from default 0.80
+		ScoreMultiplier: extractor.ContentScoreMultiplier{
+			NonWhitespaceDivisor: 40.0, // Changed from default 50.0
+			Paragraphs:           6.0,  // Changed from default 5.0
+			Headings:             12.0, // Changed from default 10.0
+			CodeBlocks:           15.0,
+			ListItems:            2.0,
+		},
+		Threshold: extractor.MeaningfulThreshold{
+			MinNonWhitespace:    30, // Changed from default 50
+			MinHeadings:         0,
+			MinParagraphsOrCode: 1,
+			MaxLinkDensity:      0.9, // Changed from default 0.8
+		},
+	}
+
+	ext2, _ := setupExtractorWithParams(customParams, ".content")
+	result2, err2 := ext2.Extract(sourceURL, []byte(htmlContent))
+
+	require.NoError(t, err2, "Expected successful extraction with custom params")
+	assert.NotNil(t, result2.ContentNode, "ContentNode should not be nil with custom params")
+	assert.Equal(t, "div", result2.ContentNode.Data, "ContentNode should be <div> element")
+
+	// Verify the extractor has the custom params
+	var hasClass bool
+	for _, attr := range result2.ContentNode.Attr {
+		if attr.Key == "class" && attr.Val == "content" {
+			hasClass = true
+			break
+		}
+	}
+	assert.True(t, hasClass, "ContentNode should have class 'content'")
 }

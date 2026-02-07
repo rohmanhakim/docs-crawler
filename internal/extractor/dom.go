@@ -44,16 +44,23 @@ type DomExtractor struct {
 	params          ExtractParam
 }
 
+// NewDomExtractor creates a new DomExtractor with default parameters.
+// Use SetExtractParam to override default parameters after construction.
 func NewDomExtractor(
 	metadataSink metadata.MetadataSink,
-	params ExtractParam,
 	customSelectors ...string,
 ) DomExtractor {
 	return DomExtractor{
 		metadataSink:    metadataSink,
 		customSelectors: customSelectors,
-		params:          params,
+		params:          DefaultExtractParam(),
 	}
+}
+
+// SetExtractParam allows callers to override the default extraction parameters.
+// This enables runtime configuration of extraction behavior.
+func (d *DomExtractor) SetExtractParam(params ExtractParam) {
+	d.params = params
 }
 
 func (d *DomExtractor) Extract(
@@ -100,7 +107,7 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	}
 
 	// Layer 1: Extract semantic container (main, article, [role="main"])
-	contentNode := extractSemanticContainer(doc)
+	contentNode := extractSemanticContainer(doc, d.params.Threshold)
 	if contentNode != nil {
 		return ExtractionResult{
 			DocumentRoot: doc,
@@ -155,27 +162,27 @@ func isValidHTML(doc *html.Node) bool {
 // extractSemanticContainer applies the first heuristic layer:
 // Priority: <main> -> <article> -> [role="main"]
 // Returns the first meaningful match, or nil if none found
-func extractSemanticContainer(doc *html.Node) *html.Node {
+func extractSemanticContainer(doc *html.Node, threshold MeaningfulThreshold) *html.Node {
 	// Use goquery as convenience wrapper
 	gqDoc := goquery.NewDocumentFromNode(doc)
 
 	// Priority 1: <main>
 	if main := gqDoc.Find("main").First(); main.Length() > 0 {
-		if node := main.Nodes[0]; isMeaningful(node) {
+		if node := main.Nodes[0]; isMeaningful(node, threshold) {
 			return node
 		}
 	}
 
 	// Priority 2: <article>
 	if article := gqDoc.Find("article").First(); article.Length() > 0 {
-		if node := article.Nodes[0]; isMeaningful(node) {
+		if node := article.Nodes[0]; isMeaningful(node, threshold) {
 			return node
 		}
 	}
 
 	// Priority 3: [role="main"]
 	if roleMain := gqDoc.Find("[role='main']").First(); roleMain.Length() > 0 {
-		if node := roleMain.Nodes[0]; isMeaningful(node) {
+		if node := roleMain.Nodes[0]; isMeaningful(node, threshold) {
 			return node
 		}
 	}
@@ -200,7 +207,7 @@ func (d *DomExtractor) extractKnownDocContainer(doc *html.Node) *html.Node {
 	// Try each selector in priority order
 	for _, selector := range allSelectors {
 		if elem := gqDoc.Find(selector).First(); elem.Length() > 0 {
-			if node := elem.Nodes[0]; isMeaningful(node) {
+			if node := elem.Nodes[0]; isMeaningful(node, d.params.Threshold) {
 				return node
 			}
 		}
@@ -229,7 +236,7 @@ func (d *DomExtractor) extractContainerAfterExplicitChromesRemoval(doc html.Node
 	}
 
 	// Step 3: Validate that the selected node is meaningful
-	if !isMeaningful(contentNode) {
+	if !isMeaningful(contentNode, d.params.Threshold) {
 		return nil
 	}
 
@@ -392,7 +399,7 @@ func (d *DomExtractor) findBestContentContainer(doc *html.Node) *html.Node {
 	var bodyScore float64
 
 	for _, candidate := range candidates {
-		score := calculateContentScore(candidate, d.params.LinkDensityThreshold)
+		score := calculateContentScore(candidate, d.params.LinkDensityThreshold, d.params.ScoreMultiplier)
 		scores[candidate] = score
 
 		if candidate.Data == "body" {
@@ -460,13 +467,13 @@ func collectCandidateNodes(root *html.Node) []*html.Node {
 
 // calculateContentScore calculates a weighted content score for a node
 // Recommendations:
-// - Text: +1 per 50 non-whitespace chars
-// - Paragraphs: +5 each
-// - Headings (h1-h3): +10 each
-// - Code blocks: +15 each
-// - List items: +2 each
+// - Text: +1 per NonWhitespaceDivisor non-whitespace chars
+// - Paragraphs: +Paragraphs each
+// - Headings (h1-h3): +Headings each
+// - Code blocks: +CodeBlocks each
+// - List items: +ListItems each
 // - Link density penalty if ratio > threshold
-func calculateContentScore(node *html.Node, linkDensityThreshold float64) float64 {
+func calculateContentScore(node *html.Node, linkDensityThreshold float64, scoreMultiplier ContentScoreMultiplier) float64 {
 	var stats struct {
 		nonWhitespace int
 		paragraphs    int
@@ -532,13 +539,12 @@ func calculateContentScore(node *html.Node, linkDensityThreshold float64) float6
 
 	walk(node)
 
-	// Calculate base score
-	// TODO: move the multiplier into ExtractParam
-	score := float64(stats.nonWhitespace) / 50.0 // +1 per 50 chars
-	score += float64(stats.paragraphs) * 5.0
-	score += float64(stats.headings) * 10.0
-	score += float64(stats.codeBlocks) * 15.0
-	score += float64(stats.listItems) * 2.0
+	// Calculate base score using configurable multipliers
+	score := float64(stats.nonWhitespace) / scoreMultiplier.NonWhitespaceDivisor
+	score += float64(stats.paragraphs) * scoreMultiplier.Paragraphs
+	score += float64(stats.headings) * scoreMultiplier.Headings
+	score += float64(stats.codeBlocks) * scoreMultiplier.CodeBlocks
+	score += float64(stats.listItems) * scoreMultiplier.ListItems
 
 	// Apply link density penalty
 	if stats.textLength > 0 {
@@ -562,7 +568,7 @@ func calculateContentScore(node *html.Node, linkDensityThreshold float64) float6
 //   - Code blocks (important for documentation)
 //
 // It rejects nodes with only navigation links.
-func isMeaningful(node *html.Node) bool {
+func isMeaningful(node *html.Node, threshold MeaningfulThreshold) bool {
 	if node == nil {
 		return false
 	}
@@ -630,31 +636,24 @@ func isMeaningful(node *html.Node) bool {
 
 	walk(node)
 
-	// Minimum thresholds for meaningful content
-	// TODO: move these into ExtractParam
-	const minNonWhitespace = 50   // At least 50 non-whitespace characters
-	const minHeadings = 0         // Headings are optional but valuable
-	const minParagraphsOrCode = 1 // At least 1 paragraph OR code block
-	const maxLinkDensity = 0.8    // Max 80% of text can be links (avoid nav)
-
 	// Check basic text presence
-	if stats.nonWhitespace < minNonWhitespace {
+	if stats.nonWhitespace < threshold.MinNonWhitespace {
 		return false
 	}
 
 	// Check for navigation-only content (high link density)
 	if stats.textLength > 0 {
 		linkDensity := float64(stats.linkTextLength) / float64(stats.textLength)
-		if linkDensity > maxLinkDensity && stats.links > 2 {
+		if linkDensity > threshold.MaxLinkDensity && stats.links > 2 {
 			return false
 		}
 	}
 
 	// Must have at least paragraphs or code blocks
-	hasContent := stats.paragraphs >= minParagraphsOrCode || stats.codeBlocks >= minParagraphsOrCode
+	hasContent := stats.paragraphs >= threshold.MinParagraphsOrCode || stats.codeBlocks >= threshold.MinParagraphsOrCode
 
 	// Or must have headings with some text
-	hasHeadingsWithText := stats.headings > minHeadings && stats.nonWhitespace >= 20
+	hasHeadingsWithText := stats.headings > threshold.MinHeadings && stats.nonWhitespace >= 20
 
 	return hasContent || hasHeadingsWithText
 }
