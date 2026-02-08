@@ -19,6 +19,15 @@ func (s *SanitizedHTMLDoc) GetDiscoveredURLs() []url.URL {
 	return s.discoveredUrls
 }
 
+// NewSanitizedHTMLDoc creates a SanitizedHTMLDoc for testing purposes.
+// The fields remain private to maintain immutability.
+func NewSanitizedHTMLDoc(contentNode *html.Node, discoveredUrls []url.URL) SanitizedHTMLDoc {
+	return SanitizedHTMLDoc{
+		contentNode:    contentNode,
+		discoveredUrls: discoveredUrls,
+	}
+}
+
 // SanitizeParam holds configuration parameters for the sanitization process.
 // This allows external configuration without hardcoding magic values.
 type SanitizeParam struct {

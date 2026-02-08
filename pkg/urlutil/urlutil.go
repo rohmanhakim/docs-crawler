@@ -79,3 +79,68 @@ func stripTrailingSlash(path string) string {
 	}
 	return path
 }
+
+// Resolve resolves a relative URL against a base URL constructed from scheme and host.
+// If the relative URL is already absolute (has a scheme), it is returned as-is.
+// The base URL is constructed as: scheme + "://" + host
+//
+// Examples:
+//   - Resolve("/docs", "https", "example.com") → "https://example.com/docs"
+//   - Resolve("page.html", "https", "example.com") from "https://example.com/dir/" → "https://example.com/dir/page.html"
+//   - Resolve("https://other.com/page", "https", "example.com") → "https://other.com/page" (unchanged)
+//
+// Properties:
+//   - Pure: no state, no memory
+//   - Deterministic: same input always produces same output
+//   - Handles protocol-relative URLs (//host/path)
+func Resolve(relativeUrl url.URL, scheme string, host string) url.URL {
+	// If the URL is already absolute (has a scheme), return it as-is
+	if relativeUrl.Scheme != "" {
+		return relativeUrl
+	}
+
+	// Construct the base URL from scheme and host
+	baseURL := url.URL{
+		Scheme: scheme,
+		Host:   host,
+	}
+
+	// Resolve the relative URL against the base
+	// url.ResolveReference handles path-absolute ("/path") and path-relative ("path") URLs
+	resolved := baseURL.ResolveReference(&relativeUrl)
+
+	return *resolved
+}
+
+// FilterByHost filters a slice of URLs to only include those from the specified host.
+// Hostname comparison is case-insensitive.
+//
+// The host parameter should be just the hostname (e.g., "example.com"), not a full URL.
+// URLs are matched by their Hostname() which excludes port numbers.
+//
+// Examples:
+//   - FilterByHost("example.com", ["https://example.com/page", "https://other.com/page"])
+//     → ["https://example.com/page"]
+//
+// Properties:
+//   - Pure: no state, no memory
+//   - Deterministic: same input always produces same output
+//   - Case-insensitive hostname matching
+func FilterByHost(host string, urls []url.URL) []url.URL {
+	if len(urls) == 0 {
+		return []url.URL{}
+	}
+
+	// Normalize target host to lowercase for case-insensitive comparison
+	targetHost := lowerASCII(host)
+
+	filtered := make([]url.URL, 0, len(urls))
+	for _, u := range urls {
+		// Compare hostnames case-insensitively
+		if lowerASCII(u.Hostname()) == targetHost {
+			filtered = append(filtered, u)
+		}
+	}
+
+	return filtered
+}

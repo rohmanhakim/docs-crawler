@@ -214,3 +214,275 @@ func TestStripTrailingSlash(t *testing.T) {
 		})
 	}
 }
+
+func TestResolve(t *testing.T) {
+	tests := []struct {
+		name        string
+		relativeURL string
+		scheme      string
+		host        string
+		expected    string
+	}{
+		{
+			name:        "path absolute URL",
+			relativeURL: "/docs",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://example.com/docs",
+		},
+		{
+			name:        "path absolute with trailing slash",
+			relativeURL: "/docs/",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://example.com/docs/",
+		},
+		{
+			name:        "path relative URL",
+			relativeURL: "page.html",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://example.com/page.html",
+		},
+		{
+			name:        "already absolute URL - unchanged",
+			relativeURL: "https://other.com/page",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://other.com/page",
+		},
+		{
+			name:        "absolute URL with http scheme - unchanged",
+			relativeURL: "http://other.com/page",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "http://other.com/page",
+		},
+		{
+			name:        "URL with query string",
+			relativeURL: "/search?q=test",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://example.com/search?q=test",
+		},
+		{
+			name:        "URL with fragment",
+			relativeURL: "/docs#section",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://example.com/docs#section",
+		},
+		{
+			name:        "empty path",
+			relativeURL: "",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://example.com",
+		},
+		{
+			name:        "root path",
+			relativeURL: "/",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://example.com/",
+		},
+		{
+			name:        "nested path",
+			relativeURL: "/api/v1/users",
+			scheme:      "https",
+			host:        "example.com",
+			expected:    "https://example.com/api/v1/users",
+		},
+		{
+			name:        "http scheme",
+			relativeURL: "/docs",
+			scheme:      "http",
+			host:        "example.com",
+			expected:    "http://example.com/docs",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			relativeURL, err := url.Parse(tt.relativeURL)
+			if err != nil {
+				t.Fatalf("failed to parse relative URL %q: %v", tt.relativeURL, err)
+			}
+
+			result := Resolve(*relativeURL, tt.scheme, tt.host)
+			resultStr := result.String()
+
+			if resultStr != tt.expected {
+				t.Errorf("Resolve(%q, %q, %q) = %q, want %q",
+					tt.relativeURL, tt.scheme, tt.host, resultStr, tt.expected)
+			}
+		})
+	}
+}
+
+func TestResolveDoesNotMutateInput(t *testing.T) {
+	input, _ := url.Parse("/docs")
+	original := *input
+
+	_ = Resolve(*input, "https", "example.com")
+
+	if input.String() != original.String() {
+		t.Error("Resolve mutated the input URL")
+	}
+}
+
+func TestFilterByHost(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		urls     []string
+		expected []string
+	}{
+		{
+			name: "mixed URLs - some matching",
+			host: "example.com",
+			urls: []string{
+				"https://example.com/page1",
+				"https://other.com/page",
+				"https://example.com/page2",
+				"http://different.com/",
+			},
+			expected: []string{
+				"https://example.com/page1",
+				"https://example.com/page2",
+			},
+		},
+		{
+			name: "all matching URLs",
+			host: "example.com",
+			urls: []string{
+				"https://example.com/page1",
+				"https://example.com/page2",
+				"http://example.com/page3",
+			},
+			expected: []string{
+				"https://example.com/page1",
+				"https://example.com/page2",
+				"http://example.com/page3",
+			},
+		},
+		{
+			name: "no matching URLs",
+			host: "example.com",
+			urls: []string{
+				"https://other.com/page1",
+				"https://different.com/page2",
+			},
+			expected: []string{},
+		},
+		{
+			name:     "empty input",
+			host:     "example.com",
+			urls:     []string{},
+			expected: []string{},
+		},
+		{
+			name: "case insensitive matching",
+			host: "EXAMPLE.COM",
+			urls: []string{
+				"https://example.com/page1",
+				"https://EXAMPLE.COM/page2",
+				"https://Other.com/page",
+			},
+			expected: []string{
+				"https://example.com/page1",
+				"https://EXAMPLE.COM/page2",
+			},
+		},
+		{
+			name: "handles www subdomain separately",
+			host: "example.com",
+			urls: []string{
+				"https://example.com/page",
+				"https://www.example.com/page",
+			},
+			expected: []string{
+				"https://example.com/page",
+			},
+		},
+		{
+			name: "handles ports correctly",
+			host: "example.com",
+			urls: []string{
+				"https://example.com/page",
+				"https://example.com:8080/page",
+				"https://other.com:8080/page",
+			},
+			expected: []string{
+				"https://example.com/page",
+				"https://example.com:8080/page",
+			},
+		},
+		{
+			name:     "single matching URL",
+			host:     "example.com",
+			urls:     []string{"https://example.com/single"},
+			expected: []string{"https://example.com/single"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse input URLs
+			urls := make([]url.URL, len(tt.urls))
+			for i, u := range tt.urls {
+				parsed, err := url.Parse(u)
+				if err != nil {
+					t.Fatalf("failed to parse URL %q: %v", u, err)
+				}
+				urls[i] = *parsed
+			}
+
+			result := FilterByHost(tt.host, urls)
+
+			// Convert result to strings for comparison
+			resultStrs := make([]string, len(result))
+			for i, u := range result {
+				resultStrs[i] = u.String()
+			}
+
+			if len(resultStrs) != len(tt.expected) {
+				t.Errorf("FilterByHost(%q) returned %d URLs, want %d",
+					tt.host, len(resultStrs), len(tt.expected))
+			}
+
+			for i, expected := range tt.expected {
+				if i >= len(resultStrs) || resultStrs[i] != expected {
+					t.Errorf("FilterByHost(%q)[%d] = %q, want %q",
+						tt.host, i, resultStrs[i], expected)
+				}
+			}
+		})
+	}
+}
+
+func TestFilterByHostDoesNotMutateInput(t *testing.T) {
+	urls := []url.URL{
+		*mustParseURL("https://example.com/page1"),
+		*mustParseURL("https://other.com/page2"),
+	}
+	original := make([]url.URL, len(urls))
+	copy(original, urls)
+
+	_ = FilterByHost("example.com", urls)
+
+	for i, u := range urls {
+		if u.String() != original[i].String() {
+			t.Errorf("FilterByHost mutated input URL at index %d", i)
+		}
+	}
+}
+
+// mustParseURL is a test helper that parses a URL or panics
+func mustParseURL(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return u
+}

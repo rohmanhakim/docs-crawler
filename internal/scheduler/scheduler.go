@@ -21,6 +21,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
+	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
 )
 
 /*
@@ -288,6 +289,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 
 	// 2. Fetch robots.txt & decide the crawling policy for this hostname based on that
 	s.currentHost = cfg.SeedURLs()[0].Host
+	seedScheme := cfg.SeedURLs()[0].Scheme
 	err = s.SubmitUrlForAdmission(cfg.SeedURLs()[0], frontier.SourceSeed, 0)
 	if err != nil {
 		// Check if this is a robots error that requires backoff
@@ -343,8 +345,21 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			continue
 		}
 
-		// 5.1 submit all discovered links through robots checking to frontier
-		for _, discoveredurl := range sanitizedHtml.GetDiscoveredURLs() {
+		// 5.2 Resolve relative URLs to absolute URLs and filter by host
+		discoveredURLs := sanitizedHtml.GetDiscoveredURLs()
+
+		// 5.3 Resolve all URLs to absolute form using the seed scheme and current host
+		resolvedURLs := make([]url.URL, 0, len(discoveredURLs))
+		for _, u := range discoveredURLs {
+			resolved := urlutil.Resolve(u, seedScheme, s.currentHost)
+			resolvedURLs = append(resolvedURLs, resolved)
+		}
+
+		// 5.4 Filter to only keep URLs from the current host
+		filteredURLs := urlutil.FilterByHost(s.currentHost, resolvedURLs)
+
+		// 5.5 submit all discovered links through robots checking to frontier
+		for _, discoveredurl := range filteredURLs {
 			submissionErr := s.SubmitUrlForAdmission(discoveredurl, frontier.SourceCrawl, nextCrawlToken.Depth()+1)
 			if submissionErr != nil {
 				// Check if this is a robots error that requires backoff

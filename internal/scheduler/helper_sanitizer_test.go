@@ -60,11 +60,8 @@ func setupSanitizerMockWithRecoverableError(m *sanitizerMock) {
 }
 
 // createSanitizedHTMLDocForTest creates a SanitizedHTMLDoc for testing
-// Since the fields are private, we use the real sanitizer's internal structure
-// In tests, we'll use the mock's On().Return() with a properly constructed result
+// Uses the NewSanitizedHTMLDoc constructor to properly initialize the struct
+// with private fields for testing purposes.
 func createSanitizedHTMLDocForTest(discoveredURLs []url.URL) sanitizer.SanitizedHTMLDoc {
-	// We need to use the NewSanitizedHTMLDocForTest function if available
-	// or construct it using a test helper from the sanitizer package
-	// For now, return empty - the test will use mock.On().Return() directly
-	return sanitizer.SanitizedHTMLDoc{}
+	return sanitizer.NewSanitizedHTMLDoc(nil, discoveredURLs)
 }

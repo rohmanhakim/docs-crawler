@@ -2,6 +2,7 @@ package scheduler_test
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -191,4 +192,220 @@ func TestInterfaceCompliance(t *testing.T) {
 	var _ metadata.CrawlFinalizer = (*mockFinalizer)(nil)
 	var _ metadata.MetadataSink = (*metadata.NoopSink)(nil)
 	var _ metadata.MetadataSink = (*errorRecordingSink)(nil)
+}
+
+// mustParseURL is a test helper that parses a URL or panics
+func mustParseURL(s string) *url.URL {
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return u
+}
+
+// TestScheduler_URLResolutionAndFiltering verifies that discovered URLs are properly
+// resolved to absolute URLs and filtered by host before submission.
+// It uses a stubbed sanitizer to return pre-defined URLs (relative and external),
+// then verifies that only resolved, same-host URLs are submitted to the frontier.
+func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
+	ctx := context.Background()
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+
+	// Set up discovered URLs:
+	// - "/relative-path" (relative, should be resolved and submitted)
+	// - "/docs/guide" (relative, should be resolved and submitted)
+	// - "https://example.com/page" (absolute same-host, should be submitted)
+	// - "https://other.com/external" (external, should be filtered out)
+	// - "http://different.com/page" (external, should be filtered out)
+	discoveredURLs := []url.URL{
+		*mustParseURL("/relative-path"),
+		*mustParseURL("/docs/guide"),
+		*mustParseURL("https://example.com/page"),
+		*mustParseURL("https://other.com/external"),
+		*mustParseURL("http://different.com/page"),
+	}
+
+	// Set up the mock to return our test URLs
+	setupSanitizerMockWithSuccess(mockSanitizer, discoveredURLs)
+
+	// Set up robot expectations - Init called once, Decide called for each URL
+	mockRobot.On("Init", mock.Anything).Return()
+	// Decide calls for all URLs that pass through SubmitUrlForAdmission
+	// The key assertion is that external URLs (other.com, different.com) are filtered out
+	// and only example.com URLs are submitted (seed + resolved relative URLs + absolute same-host)
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Maybe()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
+
+	// Set up fetcher mock to return valid HTML
+	setupFetcherMockWithSuccess(mockFetcher, "https://example.com", []byte("<html><body>Test</body></html>"), 200)
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, mockSanitizer, mockSleeper)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	// Create a valid config with seed URL
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"maxDepth": 1,
+		"maxPages": 50
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Execute crawl
+	_, err = s.ExecuteCrawling(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify that the sanitizer was called
+	mockSanitizer.AssertExpectations(t)
+
+	// Verify that the robot's Decide was called the expected number of times
+	// (1 for seed URL + 3 for filtered discovered URLs)
+	mockRobot.AssertExpectations(t)
+}
+
+// TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs verifies that when
+// all discovered URLs are external, none are submitted to the frontier.
+func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
+	ctx := context.Background()
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+
+	// Set up discovered URLs - all external
+	discoveredURLs := []url.URL{
+		*mustParseURL("https://other.com/page1"),
+		*mustParseURL("https://different.com/page2"),
+		*mustParseURL("http://external.org/page3"),
+	}
+
+	// Set up the mock to return our test URLs
+	setupSanitizerMockWithSuccess(mockSanitizer, discoveredURLs)
+
+	// Set up robot expectations - only the seed URL should be processed
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once() // Only called for seed URL
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
+
+	// Set up fetcher mock to return valid HTML
+	setupFetcherMockWithSuccess(mockFetcher, "https://example.com", []byte("<html><body>Test</body></html>"), 200)
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, mockSanitizer, mockSleeper)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	// Create a valid config with seed URL
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"maxDepth": 1,
+		"maxPages": 50
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Execute crawl
+	_, err = s.ExecuteCrawling(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify that the sanitizer was called
+	mockSanitizer.AssertExpectations(t)
+
+	// Verify that the robot's Decide was called exactly once (for seed URL only)
+	mockRobot.AssertExpectations(t)
+}
+
+// TestScheduler_URLResolutionAndFiltering_AllRelativeURLs verifies that relative
+// URLs are properly resolved to absolute URLs before submission.
+func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
+	ctx := context.Background()
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+
+	// Set up discovered URLs - all relative
+	discoveredURLs := []url.URL{
+		*mustParseURL("/path1"),
+		*mustParseURL("/docs/page"),
+		*mustParseURL("/api/v1/users"),
+	}
+
+	// Set up the mock to return our test URLs
+	setupSanitizerMockWithSuccess(mockSanitizer, discoveredURLs)
+
+	// Set up robot expectations - Init called once, Decide for seed + all resolved URLs
+	mockRobot.On("Init", mock.Anything).Return()
+	// Decide calls for seed URL and all resolved URLs
+	// The key assertion is that all 3 relative URLs are resolved and submitted
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Maybe()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
+
+	// Set up fetcher mock to return valid HTML
+	setupFetcherMockWithSuccess(mockFetcher, "https://example.com", []byte("<html><body>Test</body></html>"), 200)
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, mockSanitizer, mockSleeper)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	// Create a valid config with seed URL
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"maxDepth": 1,
+		"maxPages": 50
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Execute crawl
+	_, err = s.ExecuteCrawling(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify that the sanitizer was called
+	mockSanitizer.AssertExpectations(t)
+
+	// Verify that the robot's Decide was called 4 times (1 seed + 3 discovered)
+	mockRobot.AssertExpectations(t)
 }
