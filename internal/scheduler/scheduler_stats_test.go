@@ -33,7 +33,7 @@ func TestScheduler_FinalStats_AccurateEmptyFrontier(t *testing.T) {
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Create a scheduler with minimal config that results in empty frontier
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	// Create a temp config file with seed URL
 	tmpDir := t.TempDir()
@@ -109,7 +109,7 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	// Create a temp config file
 	tmpDir := t.TempDir()
@@ -162,7 +162,7 @@ func TestScheduler_FinalStats_DurationNonNegative(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -218,7 +218,7 @@ func TestScheduler_GracefulShutdown_ConfigError(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil)
 
 	// Try to execute with non-existent config
 	_, err := s.ExecuteCrawling("/nonexistent/path/config.json")
@@ -249,7 +249,7 @@ func TestScheduler_GracefulShutdown_InvalidConfig(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.json")
@@ -284,7 +284,7 @@ func TestScheduler_GracefulShutdown_MissingSeedUrls(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "empty.json")
@@ -323,7 +323,7 @@ func TestScheduler_StatsAccuracy_PagesTracked(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -379,7 +379,7 @@ func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -429,7 +429,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -479,7 +479,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -528,7 +528,7 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -578,7 +578,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -634,7 +634,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	}, nil).Once()
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

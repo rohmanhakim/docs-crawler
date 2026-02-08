@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Semantic Inference Required</title>
+</head>
+<body>
+    <main>
+        <h1>Documentation</h1>
+        
+        <!-- Bold text used as pseudo-headings - requires semantic inference to detect -->
+        <p><strong>Introduction to the System</strong></p>
+        <p>This paragraph introduces the system. The bold text above looks like a heading but is just styled paragraph text.</p>
+        
+        <p><strong>Getting Started Guide</strong></p>
+        <p>Steps to get started. The bold text above is semantically a section title but structurally just a paragraph.</p>
+        
+        <!-- Another example with different styling -->
+        <p style="font-size: 1.5em; font-weight: bold;">Configuration Options</p>
+        <p>Available configuration options. This looks like an h2 but is just a styled paragraph.</p>
+        
+        <!-- Text that suggests structure but has no heading markup -->
+        <p>Section One: Understanding the Basics</p>
+        <p>Content for section one. The structure is implied by the text content, not markup.</p>
+        
+        <p>Section Two: Advanced Topics</p>
+        <p>Content for section two. Requires understanding the text to infer structure.</p>
+        
+        <!-- All caps text as pseudo-headings -->
+        <p>API REFERENCE</p>
+        <p>API documentation content. All-caps suggests heading but is not marked up as such.</p>
+    </main>
+</body>
+</html>

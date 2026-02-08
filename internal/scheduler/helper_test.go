@@ -7,14 +7,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
 // createSchedulerForTest creates a scheduler with test-specific initialization
-// that allows testing scheduler in isolation
+// that allows testing scheduler in isolation.
+// If mockExtractor is nil, a real extractor will be created.
+// If mockSanitizer is nil, a real sanitizer will be created.
 func createSchedulerForTest(
 	t *testing.T,
 	ctx context.Context,
@@ -23,10 +27,22 @@ func createSchedulerForTest(
 	mockLimiter *rateLimiterMock,
 	mockRobot *robotsMock,
 	mockFetcher *fetcherMock,
+	mockExtractor extractor.Extractor,
+	mockSanitizer sanitizer.Sanitizer,
 	mockSleeper timeutil.Sleeper,
 ) *scheduler.Scheduler {
 	t.Helper()
-	s := scheduler.NewSchedulerWithDeps(ctx, mockFinalizer, metadataSink, mockLimiter, mockFetcher, mockRobot, mockSleeper)
+	// Create a real extractor if none provided
+	if mockExtractor == nil {
+		ext := extractor.NewDomExtractor(metadataSink)
+		mockExtractor = &ext
+	}
+	// Create a real sanitizer if none provided
+	if mockSanitizer == nil {
+		san := sanitizer.NewHTMLSanitizer(metadataSink)
+		mockSanitizer = &san
+	}
+	s := scheduler.NewSchedulerWithDeps(ctx, mockFinalizer, metadataSink, mockLimiter, mockFetcher, mockRobot, mockExtractor, mockSanitizer, mockSleeper)
 	return &s
 }
 

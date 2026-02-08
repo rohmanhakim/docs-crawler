@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Repairable Heading Skips</title>
+</head>
+<body>
+    <main>
+        <h1>Main Documentation Title</h1>
+        <p>Introduction paragraph.</p>
+        
+        <!-- Skip: h1 -> h3 (missing h2) -->
+        <h3>Getting Started Section</h3>
+        <p>Getting started content.</p>
+        
+        <!-- Skip: h3 -> h2 (going backward, but also out of order) -->
+        <h2>Installation Guide</h2>
+        <p>Installation instructions.</p>
+        
+        <!-- Skip: h2 -> h4 (missing h3) -->
+        <h4>System Requirements</h4>
+        <p>Required specifications.</p>
+        
+        <!-- Skip: h4 -> h2 (jumping back up) -->
+        <h2>Configuration</h2>
+        <p>Configuration details.</p>
+        
+        <!-- Skip: h2 -> h5 (missing h3, h4) -->
+        <h5>Advanced Settings</h5>
+        <p>Advanced configuration options.</p>
+    </main>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Malformed But Repairable DOM</title>
+</head>
+<body>
+    <main>
+        <h1>Documentation Title</h1>
+        <p>This paragraph is inside the h1 tag but not properly closed above</p>
+        
+        <div class="content">
+            <p>Another paragraph that is unclosed</p>
+            <span>Some inline text</span>
+        </div>
+        
+        <section>
+            <h2>Section One</h2>
+            <p>Content for section one.</p>
+            
+            <h3>Subsection</h3>
+            <p>Subsection content without closing tags</p>
+            
+        </section>
+        
+        <article>
+            <h2>Article Section</h2>
+            <div><div><p>Deeply nested unclosed divs</p></div></div>
+        </article>
+    </main>
+</body>
+</html>

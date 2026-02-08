@@ -35,7 +35,7 @@ func TestRateLimiter_SetBaseDelay_Called(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{Allowed: true, Reason: robots.EmptyRuleSet}, nil)
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -87,7 +87,7 @@ func TestRateLimiter_SetCrawlDelay_CalledWithCorrectDelay(t *testing.T) {
 	mockLimiter.On("ResetBackoff", host).Return()
 	mockRobot.OnDecide(mock.Anything, decision, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission
@@ -124,7 +124,7 @@ func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{Allowed: true, Reason: robots.EmptyRuleSet}, nil)
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -171,7 +171,7 @@ func TestRateLimiter_SetRandomSeed_CalledWithConfigValue(t *testing.T) {
 	mockRobot.OnDecide(mock.Anything, robots.Decision{Allowed: true, Reason: robots.EmptyRuleSet}, nil)
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -224,7 +224,7 @@ func TestBackoff_TriggersOnTooManyRequests(t *testing.T) {
 	mockLimiter.On("Backoff", host).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission (simulating the call from ExecuteCrawling)
@@ -275,7 +275,7 @@ func TestBackoff_TriggersOnServerError(t *testing.T) {
 	mockLimiter.On("Backoff", host).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission
@@ -323,7 +323,7 @@ func TestBackoff_DoesNotTriggerOnOtherErrors(t *testing.T) {
 	// Backoff should NOT be called for 403
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission
@@ -369,7 +369,7 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -429,7 +429,7 @@ func TestResetBackoff_CalledOnSuccessfulRobotsRequest(t *testing.T) {
 	mockLimiter.On("ResetBackoff", host).Return()
 	mockRobot.OnDecide(mock.Anything, decision, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission (successful robots request)
@@ -477,7 +477,7 @@ func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 	mockLimiter.On("Backoff", host).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 	s.SetCurrentHost(host)
 
 	// WHEN: submitting URL for admission (failed robots request)
@@ -521,7 +521,7 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -580,7 +580,7 @@ func TestSleeper_ResolveDelayAndSleepCalled(t *testing.T) {
 	// Sleep should be called with the delay returned by ResolveDelay
 	mockSleeper.On("Sleep", delay).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

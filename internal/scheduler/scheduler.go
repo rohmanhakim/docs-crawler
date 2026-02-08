@@ -62,8 +62,8 @@ type Scheduler struct {
 	robot                  robots.Robot
 	frontier               *frontier.Frontier
 	htmlFetcher            fetcher.Fetcher
-	domExtractor           extractor.DomExtractor
-	htmlSanitizer          sanitizer.HtmlSanitizer
+	domExtractor           extractor.Extractor
+	htmlSanitizer          sanitizer.Sanitizer
 	markdownConversionRule mdconvert.Rule
 	assetResolver          assets.Resolver
 	markdownConstraint     normalize.MarkdownConstraint
@@ -93,8 +93,8 @@ func NewScheduler() Scheduler {
 		robot:                  &cachedRobot,
 		frontier:               &frontier,
 		htmlFetcher:            &fetcher,
-		domExtractor:           ext,
-		htmlSanitizer:          sanitizer,
+		domExtractor:           &ext,
+		htmlSanitizer:          &sanitizer,
 		markdownConversionRule: conversionRule,
 		assetResolver:          resolver,
 		markdownConstraint:     markdownConstraint,
@@ -114,15 +114,15 @@ func NewSchedulerWithDeps(
 	rateLimiter limiter.RateLimiter,
 	fetcher fetcher.Fetcher,
 	robot robots.Robot,
+	domExtractor extractor.Extractor,
+	sanitizer sanitizer.Sanitizer,
 	sleeper timeutil.Sleeper,
 ) Scheduler {
-	frontier := frontier.NewFrontier()
-	ext := extractor.NewDomExtractor(metadataSink)
-	sanitizer := sanitizer.NewHTMLSanitizer(metadataSink)
 	conversionRule := mdconvert.NewRule()
 	resolver := assets.NewResolver(metadataSink)
 	markdownConstraint := normalize.NewMarkdownConstraint(metadataSink)
 	storageSink := storage.NewSink(metadataSink)
+	frontier := frontier.NewFrontier()
 	return Scheduler{
 		ctx:                    ctx,
 		metadataSink:           metadataSink,
@@ -130,7 +130,7 @@ func NewSchedulerWithDeps(
 		robot:                  robot,
 		frontier:               &frontier,
 		htmlFetcher:            fetcher,
-		domExtractor:           ext,
+		domExtractor:           domExtractor,
 		htmlSanitizer:          sanitizer,
 		markdownConversionRule: conversionRule,
 		assetResolver:          resolver,
@@ -334,7 +334,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 5. Sanitize extracted HTML
-		sanitizedHtml, err := s.htmlSanitizer.Sanitize(extractionResult)
+		sanitizedHtml, err := s.htmlSanitizer.Sanitize(extractionResult.ContentNode)
 		if err != nil {
 			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
