@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Structurally Ambiguous DOM</title>
+</head>
+<body>
+    <main>
+        <!-- Deeply nested conflicting structures -->
+        <div>
+            <article>
+                <section>
+                    <article>
+                        <h1>First Possible Title</h1>
+                        <p>Content under first interpretation.</p>
+                        
+                        <div>
+                            <section>
+                                <h2>Nested Section</h2>
+                                <p>Could belong to either article.</p>
+                            </section>
+                        </div>
+                    </article>
+                    
+                    <h1>Second Possible Title</h1>
+                    <p>Content under second interpretation.</p>
+                </section>
+            </article>
+        </div>
+        
+        <!-- Overlapping heading contexts -->
+        <h1>Top Level Heading 1</h1>
+        <h2>Subheading A</h2>
+        <div>
+            <h1>Another Top Level Heading</h1>
+            <h2>Subheading B</h2>
+            <div>
+                <h3>Deeply Nested</h3>
+                <p>Could belong to either h1 context.</p>
+            </div>
+        </div>
+        <h3>Orphaned Heading</h3>
+        <p>Belongs to which parent? Unclear.</p>
+        
+        <!-- Multiple main elements -->
+        <main>
+            <h2>Secondary Main Content</h2>
+            <p>Another main element later in the document.</p>
+        </main>
+    </main>
+</body>
+</html>

@@ -5,22 +5,24 @@ import (
 	"testing"
 
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/net/html"
 )
 
-// extractorMock is a testify mock for the extractor.DomExtractor
+// extractorMock is a testify mock for the extractor.Extractor
 type extractorMock struct {
 	mock.Mock
 }
 
 // Extract mocks the Extract method
-func (e *extractorMock) Extract(sourceURL url.URL, htmlBytes []byte) (extractor.ExtractionResult, error) {
-	args := e.Called(sourceURL, htmlBytes)
+func (e *extractorMock) Extract(sourceUrl url.URL, htmlByte []byte) (extractor.ExtractionResult, failure.ClassifiedError) {
+	args := e.Called(sourceUrl, htmlByte)
 	result := args.Get(0).(extractor.ExtractionResult)
-	var err error
+	var err failure.ClassifiedError
 	if args.Get(1) != nil {
-		err = args.Error(1)
+		err = args.Get(1).(failure.ClassifiedError)
 	}
 	return result, err
 }
@@ -38,8 +40,17 @@ func newExtractorMockForTest(t *testing.T) *extractorMock {
 }
 
 // setupExtractorMockWithSuccess sets up the extractor mock to return a successful extraction result
-func setupExtractorMockWithSuccess(m *extractorMock) {
-	m.On("Extract", mock.Anything, mock.Anything).Return(extractor.ExtractionResult{}, nil)
+func setupExtractorMockWithSuccess(m *extractorMock, contentNode *html.Node) {
+	result := extractor.ExtractionResult{
+		DocumentRoot: contentNode, // Using contentNode as DocumentRoot for simplicity
+		ContentNode:  contentNode,
+	}
+	m.On("Extract", mock.Anything, mock.Anything).Return(result, nil)
+}
+
+// setupExtractorMockWithError sets up the extractor mock to return an error
+func setupExtractorMockWithError(m *extractorMock, err failure.ClassifiedError) {
+	m.On("Extract", mock.Anything, mock.Anything).Return(extractor.ExtractionResult{}, err)
 }
 
 // setupExtractorMockWithSetExtractParamExpectation sets up the extractor mock to expect SetExtractParam call
@@ -47,7 +58,6 @@ func setupExtractorMockWithSetExtractParamExpectation(m *extractorMock, params e
 	m.On("SetExtractParam", params).Return()
 }
 
-// verifyExtractParam verifies that the extraction parameters match expected values
 func verifyExtractParam(t *testing.T, actual extractor.ExtractParam, expected extractor.ExtractParam) {
 	t.Helper()
 	assert.InDelta(t, expected.BodySpecificityBias, actual.BodySpecificityBias, 0.0001, "BodySpecificityBias mismatch")

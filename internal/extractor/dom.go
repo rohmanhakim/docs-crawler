@@ -23,20 +23,30 @@ Responsibilities
 
 Extraction Strategy
 - Priority order:
-	- Semantic containers (main, article)
-    - Configured selectors
-    - Heuristic fallback (largest coherent text block)
+  - Semantic containers (main, article)
+  - Configured selectors
+  - Heuristic fallback (largest coherent text block)
+
 Removal Rules
 - Strip:
-    - Navigation menus
-    - Headers and footers
-    - Sidebars
-    - Cookie banners
-    - Version selectors
-    - Edit links
+  - Navigation menus
+  - Headers and footers
+  - Sidebars
+  - Cookie banners
+  - Version selectors
+  - Edit links
 
 Only content relevant to the document body may pass through.
 */
+type Extractor interface {
+	// Extract processes the HTML bytes and returns the extracted content.
+	// It returns an ExtractionResult containing the document root and content node,
+	// or a ClassifiedError if extraction fails.
+	Extract(sourceUrl url.URL, htmlByte []byte) (ExtractionResult, failure.ClassifiedError)
+
+	// SetExtractParam allows callers to override the default extraction parameters.
+	SetExtractParam(params ExtractParam)
+}
 
 type DomExtractor struct {
 	metadataSink    metadata.MetadataSink

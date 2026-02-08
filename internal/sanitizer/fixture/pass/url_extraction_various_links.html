@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>URL Extraction Test Document</title>
+</head>
+<body>
+    <main>
+        <h1>Documentation with Various Links</h1>
+        
+        <h2>HTTP(S) Absolute URLs</h2>
+        <p>
+            <a href="https://example.com/page1">Example Page 1</a>
+            <a href="http://example.org/page2">Example Page 2 (HTTP)</a>
+            <a href="https://docs.example.com/guide">Documentation Guide</a>
+        </p>
+        
+        <h2>Relative URLs</h2>
+        <p>
+            <a href="./getting-started.html">Getting Started</a>
+            <a href="../api/reference.html">API Reference</a>
+            <a href="/absolute/path/page.html">Absolute Path</a>
+            <a href="chapter/section.html">Chapter Section</a>
+        </p>
+        
+        <h2>Fragment-only Links (Should be skipped)</h2>
+        <p>
+            <a href="#section1">Jump to Section 1</a>
+            <a href="#">Top of page</a>
+        </p>
+        
+        <h2>Non-HTTP Schemes (Should be skipped)</h2>
+        <p>
+            <a href="mailto:user@example.com">Email Link</a>
+            <a href="javascript:alert('hello')">JavaScript Link</a>
+            <a href="tel:+1234567890">Phone Link</a>
+            <a href="ftp://ftp.example.com/file.txt">FTP Link</a>
+        </p>
+        
+        <h2>Empty or Whitespace (Should be skipped)</h2>
+        <p>
+            <a href="">Empty Href</a>
+            <a href="   ">Whitespace Only</a>
+        </p>
+        
+        <h2>Duplicate Links (Should be deduplicated)</h2>
+        <p>
+            <a href="https://example.com/duplicate">First Occurrence</a>
+            <a href="https://example.com/duplicate">Duplicate Link</a>
+            <a href="./relative-duplicate.html">Relative First</a>
+            <a href="./relative-duplicate.html">Relative Duplicate</a>
+        </p>
+        
+        <h2>Links Without href (Should be skipped)</h2>
+        <p>
+            <a name="anchor">Named Anchor</a>
+            <a>Link without href</a>
+        </p>
+    </main>
+</body>
+</html>

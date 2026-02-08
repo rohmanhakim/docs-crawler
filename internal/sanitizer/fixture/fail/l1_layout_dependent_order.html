@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Layout Dependent Reading Order</title>
+    <style>
+        /* CSS Grid that reorders content visually */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-areas: 
+                "sidebar main";
+        }
+        .sidebar { grid-area: sidebar; }
+        .main { grid-area: main; }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Documentation</h1>
+        
+        <!-- DOM order: sidebar comes first -->
+        <!-- Visual order: main appears first due to CSS grid -->
+        <div class="grid-container">
+            <aside class="sidebar">
+                <h2>Related Topics</h2>
+                <p>Links to related documentation.</p>
+                <p>These appear on the left in visual layout.</p>
+            </aside>
+            
+            <div class="main">
+                <h2>Main Content</h2>
+                <p>This is the primary documentation content.</p>
+                <p>This appears on the right in visual layout but is second in DOM.</p>
+            </div>
+        </div>
+        
+        <!-- Another example with flexbox reordering -->
+        <div style="display: flex; flex-direction: row-reverse;">
+            <div>
+                <h2>Conclusion</h2>
+                <p>This appears first visually but second in DOM.</p>
+            </div>
+            <div>
+                <h2>Introduction</h2>
+                <p>This appears second visually but first in DOM.</p>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
