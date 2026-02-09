@@ -9,219 +9,18 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
+	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
-	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/html"
 )
 
-// TestScheduler_Sanitizer_CalledWithExtractedContentNode verifies that the sanitizer
-// is called with the ContentNode from the extraction result.
-func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-
-	// Setup extractor to return a valid content node
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer mock to capture the input node
-	var receivedNode *html.Node
-	mockSanitizer.On("Sanitize", mock.Anything).
-		Run(func(args mock.Arguments) {
-			receivedNode = args.Get(0).(*html.Node)
-		}).
-		Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		nil,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
-
-	// Verify sanitizer was called with the content node from extractor
-	assert.Equal(t, contentNode, receivedNode, "Sanitizer should be called with the ContentNode from extraction")
-	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
-	mockExtractor.AssertCalled(t, "Extract", mock.Anything, mock.Anything)
-}
-
-// TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion verifies
-// that successful sanitization allows the pipeline to continue to markdown conversion.
-func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer to return successful result with valid content node
-	mockSanitizer.On("Sanitize", mock.Anything).
-		Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		nil,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	exec, err := s.ExecuteCrawling(configPath)
-
-	// Should complete without error
-	assert.NoError(t, err)
-	// Sanitizer should be called
-	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
-	t.Logf("Execution completed with %d write results", len(exec.WriteResults))
-}
-
-// TestScheduler_Sanitizer_FatalError_AbortsCrawl verifies that fatal sanitizer errors
-// cause the crawl to abort immediately.
-func TestScheduler_Sanitizer_FatalError_AbortsCrawl(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer to return a fatal error
-	sanitizerErr := &sanitizer.SanitizationError{
-		Message:   "structural error: multiple competing roots",
-		Retryable: false,
-		Cause:     sanitizer.ErrCauseCompetingRoots,
-	}
-	mockSanitizer.On("Sanitize", contentNode).
-		Return(sanitizer.SanitizedHTMLDoc{}, sanitizerErr)
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		nil,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 1
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
-
-	// Fatal sanitizer error should abort the crawl
-	assert.Error(t, execErr, "Expected error for fatal sanitizer error")
-	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
-}
-
-// TestScheduler_Sanitizer_ErrorDoesNotCallConvert verifies that when Sanitize()
-// returns an error, the scheduler does not call mdconvert.Convert().
-func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
+// TestScheduler_Convert_CalledWithSanitizedHTMLDoc verifies that the convert
+// is called with the SanitizedHTMLDoc from the sanitizer stage.
+func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
@@ -242,22 +41,23 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	// Setup extractor
+	// Setup extractor to return a valid content node
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
 	setupExtractorMockWithSuccess(mockExtractor, contentNode)
 	mockExtractor.On("SetExtractParam", mock.Anything).Return()
 
-	// Setup sanitizer to return a fatal error
-	sanitizerErr := &sanitizer.SanitizationError{
-		Message:   "sanitization failed",
-		Retryable: false,
-		Cause:     sanitizer.ErrCauseCompetingRoots,
-	}
-	mockSanitizer.On("Sanitize", mock.Anything).
-		Return(sanitizer.SanitizedHTMLDoc{}, sanitizerErr)
+	// Setup sanitizer to return a valid sanitized doc
+	sanitizedDoc := createSanitizedHTMLDocForTest(nil)
+	mockSanitizer.On("Sanitize", contentNode).Return(sanitizedDoc, nil)
 
-	// Setup convert mock - should NOT be called
-	mockConvert.On("Convert", mock.Anything).Return(createConversionResultForTest("# Test", nil), nil)
+	// Setup convert mock to capture the input
+	var receivedDoc sanitizer.SanitizedHTMLDoc
+	setupConvertMockWithSuccess(mockConvert)
+	mockConvert.On("Convert", mock.Anything).
+		Run(func(args mock.Arguments) {
+			receivedDoc = args.Get(0).(sanitizer.SanitizedHTMLDoc)
+		}).
+		Return(createConversionResultForTest("# Test", nil), nil)
 
 	s := createSchedulerForTest(
 		t,
@@ -283,23 +83,17 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Execute crawl
+	_, _ = s.ExecuteCrawling(configPath)
 
-	// Fatal sanitizer error should abort the crawl
-	assert.Error(t, execErr, "Expected error for fatal sanitizer error")
-
-	// Verify sanitizer was called
-	mockSanitizer.AssertCalled(t, "Sanitize", mock.Anything)
-
-	// Verify that Convert was NEVER called
-	mockConvert.AssertNotCalled(t, "Convert", mock.Anything)
-	t.Logf("Sanitize error prevented Convert from being called as expected")
+	// Verify convert was called with the sanitized HTML doc
+	mockConvert.AssertCalled(t, "Convert", mock.Anything)
+	assert.NotNil(t, receivedDoc, "Convert should be called with a SanitizedHTMLDoc")
 }
 
-// TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl verifies that recoverable
-// sanitizer errors are counted but the crawl continues.
-func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
+// TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution verifies
+// that successful conversion allows the pipeline to continue to asset resolution.
+func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
@@ -309,6 +103,7 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -324,13 +119,11 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 	setupExtractorMockWithSuccess(mockExtractor, contentNode)
 	mockExtractor.On("SetExtractParam", mock.Anything).Return()
 
-	// Setup sanitizer to return a recoverable error
-	recoverableErr := &mockClassifiedError{
-		msg:      "recoverable sanitization error",
-		severity: failure.SeverityRecoverable,
-	}
-	mockSanitizer.On("Sanitize", contentNode).
-		Return(sanitizer.SanitizedHTMLDoc{}, recoverableErr)
+	// Setup sanitizer
+	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
+
+	// Setup convert to return successful result
+	setupConvertMockWithSuccess(mockConvert)
 
 	s := createSchedulerForTest(
 		t,
@@ -342,7 +135,141 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		mockConvert,
+		mockSleeper,
+	)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	configData := `{
+		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"maxDepth": 0
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	assert.NoError(t, err)
+
+	// Execute crawl
+	exec, execErr := s.ExecuteCrawling(configPath)
+
+	// Should complete without fatal error
+	assert.NoError(t, execErr)
+	// Convert should be called
+	mockConvert.AssertCalled(t, "Convert", mock.Anything)
+	t.Logf("Execution completed with %d write results", len(exec.WriteResults))
+}
+
+// TestScheduler_Convert_FatalError_AbortsCrawl verifies that fatal conversion errors
+// cause the crawl to abort immediately.
+func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
+	ctx := context.Background()
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockExtractor := newExtractorMockForTest(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
+
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
+
+	// Setup extractor
+	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
+	setupExtractorMockWithSuccess(mockExtractor, contentNode)
+	mockExtractor.On("SetExtractParam", mock.Anything).Return()
+
+	// Setup sanitizer
+	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
+
+	// Setup convert to return a fatal error
+	setupConvertMockWithFatalError(mockConvert)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		mockConvert,
+		mockSleeper,
+	)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	configData := `{
+		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"maxDepth": 1
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	assert.NoError(t, err)
+
+	// Execute crawl - should return fatal error
+	_, execErr := s.ExecuteCrawling(configPath)
+
+	// Fatal convert error should abort the crawl
+	assert.Error(t, execErr, "Expected error for fatal convert error")
+	mockConvert.AssertCalled(t, "Convert", mock.Anything)
+}
+
+// TestScheduler_Convert_RecoverableError_ContinuesCrawl verifies that recoverable
+// conversion errors are counted but the crawl continues.
+func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
+	ctx := context.Background()
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockExtractor := newExtractorMockForTest(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
+
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
+
+	// Setup extractor
+	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
+	setupExtractorMockWithSuccess(mockExtractor, contentNode)
+	mockExtractor.On("SetExtractParam", mock.Anything).Return()
+
+	// Setup sanitizer
+	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
+
+	// Setup convert to return a recoverable error
+	setupConvertMockWithRecoverableError(mockConvert)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		mockConvert,
 		mockSleeper,
 	)
 
@@ -360,83 +287,13 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 	_, execErr := s.ExecuteCrawling(configPath)
 
 	// Recoverable errors should not abort the crawl
-	assert.NoError(t, execErr, "Recoverable sanitizer error should not abort crawl")
-	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
+	assert.NoError(t, execErr, "Recoverable convert error should not abort crawl")
+	mockConvert.AssertCalled(t, "Convert", mock.Anything)
 }
 
-// TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier verifies that URLs
-// discovered during sanitization are submitted to the frontier through robots check.
-func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything).Return()
-
-	// Expect Decide calls for: seed URL, seed URL robots check, and discovered URL
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Twice()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer to return discovered URLs
-	discoveredURL, _ := url.Parse("/discovered.html")
-	mockSanitizer.On("Sanitize", contentNode).
-		Return(createSanitizedHTMLDocForTest([]url.URL{*discoveredURL}), nil).Once()
-	mockSanitizer.On("Sanitize", contentNode).
-		Return(createSanitizedHTMLDocForTest([]url.URL{}), nil).Once()
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		nil,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 1
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	t.Logf("Discovered URL test: %v", discoveredURL)
-
-	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
-
-	// Should complete without fatal error
-	assert.NoError(t, execErr)
-	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
-}
-
-// TestScheduler_Sanitizer_MethodCallOrder verifies the correct order of method calls:
+// TestScheduler_Convert_MethodCallOrder verifies the correct order of method calls:
 // Fetch → Extract → Sanitize → Convert → Resolve → Normalize → Write
-func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
+func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
@@ -446,6 +303,7 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -483,10 +341,17 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 		}).Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
 	mockExtractor.On("SetExtractParam", mock.Anything).Return()
 
+	// Setup sanitizer
 	mockSanitizer.On("Sanitize", contentNode).
 		Run(func(args mock.Arguments) {
 			callOrder = append(callOrder, "Sanitize")
 		}).Return(createSanitizedHTMLDocForTest(nil), nil)
+
+	// Setup convert
+	mockConvert.On("Convert", mock.Anything).
+		Run(func(args mock.Arguments) {
+			callOrder = append(callOrder, "Convert")
+		}).Return(createConversionResultForTest("# Test", nil), nil)
 
 	s := createSchedulerForTest(
 		t,
@@ -498,7 +363,7 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		mockConvert,
 		mockSleeper,
 	)
 
@@ -515,19 +380,21 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 	// Execute crawl
 	_, _ = s.ExecuteCrawling(configPath)
 
-	// Verify sanitizer was called
-	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
+	// Verify convert was called
+	mockConvert.AssertCalled(t, "Convert", mock.Anything)
 
-	// Verify order: Sanitize should be called after Extract
+	// Verify order: Convert should be called after Sanitize
 	t.Logf("Call order: %v", callOrder)
 	assert.Contains(t, callOrder, "Fetch", "Fetch should be called")
 	assert.Contains(t, callOrder, "Extract", "Extract should be called")
 	assert.Contains(t, callOrder, "Sanitize", "Sanitize should be called")
+	assert.Contains(t, callOrder, "Convert", "Convert should be called")
 
 	// Find positions
 	fetchIdx := -1
 	extractIdx := -1
 	sanitizeIdx := -1
+	convertIdx := -1
 	for i, call := range callOrder {
 		switch call {
 		case "Fetch":
@@ -536,16 +403,19 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 			extractIdx = i
 		case "Sanitize":
 			sanitizeIdx = i
+		case "Convert":
+			convertIdx = i
 		}
 	}
 
 	assert.Less(t, fetchIdx, extractIdx, "Fetch should be called before Extract")
 	assert.Less(t, extractIdx, sanitizeIdx, "Extract should be called before Sanitize")
+	assert.Less(t, sanitizeIdx, convertIdx, "Sanitize should be called before Convert")
 }
 
-// TestScheduler_Sanitizer_CalledExactlyOncePerPage verifies that the sanitizer
+// TestScheduler_Convert_CalledExactlyOncePerPage verifies that the convert
 // is called exactly once for each page processed.
-func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
+func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
@@ -555,6 +425,7 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -570,9 +441,11 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 	setupExtractorMockWithSuccess(mockExtractor, contentNode)
 	mockExtractor.On("SetExtractParam", mock.Anything).Return()
 
-	// Setup sanitizer - should be called exactly once
-	mockSanitizer.On("Sanitize", contentNode).
-		Return(createSanitizedHTMLDocForTest(nil), nil).Once()
+	// Setup sanitizer
+	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
+
+	// Setup convert - should be called exactly once
+	setupConvertMockWithSuccess(mockConvert)
 
 	s := createSchedulerForTest(
 		t,
@@ -584,7 +457,7 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		mockConvert,
 		mockSleeper,
 	)
 
@@ -601,14 +474,14 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 	// Execute crawl
 	_, _ = s.ExecuteCrawling(configPath)
 
-	// Verify sanitizer was called exactly once
-	mockSanitizer.AssertNumberOfCalls(t, "Sanitize", 1)
+	// Verify convert was called exactly once
+	mockConvert.AssertNumberOfCalls(t, "Convert", 1)
 }
 
-// TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls verifies that when Sanitize()
-// returns an error, the scheduler does not call sanitizedHtml.GetDiscoveredURLs()
-// or SubmitUrlForAdmission() for discovered URLs.
-func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
+// TestScheduler_Convert_ErrorPreventsSubsequentCalls verifies that when Convert()
+// returns a fatal error, the scheduler aborts the crawl and does not proceed to
+// subsequent pipeline stages.
+func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
@@ -618,9 +491,10 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
-	// Only expect one Decide call for the seed URL - no discovered URLs should be submitted
+	// Only expect one Decide call for the seed URL
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -634,14 +508,16 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 	setupExtractorMockWithSuccess(mockExtractor, contentNode)
 	mockExtractor.On("SetExtractParam", mock.Anything).Return()
 
-	// Setup sanitizer to return a fatal error using mock.Anything to ensure it gets called
-	sanitizerErr := &sanitizer.SanitizationError{
-		Message:   "ambiguous DOM structure",
+	// Setup sanitizer
+	mockSanitizer.On("Sanitize", mock.Anything).Return(createSanitizedHTMLDocForTest(nil), nil)
+
+	// Setup convert to return a fatal error
+	convertErr := &mdconvert.ConversionError{
+		Message:   "conversion failed",
 		Retryable: false,
-		Cause:     sanitizer.ErrCauseAmbiguousDOM,
+		Cause:     mdconvert.ErrCauseConversionFailure,
 	}
-	mockSanitizer.On("Sanitize", mock.Anything).
-		Return(sanitizer.SanitizedHTMLDoc{}, sanitizerErr)
+	mockConvert.On("Convert", mock.Anything).Return(mdconvert.ConversionResult{}, convertErr)
 
 	s := createSchedulerForTest(
 		t,
@@ -653,14 +529,14 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		mockConvert,
 		mockSleeper,
 	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 
-	// Use maxDepth: 1 to allow for potential discovered URLs
+	// Use maxDepth: 1 to allow for potential additional processing
 	configData := `{
 		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
 		"maxDepth": 1
@@ -671,14 +547,14 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 	// Execute crawl - should return fatal error
 	_, execErr := s.ExecuteCrawling(configPath)
 
-	// Fatal sanitizer error should abort the crawl
-	assert.Error(t, execErr, "Expected error for fatal sanitizer error")
+	// Fatal convert error should abort the crawl
+	assert.Error(t, execErr, "Expected error for fatal convert error")
 
-	// Verify sanitizer was called
-	mockSanitizer.AssertCalled(t, "Sanitize", mock.Anything)
+	// Verify convert was called
+	mockConvert.AssertCalled(t, "Convert", mock.Anything)
 
-	// Verify that Robot.Decide was only called once (for seed URL, not for discovered URLs)
-	// This proves that SubmitUrlForAdmission was never called for discovered URLs
+	// Verify that Robot.Decide was only called once (for seed URL)
+	// This proves that the crawl aborted before processing more URLs
 	mockRobot.AssertNumberOfCalls(t, "Decide", 1)
-	t.Logf("Sanitize error prevented discovered URL submission as expected")
+	t.Logf("Convert error prevented further processing as expected")
 }

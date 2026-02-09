@@ -2,6 +2,7 @@ package scheduler_test
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
@@ -61,7 +62,26 @@ func setupSanitizerMockWithRecoverableError(m *sanitizerMock) {
 
 // createSanitizedHTMLDocForTest creates a SanitizedHTMLDoc for testing
 // Uses the NewSanitizedHTMLDoc constructor to properly initialize the struct
-// with private fields for testing purposes.
+// with private fields for testing purposes. Creates a minimal valid HTML node
+// to avoid nil pointer issues during markdown conversion.
 func createSanitizedHTMLDocForTest(discoveredURLs []url.URL) sanitizer.SanitizedHTMLDoc {
-	return sanitizer.NewSanitizedHTMLDoc(nil, discoveredURLs)
+	// Create a minimal valid HTML node to avoid nil pointer issues
+	htmlContent := "<p>Test content</p>"
+	doc, _ := html.Parse(strings.NewReader(htmlContent))
+
+	// Find the body node
+	var body *html.Node
+	var traverse func(*html.Node)
+	traverse = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "body" {
+			body = n
+			return
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			traverse(c)
+		}
+	}
+	traverse(doc)
+
+	return sanitizer.NewSanitizedHTMLDoc(body, discoveredURLs)
 }

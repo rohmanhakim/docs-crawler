@@ -65,7 +65,7 @@ type Scheduler struct {
 	htmlFetcher            fetcher.Fetcher
 	domExtractor           extractor.Extractor
 	htmlSanitizer          sanitizer.Sanitizer
-	markdownConversionRule mdconvert.Rule
+	markdownConversionRule mdconvert.ConvertRule
 	assetResolver          assets.Resolver
 	markdownConstraint     normalize.MarkdownConstraint
 	storageSink            storage.Sink
@@ -82,7 +82,7 @@ func NewScheduler() Scheduler {
 	fetcher := fetcher.NewHtmlFetcher(&recorder)
 	ext := extractor.NewDomExtractor(&recorder)
 	sanitizer := sanitizer.NewHTMLSanitizer(&recorder)
-	conversionRule := mdconvert.NewRule()
+	conversionRule := mdconvert.NewRule(&recorder)
 	resolver := assets.NewResolver(&recorder)
 	markdownConstraint := normalize.NewMarkdownConstraint(&recorder)
 	storageSink := storage.NewSink(&recorder)
@@ -119,7 +119,7 @@ func NewSchedulerWithDeps(
 	sanitizer sanitizer.Sanitizer,
 	sleeper timeutil.Sleeper,
 ) Scheduler {
-	conversionRule := mdconvert.NewRule()
+	conversionRule := mdconvert.NewRule(metadataSink)
 	resolver := assets.NewResolver(metadataSink)
 	markdownConstraint := normalize.NewMarkdownConstraint(metadataSink)
 	storageSink := storage.NewSink(metadataSink)
@@ -373,7 +373,14 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 6. HTML → Markdown Conversion
-		markdownDoc := s.markdownConversionRule.Convert(sanitizedHtml)
+		markdownDoc, err := s.markdownConversionRule.Convert(sanitizedHtml)
+		if err != nil {
+			if err.Severity() == failure.SeverityFatal {
+				return CrawlingExecution{}, err
+			}
+			totalErrors++
+			continue
+		}
 
 		// 7. Assets Resolution
 		assetfulMarkdown, err := s.assetResolver.Resolve(markdownDoc)
@@ -499,4 +506,10 @@ func (s *Scheduler) DequeueFromFrontier() (frontier.CrawlToken, bool) {
 		return frontier.CrawlToken{}, false
 	}
 	return s.frontier.Dequeue()
+}
+
+// SetConvertRule sets the markdown conversion rule for testing.
+// This is a test helper method to inject mock conversion rules.
+func (s *Scheduler) SetConvertRule(rule mdconvert.ConvertRule) {
+	s.markdownConversionRule = rule
 }

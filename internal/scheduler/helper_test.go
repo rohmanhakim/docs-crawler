@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
+	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
@@ -19,6 +20,7 @@ import (
 // that allows testing scheduler in isolation.
 // If mockExtractor is nil, a real extractor will be created.
 // If mockSanitizer is nil, a real sanitizer will be created.
+// If mockConvert is nil, a real convert rule will be created.
 func createSchedulerForTest(
 	t *testing.T,
 	ctx context.Context,
@@ -29,6 +31,7 @@ func createSchedulerForTest(
 	mockFetcher *fetcherMock,
 	mockExtractor extractor.Extractor,
 	mockSanitizer sanitizer.Sanitizer,
+	mockConvert mdconvert.ConvertRule,
 	mockSleeper timeutil.Sleeper,
 ) *scheduler.Scheduler {
 	t.Helper()
@@ -42,7 +45,21 @@ func createSchedulerForTest(
 		san := sanitizer.NewHTMLSanitizer(metadataSink)
 		mockSanitizer = &san
 	}
-	s := scheduler.NewSchedulerWithDeps(ctx, mockFinalizer, metadataSink, mockLimiter, mockFetcher, mockRobot, mockExtractor, mockSanitizer, mockSleeper)
+	s := scheduler.NewSchedulerWithDeps(
+		ctx,
+		mockFinalizer,
+		metadataSink,
+		mockLimiter,
+		mockFetcher,
+		mockRobot,
+		mockExtractor,
+		mockSanitizer,
+		mockSleeper,
+	)
+	// Inject convert mock if provided
+	if mockConvert != nil {
+		s.SetConvertRule(mockConvert)
+	}
 	return &s
 }
 
