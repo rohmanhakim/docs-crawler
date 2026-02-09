@@ -35,7 +35,7 @@ func NewResolver(
 }
 
 func (r *Resolver) Resolve(
-	markdownDoc mdconvert.MarkdownDoc,
+	markdownDoc mdconvert.ConversionResult,
 ) (AssetfulMarkdownDoc, failure.ClassifiedError) {
 	assetfulMarkdownDoc, err := resolve()
 	if err != nil {
