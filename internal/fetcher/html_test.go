@@ -141,6 +141,10 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 	if fetchEvt.crawlDepth != 0 {
 		t.Errorf("expected crawl depth 0, got %d", fetchEvt.crawlDepth)
 	}
+	// Verify retry count records actual attempts (1 for immediate success), not MaxAttempts
+	if fetchEvt.retryCount != 1 {
+		t.Errorf("expected retry count 1 (actual attempts), got %d", fetchEvt.retryCount)
+	}
 
 	// Verify no error events were recorded
 	if len(sink.errorEvents) != 0 {
@@ -296,6 +300,15 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 	if errorEvt.cause != metadata.CauseRetryFailure {
 		t.Errorf("expected cause CauseRetryFailure, got %v", errorEvt.cause)
 	}
+
+	// Verify retry count records actual attempts (2), not MaxAttempts
+	if len(sink.fetchEvents) != 1 {
+		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
+	}
+	fetchEvt := sink.fetchEvents[0]
+	if fetchEvt.retryCount != 2 {
+		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.retryCount)
+	}
 }
 
 func TestHtmlFetcher_Fetch_HTTP429_Retryable(t *testing.T) {
@@ -365,6 +378,15 @@ func TestHtmlFetcher_Fetch_SuccessAfterRetry(t *testing.T) {
 
 	if result.Code() != http.StatusOK {
 		t.Errorf("expected status %d, got %d", http.StatusOK, result.Code())
+	}
+
+	// Verify retry count records actual attempts (2), not MaxAttempts (3)
+	if len(sink.fetchEvents) != 1 {
+		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
+	}
+	fetchEvt := sink.fetchEvents[0]
+	if fetchEvt.retryCount != 2 {
+		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.retryCount)
 	}
 
 	// Verify no error events were recorded (success case)

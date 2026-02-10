@@ -56,7 +56,9 @@ func (h *HtmlFetcher) Fetch(
 	callerMethod := "HtmlFetcher.Fetch"
 	startTime := time.Now()
 
-	result, err := h.fetchWithRetry(ctx, fetchParam.fetchUrl, fetchParam.userAgent, retryParam)
+	retryResult := h.fetchWithRetry(ctx, fetchParam.fetchUrl, fetchParam.userAgent, retryParam)
+	result := retryResult.Value()
+	err := retryResult.Err()
 
 	duration := time.Since(startTime)
 
@@ -66,14 +68,12 @@ func (h *HtmlFetcher) Fetch(
 	var retryCount int
 
 	if err != nil {
-		// Extract retry count from error if it's a RetryError
-		var retryErr *retry.RetryError
-		if errors.As(err, &retryErr) {
-			retryCount = retryParam.MaxAttempts
-		}
+		// Use the actual attempts count from the retry result
+		retryCount = retryResult.Attempts()
 	} else {
 		statusCode = result.Code()
 		contentType = h.extractContentType(result.Headers())
+		retryCount = retryResult.Attempts()
 	}
 
 	h.metadataSink.RecordFetch(
@@ -143,29 +143,12 @@ func (h *HtmlFetcher) recordRetryError(callerMethod string, fetchUrl url.URL, er
 	}
 }
 
-func (h *HtmlFetcher) fetchWithRetry(ctx context.Context, fetchUrl url.URL, userAgent string, retryParam retry.RetryParam) (FetchResult, failure.ClassifiedError) {
+func (h *HtmlFetcher) fetchWithRetry(ctx context.Context, fetchUrl url.URL, userAgent string, retryParam retry.RetryParam) retry.Result[FetchResult] {
 	fetchTask := func() (FetchResult, failure.ClassifiedError) {
 		return h.performFetch(ctx, fetchUrl, userAgent)
 	}
 
-	retryResult := retry.Retry(retryParam, fetchTask)
-	result := retryResult.Value()
-	retryErr := retryResult.Err()
-
-	if retryErr != nil {
-		// Handle error - decide what to return based on error type
-		// Check if it's a FetchError (returned by the task) or RetryError (from retry.Retry)
-		var fetchErr *FetchError
-		if errors.As(retryErr, &fetchErr) {
-			// The underlying error is a FetchError, return it directly
-			return FetchResult{}, fetchErr
-		}
-
-		// It's a RetryError, return it as-is
-		return FetchResult{}, retryErr
-	}
-
-	return result, nil
+	return retry.Retry(retryParam, fetchTask)
 }
 
 func (h *HtmlFetcher) performFetch(ctx context.Context, fetchUrl url.URL, userAgent string) (FetchResult, failure.ClassifiedError) {
