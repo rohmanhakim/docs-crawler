@@ -325,7 +325,6 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 		htmlBody,
 		200,
 		"text/html",
-		uint64(len(htmlBody)),
 		map[string]string{"Content-Type": "text/html"},
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).

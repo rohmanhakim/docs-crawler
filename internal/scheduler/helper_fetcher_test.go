@@ -51,9 +51,15 @@ func newFetcherMockForTest(t *testing.T) *fetcherMock {
 	// Set up default expectation to return valid HTML with meaningful content
 	// This ensures the extractor won't fail with "no content" errors
 	testURL, _ := url.Parse("https://example.com/test")
-	result := fetcher.NewFetchResultForTest(*testURL, []byte(defaultValidHTML), 200, "text/html", uint64(len(defaultValidHTML)), map[string]string{
-		"Content-Type": "text/html",
-	})
+	result := fetcher.NewFetchResultForTest(
+		*testURL,
+		[]byte(defaultValidHTML),
+		200,
+		"text/html",
+		map[string]string{
+			"Content-Type": "text/html",
+		},
+	)
 	m.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(result, nil)
 	return m
@@ -62,9 +68,15 @@ func newFetcherMockForTest(t *testing.T) *fetcherMock {
 // setupFetcherMockWithSuccess sets up the fetcher mock to return a successful response
 func setupFetcherMockWithSuccess(m *fetcherMock, urlStr string, body []byte, statusCode int) {
 	testURL, _ := url.Parse(urlStr)
-	result := fetcher.NewFetchResultForTest(*testURL, body, statusCode, "text/html", uint64(len(body)), map[string]string{
-		"Content-Type": "text/html",
-	})
+	result := fetcher.NewFetchResultForTest(
+		*testURL,
+		body,
+		statusCode,
+		"text/html",
+		map[string]string{
+			"Content-Type": "text/html",
+		},
+	)
 	m.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(result, nil)
 }
 

@@ -255,9 +255,8 @@ func (h *HtmlFetcher) performFetch(ctx context.Context, fetchUrl url.URL, userAg
 		url:  fetchUrl,
 		body: body,
 		meta: ResponseMeta{
-			statusCode:          resp.StatusCode,
-			transferredSizeByte: uint64(len(body)),
-			responseHeaders:     responseHeaders,
+			statusCode:      resp.StatusCode,
+			responseHeaders: responseHeaders,
 		},
 	}
 

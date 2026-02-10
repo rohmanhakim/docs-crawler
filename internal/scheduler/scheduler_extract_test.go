@@ -205,7 +205,6 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 		htmlBody,
 		200,
 		"text/html",
-		uint64(len(htmlBody)),
 		map[string]string{"Content-Type": "text/html"},
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -300,7 +299,6 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 		htmlBody,
 		200,
 		"text/html",
-		uint64(len(htmlBody)),
 		map[string]string{"Content-Type": "text/html"},
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -355,7 +353,6 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 		textBody,
 		200,
 		"text/plain",
-		uint64(len(textBody)),
 		map[string]string{"Content-Type": "text/plain"},
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).

@@ -37,7 +37,7 @@ func (f *FetchResult) Code() int {
 }
 
 func (f *FetchResult) SizeByte() uint64 {
-	return f.meta.transferredSizeByte
+	return uint64(len(f.body))
 }
 
 func (f *FetchResult) Headers() map[string]string {
@@ -45,9 +45,8 @@ func (f *FetchResult) Headers() map[string]string {
 }
 
 type ResponseMeta struct {
-	statusCode          int
-	transferredSizeByte uint64
-	responseHeaders     map[string]string
+	statusCode      int
+	responseHeaders map[string]string
 }
 
 // NewFetchResultForTest creates a FetchResult for testing purposes.
@@ -58,16 +57,14 @@ func NewFetchResultForTest(
 	body []byte,
 	statusCode int,
 	contentType string,
-	transferredSizeByte uint64,
 	responseHeaders map[string]string,
 ) FetchResult {
 	return FetchResult{
 		url:  url,
 		body: body,
 		meta: ResponseMeta{
-			statusCode:          statusCode,
-			transferredSizeByte: transferredSizeByte,
-			responseHeaders:     responseHeaders,
+			statusCode:      statusCode,
+			responseHeaders: responseHeaders,
 		},
 	}
 }
