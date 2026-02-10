@@ -148,7 +148,9 @@ func (h *HtmlFetcher) fetchWithRetry(ctx context.Context, fetchUrl url.URL, user
 		return h.performFetch(ctx, fetchUrl, userAgent)
 	}
 
-	result, retryErr := retry.Retry(retryParam, fetchTask)
+	retryResult := retry.Retry(retryParam, fetchTask)
+	result := retryResult.Value()
+	retryErr := retryResult.Err()
 
 	if retryErr != nil {
 		// Handle error - decide what to return based on error type

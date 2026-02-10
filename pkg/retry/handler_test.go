@@ -55,13 +55,16 @@ func TestRetry_SuccessOnFirstAttempt(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected no error, got: %v", result.Err())
 	}
-	if result != "success" {
-		t.Fatalf("expected 'success', got: %s", result)
+	if result.Value() != "success" {
+		t.Fatalf("expected 'success', got: %s", result.Value())
+	}
+	if result.Attempts() != 1 {
+		t.Fatalf("expected 1 attempt, got: %d", result.Attempts())
 	}
 	if callCount != 1 {
 		t.Fatalf("expected 1 call, got: %d", callCount)
@@ -85,13 +88,16 @@ func TestRetry_PassParameter(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected no error, got: %v", result.Err())
 	}
-	if result != "Hello, world!" {
-		t.Fatalf("expected 'Hello, world!', got: %s", result)
+	if result.Value() != "Hello, world!" {
+		t.Fatalf("expected 'Hello, world!', got: %s", result.Value())
+	}
+	if result.Attempts() != 1 {
+		t.Fatalf("expected 1 attempt, got: %d", result.Attempts())
 	}
 	if callCount != 1 {
 		t.Fatalf("expected 1 call, got: %d", callCount)
@@ -121,13 +127,16 @@ func TestRetry_SuccessAfterRetries(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected no error, got: %v", result.Err())
 	}
-	if result != "success" {
-		t.Fatalf("expected 'success', got: %s", result)
+	if result.Value() != "success" {
+		t.Fatalf("expected 'success', got: %s", result.Value())
+	}
+	if result.Attempts() != 3 {
+		t.Fatalf("expected 3 attempts, got: %d", result.Attempts())
 	}
 	if callCount != 3 {
 		t.Fatalf("expected 3 calls, got: %d", callCount)
@@ -156,19 +165,22 @@ func TestRetry_NonRetryableErrorReturnsImmediately(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err == nil {
+	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
 	}
-	if result != "" {
-		t.Fatalf("expected empty result, got: %s", result)
+	if result.Value() != "" {
+		t.Fatalf("expected empty result, got: %s", result.Value())
+	}
+	if result.Attempts() != 1 {
+		t.Fatalf("expected 1 attempt, got: %d", result.Attempts())
 	}
 	if callCount != 1 {
 		t.Fatalf("expected 1 call for non-retryable error, got: %d", callCount)
 	}
-	if err.Error() != expectedErr.Error() {
-		t.Fatalf("expected error '%s', got: '%s'", expectedErr.Error(), err.Error())
+	if result.Err().Error() != expectedErr.Error() {
+		t.Fatalf("expected error '%s', got: '%s'", expectedErr.Error(), result.Err().Error())
 	}
 }
 
@@ -193,22 +205,25 @@ func TestRetry_ExhaustedAttempts(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err == nil {
+	if result.IsSuccess() {
 		t.Fatal("expected error after exhausting attempts, got nil")
 	}
-	if result != 0 {
-		t.Fatalf("expected zero result, got: %d", result)
+	if result.Value() != 0 {
+		t.Fatalf("expected zero result, got: %d", result.Value())
+	}
+	if result.Attempts() != maxAttempts {
+		t.Fatalf("expected %d attempts, got: %d", maxAttempts, result.Attempts())
 	}
 	if callCount != maxAttempts {
 		t.Fatalf("expected %d calls, got: %d", maxAttempts, callCount)
 	}
-	if err.Severity() != failure.SeverityRecoverable {
-		t.Fatalf("expected error severity to be 'SeverityRecoverable', got: '%s'", err.Severity())
+	if result.Err().Severity() != failure.SeverityRecoverable {
+		t.Fatalf("expected error severity to be 'SeverityRecoverable', got: '%s'", result.Err().Severity())
 	}
 	var retryErr *retry.RetryError
-	errors.As(err, &retryErr)
+	errors.As(result.Err(), &retryErr)
 	if retryErr.Cause != retry.ErrExhaustedAttempts {
 		t.Fatalf("expected error cause 'ErrExhaustedAttempts', got: '%s'", retryErr.Cause)
 	}
@@ -229,20 +244,23 @@ func TestRetry_MaxAttemptsLessThanOne(t *testing.T) {
 	)
 
 	var retryErr *retry.RetryError
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err == nil {
+	if result.IsSuccess() {
 		t.Fatal("expected error for MaxAttempts < 1, got nil")
 	}
-	if err.Severity() != failure.SeverityRecoverable {
-		t.Fatalf("expected error severity to be 'SeverityRecoverable', got: '%s'", err.Severity())
+	if result.Err().Severity() != failure.SeverityRecoverable {
+		t.Fatalf("expected error severity to be 'SeverityRecoverable', got: '%s'", result.Err().Severity())
 	}
-	errors.As(err, &retryErr)
+	errors.As(result.Err(), &retryErr)
 	if retryErr.Cause != retry.ErrZeroAttempt {
 		t.Fatalf("expected error cause is ErrZeroAttempt, got %s", retryErr.Cause)
 	}
-	if result != "" {
-		t.Fatalf("expected empty result, got: %s", result)
+	if result.Value() != "" {
+		t.Fatalf("expected empty result, got: %s", result.Value())
+	}
+	if result.Attempts() != 0 {
+		t.Fatalf("expected 0 attempts, got: %d", result.Attempts())
 	}
 }
 
@@ -273,16 +291,19 @@ func TestRetry_GenericTypePointer(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected no error, got: %v", result.Err())
 	}
-	if result == nil {
+	if result.Value() == nil {
 		t.Fatal("expected non-nil result, got nil")
 	}
-	if result.Value != 42 {
-		t.Fatalf("expected Value=42, got: %d", result.Value)
+	if result.Value().Value != 42 {
+		t.Fatalf("expected Value=42, got: %d", result.Value().Value)
+	}
+	if result.Attempts() != 2 {
+		t.Fatalf("expected 2 attempts, got: %d", result.Attempts())
 	}
 	if callCount != 2 {
 		t.Fatalf("expected 2 calls, got: %d", callCount)
@@ -312,13 +333,16 @@ func TestRetry_GenericTypeSlice(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected no error, got: %v", result.Err())
 	}
-	if len(result) != 3 {
-		t.Fatalf("expected 3 elements, got: %d", len(result))
+	if len(result.Value()) != 3 {
+		t.Fatalf("expected 3 elements, got: %d", len(result.Value()))
+	}
+	if result.Attempts() != 2 {
+		t.Fatalf("expected 2 attempts, got: %d", result.Attempts())
 	}
 }
 
@@ -359,13 +383,16 @@ func TestRetry_MixedRetryableAndNonRetryable(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err == nil {
+	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
 	}
-	if result != "" {
-		t.Fatalf("expected empty result, got: %s", result)
+	if result.Value() != "" {
+		t.Fatalf("expected empty result, got: %s", result.Value())
+	}
+	if result.Attempts() != 3 {
+		t.Fatalf("expected 3 attempts, got: %d", result.Attempts())
 	}
 	if callCount != 3 {
 		t.Fatalf("expected 3 calls (stops at non-retryable), got: %d", callCount)
@@ -399,13 +426,16 @@ func TestRetry_DeterministicWithSameSeed(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected no error, got: %v", result.Err())
 	}
-	if result != 42 {
-		t.Fatalf("expected 42, got: %d", result)
+	if result.Value() != 42 {
+		t.Fatalf("expected 42, got: %d", result.Value())
+	}
+	if result.Attempts() != 2 {
+		t.Fatalf("expected 2 attempts, got: %d", result.Attempts())
 	}
 }
 
@@ -433,13 +463,16 @@ func TestRetry_SuccessAfterManyFailures(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected no error, got: %v", result.Err())
 	}
-	if result != "eventual success" {
-		t.Fatalf("expected 'eventual success', got: %s", result)
+	if result.Value() != "eventual success" {
+		t.Fatalf("expected 'eventual success', got: %s", result.Value())
+	}
+	if result.Attempts() != maxAttempts {
+		t.Fatalf("expected %d attempts, got: %d", maxAttempts, result.Attempts())
 	}
 	if callCount != maxAttempts {
 		t.Fatalf("expected %d calls, got: %d", maxAttempts, callCount)
@@ -464,9 +497,9 @@ func TestRetry_ExhaustedErrorIsRetryable(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	_, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err == nil {
+	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
 	}
 
@@ -475,7 +508,7 @@ func TestRetry_ExhaustedErrorIsRetryable(t *testing.T) {
 		IsRetryable() bool
 	}
 
-	if r, ok := err.(retryableChecker); ok {
+	if r, ok := result.Err().(retryableChecker); ok {
 		if !r.IsRetryable() {
 			t.Error("expected exhausted attempt error to be retryable at scheduler level")
 		}
@@ -518,13 +551,16 @@ func TestRetry_DefaultRetryableWhenNoIsRetryable(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected no error after retry, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected no error after retry, got: %v", result.Err())
 	}
-	if result != "success" {
-		t.Fatalf("expected 'success', got: %s", result)
+	if result.Value() != "success" {
+		t.Fatalf("expected 'success', got: %s", result.Value())
+	}
+	if result.Attempts() != 2 {
+		t.Fatalf("expected 2 attempts, got: %d", result.Attempts())
 	}
 	if callCount != 2 {
 		t.Fatalf("expected 2 calls (default to retryable), got: %d", callCount)
@@ -551,14 +587,14 @@ func TestRetry_ErrorWrapping(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	_, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err == nil {
+	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
 	}
 
 	// The error message should contain information about exhausted attempts
-	if err.Error() == "" {
+	if result.Err().Error() == "" {
 		t.Error("expected non-empty error message")
 	}
 }
@@ -580,13 +616,16 @@ func TestNewRetryParam(t *testing.T) {
 		return "success", nil
 	}
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("unexpected error: %v", result.Err())
 	}
-	if result != "success" {
-		t.Fatalf("unexpected result: %s", result)
+	if result.Value() != "success" {
+		t.Fatalf("unexpected result: %s", result.Value())
+	}
+	if result.Attempts() != 1 {
+		t.Fatalf("expected 1 attempt, got: %d", result.Attempts())
 	}
 	if callCount != 1 {
 		t.Fatalf("expected 1 call, got: %d", callCount)
@@ -609,7 +648,7 @@ func BenchmarkRetry(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = retry.Retry(params, fn)
+		_ = retry.Retry(params, fn)
 	}
 }
 
@@ -629,13 +668,16 @@ func TestRetry_NilErrorTypeSafety(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result, err := retry.Retry(params, fn)
+	result := retry.Retry(params, fn)
 
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
+	if result.IsFailure() {
+		t.Fatalf("expected nil error, got: %v", result.Err())
 	}
-	if result != "success" {
-		t.Fatalf("expected 'success', got: %s", result)
+	if result.Value() != "success" {
+		t.Fatalf("expected 'success', got: %s", result.Value())
+	}
+	if result.Attempts() != 1 {
+		t.Fatalf("expected 1 attempt, got: %d", result.Attempts())
 	}
 }
 
@@ -663,8 +705,8 @@ func TestRetryErrorType(t *testing.T) {
 	)
 
 	// We expect an error here - it should be a RetryError after exhausting attempts
-	_, err := retry.Retry(params, fn)
-	if err == nil {
+	result := retry.Retry(params, fn)
+	if result.IsSuccess() {
 		t.Fatal("expected error after exhausting attempts")
 	}
 }

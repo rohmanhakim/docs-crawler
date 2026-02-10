@@ -14,15 +14,21 @@ import (
 // with jitter between attempts. Only retryable errors will trigger a retry.
 //
 // Type parameter T represents the return type of the function being retried.
-func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError)) (T, failure.ClassifiedError) {
+// Returns a Result containing the value (if successful), error (if failed),
+// and the number of attempts made.
+func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError)) Result[T] {
 	var lastErr failure.ClassifiedError
 	var zero T
 
 	if retryParam.MaxAttempts < 1 {
-		return zero, &RetryError{
-			Message:   "max attempt cannot be 0",
-			Cause:     ErrZeroAttempt,
-			Retryable: true,
+		return Result[T]{
+			value: zero,
+			err: &RetryError{
+				Message:   "max attempt cannot be 0",
+				Cause:     ErrZeroAttempt,
+				Retryable: true,
+			},
+			attempts: 0,
 		}
 	}
 
@@ -34,7 +40,7 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 
 		// Success case: no error
 		if err == nil {
-			return result, nil
+			return NewSuccessResult(result, attempt)
 		}
 
 		lastErr = err
@@ -45,7 +51,11 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 
 		// If not retryable, return immediately
 		if !shouldRetry {
-			return zero, err
+			return Result[T]{
+				value:    zero,
+				err:      err,
+				attempts: attempt,
+			}
 		}
 
 		// If this was the last attempt, break and return exhausted error
@@ -65,11 +75,15 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 		time.Sleep(backoffDelay)
 	}
 
-	// Return the "zero value" of T and the final error when reached max attempts
-	return zero, &RetryError{
-		Message:   fmt.Sprintf("exhausted %d attempts. Last error: %v", retryParam.MaxAttempts, lastErr),
-		Cause:     ErrExhaustedAttempts,
-		Retryable: true, // This is recoverable at scheduler level
+	// Return failure result when max attempts are exhausted
+	return Result[T]{
+		value: zero,
+		err: &RetryError{
+			Message:   fmt.Sprintf("exhausted %d attempts. Last error: %v", retryParam.MaxAttempts, lastErr),
+			Cause:     ErrExhaustedAttempts,
+			Retryable: true, // This is recoverable at scheduler level
+		},
+		attempts: retryParam.MaxAttempts,
 	}
 }
 
