@@ -60,6 +60,20 @@ func (m *mockMetadataSink) RecordFetch(
 	})
 }
 
+func (m *mockMetadataSink) RecordAssetFetch(
+	fetchUrl string,
+	httpStatus int,
+	duration time.Duration,
+	retryCount int,
+) {
+	m.fetchEvents = append(m.fetchEvents, fetchEvent{
+		fetchUrl:   fetchUrl,
+		httpStatus: httpStatus,
+		duration:   duration,
+		retryCount: retryCount,
+	})
+}
+
 func (m *mockMetadataSink) RecordError(
 	observedAt time.Time,
 	packageName string,

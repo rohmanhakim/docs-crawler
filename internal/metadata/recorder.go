@@ -81,6 +81,13 @@ func (r *Recorder) RecordFetch(
 }
 
 func (r *Recorder) RecordArtifact(kind ArtifactKind, path string, attrs []Attribute) {}
+func (r *Recorder) RecordAssetFetch(
+	fetchUrl string,
+	httpStatus int,
+	duration time.Duration,
+	retryCount int,
+) {
+}
 
 /*
 RecordFinalCrawlStats records a terminal, derived summary of a completed crawl.
@@ -131,6 +138,13 @@ type MetadataSink interface {
 		crawlDepth int,
 	)
 	RecordArtifact(kind ArtifactKind, path string, attrs []Attribute)
+
+	RecordAssetFetch(
+		fetchUrl string,
+		httpStatus int,
+		duration time.Duration,
+		retryCount int,
+	)
 }
 
 type CrawlFinalizer interface {
@@ -170,3 +184,10 @@ func (n *NoopSink) RecordFetch(
 }
 
 func (n *NoopSink) RecordArtifact(kind ArtifactKind, path string, attrs []Attribute) {}
+func (n *NoopSink) RecordAssetFetch(
+	fetchUrl string,
+	httpStatus int,
+	duration time.Duration,
+	retryCount int,
+) {
+}

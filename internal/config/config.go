@@ -49,13 +49,15 @@ type Config struct {
 	// capped maximum delay for backoff to stop exponential multiplication
 	backoffMaxDuration time.Duration
 
-	//===============
+	// ===============
 	// Fetch
-	//===============
+	// ===============
 	// Maximum time of a single fetch request in millisecond
 	timeout time.Duration
 	// User agent that will be used in the request header. In raw string
 	userAgent string
+	// Maximum size of assets to download in bytes. 0 means unlimited.
+	maxAssetSize int64
 
 	//===============
 	// Output
@@ -127,6 +129,7 @@ type configDTO struct {
 	BackoffMaxDuration     time.Duration       `json:"backoffMaxDuration,omitempty"`
 	Timeout                time.Duration       `json:"timeout,omitempty"`
 	UserAgent              string              `json:"userAgent,omitempty"`
+	MaxAssetSize           int64               `json:"maxAssetSize,omitempty"`
 	OutputDir              string              `json:"outputDir,omitempty"`
 	DryRun                 bool                `json:"dryRun,omitempty"`
 	// Extraction parameters
@@ -196,6 +199,9 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	}
 	if dto.UserAgent != "" {
 		cfg.userAgent = dto.UserAgent
+	}
+	if dto.MaxAssetSize != 0 {
+		cfg.maxAssetSize = dto.MaxAssetSize
 	}
 	if dto.OutputDir != "" {
 		cfg.outputDir = dto.OutputDir
@@ -285,6 +291,7 @@ func WithDefault(seedUrls []url.URL) *Config {
 		backoffMaxDuration:     10 * time.Second,
 		timeout:                time.Second * 10,
 		userAgent:              "docs-crawler/1.0",
+		maxAssetSize:           0, // 0 means unlimited
 		outputDir:              "output",
 		dryRun:                 false,
 		// Extraction defaults
@@ -375,6 +382,11 @@ func (c *Config) WithTimeout(timeout time.Duration) *Config {
 
 func (c *Config) WithUserAgent(agent string) *Config {
 	c.userAgent = agent
+	return c
+}
+
+func (c *Config) WithMaxAssetSize(size int64) *Config {
+	c.maxAssetSize = size
 	return c
 }
 
@@ -511,6 +523,10 @@ func (c Config) Timeout() time.Duration {
 
 func (c Config) UserAgent() string {
 	return c.userAgent
+}
+
+func (c Config) MaxAssetSize() int64 {
+	return c.maxAssetSize
 }
 
 func (c Config) OutputDir() string {
