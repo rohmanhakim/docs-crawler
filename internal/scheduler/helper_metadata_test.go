@@ -32,4 +32,5 @@ func (e *errorRecordingSink) RecordFetch(
 ) {
 }
 
-func (e *errorRecordingSink) RecordArtifact(path string) {}
+func (e *errorRecordingSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
+}

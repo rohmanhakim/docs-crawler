@@ -52,7 +52,13 @@ func (s *Sink) Write(
 		)
 		return WriteResult{}, storageError
 	}
-	s.metadataSink.RecordArtifact(writeResult.artifact.path)
+	s.metadataSink.RecordArtifact(
+		metadata.ArtifactMarkdown,
+		writeResult.artifact.path,
+		[]metadata.Attribute{
+			metadata.NewAttr(metadata.AttrWritePath, writeResult.artifact.path),
+		},
+	)
 	return writeResult, nil
 }
 

@@ -78,7 +78,7 @@ func (m *mockMetadataSink) RecordError(
 	})
 }
 
-func (m *mockMetadataSink) RecordArtifact(path string) {
+func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
 	m.artifactEvents = append(m.artifactEvents, path)
 }
 

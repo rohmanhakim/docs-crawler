@@ -38,7 +38,8 @@ func (m *mockMetadataSink) RecordFetch(
 ) {
 }
 
-func (m *mockMetadataSink) RecordArtifact(path string) {}
+func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
+}
 
 func TestNewRobotsFetcher(t *testing.T) {
 	sink := &mockMetadataSink{}

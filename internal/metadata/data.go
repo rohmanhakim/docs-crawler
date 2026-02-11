@@ -29,8 +29,20 @@ type crawlStats struct {
 	durationMs  int64
 }
 
+type ArtifactKind string
+
+const (
+	ArtifactMarkdown ArtifactKind = "markdown"
+	ArtifactAsset    ArtifactKind = "asset"
+)
+
 type ArtifactRecord struct {
-	paths string
+	Kind        ArtifactKind
+	WritePath   string
+	SourceURL   string
+	ContentHash string
+	Overwrite   bool
+	Bytes       int64
 }
 
 /*

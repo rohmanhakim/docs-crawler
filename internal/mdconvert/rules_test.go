@@ -259,7 +259,8 @@ func (m *mockMetadataSink) RecordFetch(
 ) {
 }
 
-func (m *mockMetadataSink) RecordArtifact(path string) {}
+func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
+}
 
 // TestConvert_ErrorMetadataRecording verifies that errors are recorded to the metadata sink.
 func TestConvert_ErrorMetadataRecording(t *testing.T) {

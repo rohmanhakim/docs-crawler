@@ -50,7 +50,8 @@ func (m *mockMetadataSink) RecordFetch(
 ) {
 }
 
-func (m *mockMetadataSink) RecordArtifact(path string) {}
+func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
+}
 
 // renderHtmlForTest serializes an html.Node to its HTML string representation.
 // This is used to compare sanitized output against expected fixtures.

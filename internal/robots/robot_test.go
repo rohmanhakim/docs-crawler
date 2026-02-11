@@ -80,7 +80,7 @@ func (m *robotTestMetadataSink) RecordError(
 	})
 }
 
-func (m *robotTestMetadataSink) RecordArtifact(path string) {
+func (m *robotTestMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
 	// No-op for testing
 }
 
