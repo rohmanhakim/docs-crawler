@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
@@ -206,6 +207,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 		200,
 		"text/html",
 		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
@@ -300,6 +302,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 		200,
 		"text/html",
 		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
@@ -354,6 +357,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 		200,
 		"text/plain",
 		map[string]string{"Content-Type": "text/plain"},
+		time.Now(),
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)

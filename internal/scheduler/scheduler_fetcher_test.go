@@ -50,6 +50,7 @@ Allow: /`
 		200,
 		"text/html",
 		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
@@ -362,6 +363,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 		200,
 		"text/html",
 		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
@@ -414,6 +416,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 		200,
 		"application/pdf",
 		map[string]string{"Content-Type": "application/pdf"},
+		time.Now(),
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
@@ -476,6 +479,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 				tc.statusCode,
 				"text/html",
 				map[string]string{},
+				time.Now(),
 			)
 			mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(fetchResult, nil)

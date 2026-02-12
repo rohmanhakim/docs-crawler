@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
@@ -350,6 +351,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 		200,
 		"text/html",
 		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
 	)
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {

@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"net/url"
+	"time"
 )
 
 // HTTP boundary
@@ -19,9 +20,10 @@ func NewFetchParam(fetchUrl url.URL, userAgent string) FetchParam {
 }
 
 type FetchResult struct {
-	url  url.URL
-	body []byte
-	meta ResponseMeta
+	url       url.URL
+	body      []byte
+	meta      ResponseMeta
+	fetchedAt time.Time
 }
 
 func (f *FetchResult) URL() url.URL {
@@ -44,6 +46,10 @@ func (f *FetchResult) Headers() map[string]string {
 	return f.meta.responseHeaders
 }
 
+func (f *FetchResult) FetchedAt() time.Time {
+	return f.fetchedAt
+}
+
 type ResponseMeta struct {
 	statusCode      int
 	responseHeaders map[string]string
@@ -58,10 +64,12 @@ func NewFetchResultForTest(
 	statusCode int,
 	contentType string,
 	responseHeaders map[string]string,
+	fetchedAt time.Time,
 ) FetchResult {
 	return FetchResult{
-		url:  url,
-		body: body,
+		url:       url,
+		body:      body,
+		fetchedAt: fetchedAt,
 		meta: ResponseMeta{
 			statusCode:      statusCode,
 			responseHeaders: responseHeaders,

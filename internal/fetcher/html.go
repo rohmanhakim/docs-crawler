@@ -143,7 +143,12 @@ func (h *HtmlFetcher) recordRetryError(callerMethod string, fetchUrl url.URL, er
 	}
 }
 
-func (h *HtmlFetcher) fetchWithRetry(ctx context.Context, fetchUrl url.URL, userAgent string, retryParam retry.RetryParam) retry.Result[FetchResult] {
+func (h *HtmlFetcher) fetchWithRetry(
+	ctx context.Context,
+	fetchUrl url.URL,
+	userAgent string,
+	retryParam retry.RetryParam,
+) retry.Result[FetchResult] {
 	fetchTask := func() (FetchResult, failure.ClassifiedError) {
 		return h.performFetch(ctx, fetchUrl, userAgent)
 	}
@@ -151,7 +156,11 @@ func (h *HtmlFetcher) fetchWithRetry(ctx context.Context, fetchUrl url.URL, user
 	return retry.Retry(retryParam, fetchTask)
 }
 
-func (h *HtmlFetcher) performFetch(ctx context.Context, fetchUrl url.URL, userAgent string) (FetchResult, failure.ClassifiedError) {
+func (h *HtmlFetcher) performFetch(
+	ctx context.Context,
+	fetchUrl url.URL,
+	userAgent string,
+) (FetchResult, failure.ClassifiedError) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchUrl.String(), nil)
 	if err != nil {
 		return FetchResult{}, &FetchError{
@@ -250,10 +259,11 @@ func (h *HtmlFetcher) performFetch(ctx context.Context, fetchUrl url.URL, userAg
 		}
 	}
 
-	// Create FetchResult
+	// Create FetchResult with timestamp
 	result := FetchResult{
-		url:  fetchUrl,
-		body: body,
+		url:       fetchUrl,
+		body:      body,
+		fetchedAt: time.Now(),
 		meta: ResponseMeta{
 			statusCode:      resp.StatusCode,
 			responseHeaders: responseHeaders,

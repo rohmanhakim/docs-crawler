@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
@@ -59,6 +60,7 @@ func newFetcherMockForTest(t *testing.T) *fetcherMock {
 		map[string]string{
 			"Content-Type": "text/html",
 		},
+		time.Now(),
 	)
 	m.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(result, nil)
@@ -76,6 +78,7 @@ func setupFetcherMockWithSuccess(m *fetcherMock, urlStr string, body []byte, sta
 		map[string]string{
 			"Content-Type": "text/html",
 		},
+		time.Now(),
 	)
 	m.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(result, nil)
 }
