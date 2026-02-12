@@ -59,9 +59,9 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 
 	// Setup resolver mock to capture the input
 	var receivedConversionResult mdconvert.ConversionResult
-	mockResolver.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	mockResolver.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receivedConversionResult = args.Get(4).(mdconvert.ConversionResult)
+			receivedConversionResult = args.Get(2).(mdconvert.ConversionResult)
 		}).
 		Return(createAssetfulMarkdownDocForTest("# Test Markdown", nil), nil)
 
@@ -94,7 +94,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	_, _ = s.ExecuteCrawling(configPath)
 
 	// Verify Resolve was called with the conversion result from Convert
-	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	assert.Equal(t, conversionResult, receivedConversionResult, "Resolve should be called with the ConversionResult from Convert")
 }
 
@@ -168,7 +168,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	// Should complete without fatal error
 	assert.NoError(t, execErr)
 	// Resolve should be called
-	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults))
 }
 
@@ -240,7 +240,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 
 	// Fatal resolver error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal resolve error")
-	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestScheduler_Resolve_RecoverableError_ContinuesCrawl verifies that recoverable
@@ -311,7 +311,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable resolve error should not abort crawl")
-	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestScheduler_Resolve_MethodCallOrder verifies the correct order of method calls:
@@ -377,7 +377,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 		}).Return(createConversionResultForTest("# Test", nil), nil)
 
 	// Setup resolver
-	mockResolver.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	mockResolver.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			callOrder = append(callOrder, "Resolve")
 		}).Return(createAssetfulMarkdownDocForTest("# Test", nil), nil)
@@ -411,7 +411,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 	_, _ = s.ExecuteCrawling(configPath)
 
 	// Verify all stages were called
-	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	// Verify order: Resolve should be called after Convert
 	t.Logf("Call order: %v", callOrder)
@@ -590,7 +590,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	assert.NoError(t, execErr, "Recoverable resolve error should not abort crawl")
 
 	// Verify resolver was called
-	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	// Verify that execution completed (Write was called)
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults))
@@ -668,7 +668,7 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	assert.Error(t, execErr, "Expected error for fatal resolve error")
 
 	// Verify resolver was called
-	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	// Verify that Robot.Decide was only called once (for seed URL)
 	// This proves that the crawl aborted before processing more URLs

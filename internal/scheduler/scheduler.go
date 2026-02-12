@@ -388,8 +388,6 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		assetfulMarkdown, err := s.assetResolver.Resolve(
 			s.ctx,
 			fetchResult.URL(),
-			cfg.SeedURLs()[0].Host,
-			cfg.SeedURLs()[0].Scheme,
 			markdownDoc,
 			resolveParam,
 			RetryParam(cfg),

@@ -177,9 +177,7 @@ func resolveWithTestParams(
 	pageUrl url.URL,
 	conversionResult mdconvert.ConversionResult,
 	outputDir string,
-	host string,
-	scheme string,
 ) (assets.AssetfulMarkdownDoc, error) {
 	resolveParam := assets.NewResolveParam(outputDir, 10*1024*1024)
-	return resolver.Resolve(ctx, pageUrl, host, scheme, conversionResult, resolveParam, testRetryParam())
+	return resolver.Resolve(ctx, pageUrl, conversionResult, resolveParam, testRetryParam())
 }

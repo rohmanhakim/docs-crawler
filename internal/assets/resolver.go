@@ -44,8 +44,6 @@ type Resolver interface {
 	Resolve(
 		ctx context.Context,
 		pageUrl url.URL,
-		host string,
-		scheme string,
 		conversionResult mdconvert.ConversionResult,
 		resolveParam ResolveParam,
 		retryParam retry.RetryParam,
@@ -81,12 +79,13 @@ func (r *LocalResolver) WrittenAssets() map[string]string {
 func (r *LocalResolver) Resolve(
 	ctx context.Context,
 	pageUrl url.URL,
-	host string,
-	scheme string,
 	conversionResult mdconvert.ConversionResult,
 	resolveParam ResolveParam,
 	retryParam retry.RetryParam,
 ) (AssetfulMarkdownDoc, failure.ClassifiedError) {
+	// Derive host and scheme from pageUrl for resolving relative asset URLs
+	host := pageUrl.Host
+	scheme := pageUrl.Scheme
 
 	fetchEventCallback := func(retryCount int, fetchResult AssetFetchResult) {
 		url := fetchResult.URL()

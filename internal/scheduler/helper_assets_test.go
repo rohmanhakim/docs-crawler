@@ -21,13 +21,11 @@ type resolverMock struct {
 func (r *resolverMock) Resolve(
 	ctx context.Context,
 	pageUrl url.URL,
-	host string,
-	scheme string,
 	conversionResult mdconvert.ConversionResult,
 	resolveParam assets.ResolveParam,
 	retryParam retry.RetryParam,
 ) (assets.AssetfulMarkdownDoc, failure.ClassifiedError) {
-	args := r.Called(ctx, pageUrl, host, scheme, conversionResult, resolveParam, retryParam)
+	args := r.Called(ctx, pageUrl, conversionResult, resolveParam, retryParam)
 	doc := args.Get(0).(assets.AssetfulMarkdownDoc)
 	var err failure.ClassifiedError
 	if args.Get(1) != nil {
@@ -45,13 +43,13 @@ func newResolverMockForTest(t *testing.T) *resolverMock {
 
 // setupResolverMockWithSuccess sets up the resolver mock to return a successful result
 func setupResolverMockWithSuccess(m *resolverMock) {
-	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(assets.AssetfulMarkdownDoc{}, nil)
 }
 
 // setupResolverMockWithError sets up the resolver mock to return an error
 func setupResolverMockWithError(m *resolverMock, err failure.ClassifiedError) {
-	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(assets.AssetfulMarkdownDoc{}, err)
 }
 
@@ -62,7 +60,7 @@ func setupResolverMockWithFatalError(m *resolverMock) {
 		Retryable: false,
 		Cause:     assets.ErrCauseDiskFull,
 	}
-	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(assets.AssetfulMarkdownDoc{}, resolverErr)
 }
 
@@ -73,13 +71,13 @@ func setupResolverMockWithRecoverableError(m *resolverMock) {
 		Retryable: true,
 		Cause:     assets.ErrCauseNetworkFailure,
 	}
-	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(assets.AssetfulMarkdownDoc{}, resolverErr)
 }
 
 // setupResolverMockWithCustomResult sets up the resolver mock to return a custom result
 func setupResolverMockWithCustomResult(m *resolverMock, doc assets.AssetfulMarkdownDoc) {
-	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(doc, nil)
 }
 

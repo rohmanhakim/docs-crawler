@@ -40,7 +40,7 @@ func TestResolve_Success_WithAssets(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert - no error should be returned when fetching succeeds
 	assert.NoError(t, err)
@@ -93,7 +93,7 @@ func TestResolve_Success_NoAssets(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert - no error should be returned when there are no assets to process
 	assert.NoError(t, err)
@@ -125,7 +125,7 @@ func TestResolve_Error_CreateAssetDirFails(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(invalidDir, 10*1024*1024)
-	_, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert - error should be returned when createAssetDir fails
 	assert.Error(t, err)
@@ -173,7 +173,7 @@ func TestResolve_AssetFetchFails_PreservesOriginalURL(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert - no error should be returned from Resolve (missing assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -241,7 +241,7 @@ func TestResolve_MixedSuccessAndFailure(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert
 	assert.NoError(t, err)
@@ -303,7 +303,7 @@ func TestResolve_MechanicalDeduplication_SinglePage(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert
 	assert.NoError(t, err)
@@ -349,7 +349,7 @@ func TestResolve_CrossCallDeduplication(t *testing.T) {
 
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	_, err := resolver.Resolve(ctx, *pageUrl1, "example.com", "https", conversionResult1, resolveParam, testRetryParam())
+	_, err := resolver.Resolve(ctx, *pageUrl1, conversionResult1, resolveParam, testRetryParam())
 	assert.NoError(t, err)
 
 	// Assert first call has artifact record
@@ -368,7 +368,7 @@ func TestResolve_CrossCallDeduplication(t *testing.T) {
 	pageUrl2, _ := url.Parse(server.URL + "/page2")
 
 	// Act
-	doc2, err := resolver.Resolve(ctx, *pageUrl2, "example.com", "https", conversionResult2, resolveParam, testRetryParam())
+	doc2, err := resolver.Resolve(ctx, *pageUrl2, conversionResult2, resolveParam, testRetryParam())
 
 	// Assert
 	assert.NoError(t, err)
@@ -418,7 +418,7 @@ func TestResolve_NonImageLinksIgnored(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert
 	assert.NoError(t, err)
@@ -463,7 +463,7 @@ func TestResolve_ContentHashDeduplication_DifferentURLs(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert
 	assert.NoError(t, err)
@@ -503,9 +503,8 @@ func TestResolve_RelativeURLsResolved(t *testing.T) {
 	resolver := newTestResolver(mockSink)
 
 	tempDir := t.TempDir()
-	// Parse server URL to extract host for the test
-	serverURL, _ := url.Parse(server.URL)
-	// Use relative URL - will be resolved using server's host
+	// Use relative URL - will be resolved using pageUrl's host/scheme
+
 	linkRefs := []mdconvert.LinkRef{
 		mdconvert.NewLinkRef("/images/logo.png", mdconvert.KindImage),
 	}
@@ -516,7 +515,7 @@ func TestResolve_RelativeURLsResolved(t *testing.T) {
 	// Act - use server's scheme and host so relative URL resolves correctly
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-	doc, err := resolver.Resolve(ctx, *pageUrl, serverURL.Host, serverURL.Scheme, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert
 	assert.NoError(t, err)
@@ -578,7 +577,7 @@ func TestResolve_ContentHashDeduplication_DeterministicPath(t *testing.T) {
 		// Act
 		ctx := context.Background()
 		resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
-		doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+		doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 		// Assert
 		assert.NoError(t, err)
@@ -625,7 +624,7 @@ func TestResolve_AssetTooLarge_ContentLengthHeader(t *testing.T) {
 	// Act - use maxAssetSize of 512 bytes (less than Content-Length of 1024)
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 512) // 512 bytes limit
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -675,7 +674,7 @@ func TestResolve_AssetTooLarge_UnknownContentLength(t *testing.T) {
 	// Act - use maxAssetSize of 512 bytes (less than streamed body of 1024)
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 512) // 512 bytes limit
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -726,7 +725,7 @@ func TestResolve_AssetTooLarge_LyingContentLength(t *testing.T) {
 	// Act - use maxAssetSize of 512 bytes (less than actual body of 1024)
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 512) // 512 bytes limit
-	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -798,7 +797,7 @@ func TestResolve_AssetAtSizeBoundary(t *testing.T) {
 			// Act
 			ctx := context.Background()
 			resolveParam := assets.NewResolveParam(tempDir, tc.maxAssetSize)
-			doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+			doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
 
 			// Assert
 			assert.NoError(t, err) // Resolve never returns error for asset failures
