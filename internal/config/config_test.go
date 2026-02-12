@@ -132,6 +132,11 @@ func TestWithDefault(t *testing.T) {
 	if builtCfg.ThresholdMaxLinkDensity() != 0.8 {
 		t.Errorf("expected ThresholdMaxLinkDensity 0.8, got %f", builtCfg.ThresholdMaxLinkDensity())
 	}
+
+	// Verify hash algorithm default
+	if builtCfg.HashAlgo() != "sha256" {
+		t.Errorf("expected HashAlgo 'sha256', got '%s'", builtCfg.HashAlgo())
+	}
 }
 
 func TestWithDefault_EmptySeedUrls(t *testing.T) {
@@ -592,6 +597,11 @@ func TestWithConfigFile_ValidCompleteConfig(t *testing.T) {
 	if loadedConfig.ThresholdMaxLinkDensity() != 0.9 {
 		t.Errorf("expected ThresholdMaxLinkDensity 0.9, got %f", loadedConfig.ThresholdMaxLinkDensity())
 	}
+
+	// Verify hash algorithm from complete config
+	if loadedConfig.HashAlgo() != "blake3" {
+		t.Errorf("expected HashAlgo 'blake3', got '%s'", loadedConfig.HashAlgo())
+	}
 }
 
 func TestWithConfigFile_PartialConfig(t *testing.T) {
@@ -857,6 +867,17 @@ func TestWithThresholdMaxLinkDensity(t *testing.T) {
 	}
 }
 
+func TestWithHashAlgo(t *testing.T) {
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithHashAlgo("blake3").Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.HashAlgo() != "blake3" {
+		t.Errorf("expected HashAlgo 'blake3', got '%s'", cfg.HashAlgo())
+	}
+}
+
 // Note: Zero values in JSON with `omitempty` tags are omitted during marshaling,
 // so they cannot override defaults. To set zero values, users must either:
 // 1. Modify the Config struct after loading, or
@@ -907,7 +928,8 @@ func completeConfigJson() string {
     "thresholdMinNonWhitespace": 60,
     "thresholdMinHeadings": 1,
     "thresholdMinParagraphsOrCode": 2,
-    "thresholdMaxLinkDensity": 0.9
+    "thresholdMaxLinkDensity": 0.9,
+    "hashAlgo": "blake3"
 }
 	`
 }

@@ -3,6 +3,8 @@ package assets
 import (
 	"net/url"
 	"time"
+
+	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 )
 
 type AssetFetchResult struct {
@@ -45,12 +47,14 @@ func (a *AssetFetchResult) Duration() time.Duration {
 type ResolveParam struct {
 	outputDir    string
 	maxAssetSize int64
+	hashAlgo     hashutil.HashAlgo
 }
 
-func NewResolveParam(outputDir string, maxAssetSize int64) ResolveParam {
+func NewResolveParam(outputDir string, maxAssetSize int64, hashAlgo hashutil.HashAlgo) ResolveParam {
 	return ResolveParam{
 		outputDir:    outputDir,
 		maxAssetSize: maxAssetSize,
+		hashAlgo:     hashAlgo,
 	}
 }
 
@@ -60,6 +64,10 @@ func (r ResolveParam) OutputDir() string {
 
 func (r ResolveParam) MaxAssetSize() int64 {
 	return r.maxAssetSize
+}
+
+func (r ResolveParam) HashAlgo() hashutil.HashAlgo {
+	return r.hashAlgo
 }
 
 type AssetfulMarkdownDoc struct {

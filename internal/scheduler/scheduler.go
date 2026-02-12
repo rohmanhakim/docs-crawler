@@ -384,7 +384,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 7. Assets Resolution
-		resolveParam := assets.NewResolveParam(cfg.OutputDir(), cfg.MaxAssetSize())
+		resolveParam := assets.NewResolveParam(cfg.OutputDir(), cfg.MaxAssetSize(), cfg.HashAlgo())
 		assetfulMarkdown, err := s.assetResolver.Resolve(
 			s.ctx,
 			fetchResult.URL(),

@@ -247,9 +247,9 @@ func (r *LocalResolver) resolve(
 			fetchResult := result.Value()
 			fetchCallback(retryCount, fetchResult)
 
-			// Hash the content
+			// Hash the content using the configured hash algorithm
 			assetData := fetchResult.Data()
-			contentHash, hashErr := hashutil.HashBytes(assetData, hashutil.HashAlgoSHA256)
+			contentHash, hashErr := hashutil.HashBytes(assetData, resolveParam.HashAlgo())
 			if hashErr != nil {
 				// This should not happen with valid algorithms, but handle defensively
 				missingAssetErrors[assetURL.String()] = ErrCauseHashError

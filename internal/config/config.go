@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 )
 
 type Config struct {
@@ -111,6 +113,11 @@ type Config struct {
 	// content is considered navigation-only and rejected.
 	// Default: 0.8 (80%)
 	thresholdMaxLinkDensity float64
+
+	//===============
+	// Hash Algorithm
+	//===============
+	hashAlgo string
 }
 
 type configDTO struct {
@@ -144,6 +151,7 @@ type configDTO struct {
 	ThresholdMinHeadings                int     `json:"thresholdMinHeadings,omitempty"`
 	ThresholdMinParagraphsOrCode        int     `json:"thresholdMinParagraphsOrCode,omitempty"`
 	ThresholdMaxLinkDensity             float64 `json:"thresholdMaxLinkDensity,omitempty"`
+	HashAlgo                            string  `json:"hashAlgo,omitempty"`
 }
 
 func newConfigFromDTO(dto configDTO) (Config, error) {
@@ -243,6 +251,10 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	if dto.ThresholdMaxLinkDensity != 0 {
 		cfg.thresholdMaxLinkDensity = dto.ThresholdMaxLinkDensity
 	}
+	// HashAlgo - override if provided (non-empty string)
+	if dto.HashAlgo != "" {
+		cfg.hashAlgo = dto.HashAlgo
+	}
 
 	return cfg, nil
 }
@@ -306,6 +318,8 @@ func WithDefault(seedUrls []url.URL) *Config {
 		thresholdMinHeadings:                0,
 		thresholdMinParagraphsOrCode:        1,
 		thresholdMaxLinkDensity:             0.8,
+		// Hash algorithm default
+		hashAlgo: string(hashutil.HashAlgoSHA256),
 	}
 	return &defaultConfig
 }
@@ -455,6 +469,11 @@ func (c *Config) WithThresholdMaxLinkDensity(max float64) *Config {
 	return c
 }
 
+func (c *Config) WithHashAlgo(algo hashutil.HashAlgo) *Config {
+	c.hashAlgo = string(algo)
+	return c
+}
+
 func (c *Config) Build() (Config, error) {
 	if len(c.seedURLs) == 0 {
 		return Config{}, fmt.Errorf("%w: seedUrls cannot be empty", ErrInvalidConfig)
@@ -595,4 +614,8 @@ func (c Config) ThresholdMinParagraphsOrCode() int {
 
 func (c Config) ThresholdMaxLinkDensity() float64 {
 	return c.thresholdMaxLinkDensity
+}
+
+func (c Config) HashAlgo() hashutil.HashAlgo {
+	return hashutil.HashAlgo(c.hashAlgo)
 }

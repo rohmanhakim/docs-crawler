@@ -10,6 +10,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
@@ -166,6 +167,6 @@ func resolveWithTestParams(
 	conversionResult mdconvert.ConversionResult,
 	outputDir string,
 ) (assets.AssetfulMarkdownDoc, error) {
-	resolveParam := assets.NewResolveParam(outputDir, 10*1024*1024)
+	resolveParam := assets.NewResolveParam(outputDir, 10*1024*1024, hashutil.HashAlgoSHA256)
 	return resolver.Resolve(ctx, pageUrl, conversionResult, resolveParam, testRetryParam())
 }
