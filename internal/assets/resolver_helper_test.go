@@ -2,8 +2,6 @@ package assets_test
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -132,21 +130,11 @@ func (m *metadataSinkMock) Reset() {
 	m.artifactRecords = nil
 }
 
-// computeHash computes SHA-256 hash of data (matches resolver implementation)
-func computeHash(data []byte) string {
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
-}
-
-// computeShortHash returns first 7 characters of hash (like git)
-func computeShortHash(data []byte) string {
-	return computeHash(data)[:7]
-}
-
-// buildExpectedPath builds the expected asset path using the new format:
+// buildExpectedPath builds the expected asset path using the format:
 // assets/images/<name>-<short-hash>.<ext>
-func buildExpectedPath(originalName string, data []byte, ext string) string {
-	shortHash := computeShortHash(data)
+// The contentHash should be the full SHA-256 hash string.
+func buildExpectedPath(originalName string, contentHash string, ext string) string {
+	shortHash := contentHash[:7]
 	return fmt.Sprintf("assets/images/%s-%s.%s", originalName, shortHash, ext)
 }
 

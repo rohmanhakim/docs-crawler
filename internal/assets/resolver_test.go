@@ -59,8 +59,8 @@ func TestResolve_Success_WithAssets(t *testing.T) {
 	artifactRecords := mockSink.GetArtifactRecords()
 	assert.Len(t, artifactRecords, 1, "Should have 1 artifact record")
 	assert.Equal(t, metadata.ArtifactAsset, artifactRecords[0].Kind)
-	expectedHash := computeHash([]byte("fake-image-data"))
-	expectedLocalPath := buildExpectedPath("image", []byte("fake-image-data"), "png")
+	expectedHash := "28d81db19370f98fdc1d3e43fb1ef83a7cee62f3be86fed923d5f734da41319c"
+	expectedLocalPath := buildExpectedPath("image", "28d81db19370f98fdc1d3e43fb1ef83a7cee62f3be86fed923d5f734da41319c", "png")
 	assert.Equal(t, expectedLocalPath, artifactRecords[0].Path)
 	// Verify attrs contain page URL
 	assert.Len(t, artifactRecords[0].Attrs, 1)
@@ -249,12 +249,12 @@ func TestResolve_MixedSuccessAndFailure(t *testing.T) {
 	// Assert - writtenAssets should only contain the successful asset's URL -> contentHash mapping
 	writtenAssets := resolver.WrittenAssets()
 	assert.Equal(t, 1, len(writtenAssets))
-	expectedSuccessHash := computeHash(successImageData)
+	expectedSuccessHash := "84a1b956adcdb84c7eda72df3a39b8034ffe0303733795d11ab73797bda03a24"
 	assert.Equal(t, expectedSuccessHash, writtenAssets[successURL], "Successful asset's URL should map to content hash")
 
 	// Assert - document content: successful asset rewritten, failed asset preserved
 	output := string(doc.Content())
-	expectedLocalPath := buildExpectedPath("success-image", successImageData, "png")
+	expectedLocalPath := buildExpectedPath("success-image", "84a1b956adcdb84c7eda72df3a39b8034ffe0303733795d11ab73797bda03a24", "png")
 	assert.Contains(t, output, expectedLocalPath, "Successful asset should be rewritten to local path")
 	assert.Contains(t, output, failedURL, "Failed asset should preserve original URL")
 
@@ -314,7 +314,7 @@ func TestResolve_MechanicalDeduplication_SinglePage(t *testing.T) {
 
 	// Assert - All occurrences in document should be rewritten
 	output := string(doc.Content())
-	expectedLocalPath := buildExpectedPath("image", []byte("image-data"), "png")
+	expectedLocalPath := buildExpectedPath("image", "2b700b7786d5a3f0cb487c3afaccb889fae829504a0ad1b70881e4643360f344", "png")
 	assert.Equal(t, 3, strings.Count(output, expectedLocalPath), "All 3 occurrences should be rewritten")
 
 	// Assert - RecordArtifact should be called once for the single successful asset
@@ -384,12 +384,12 @@ func TestResolve_CrossCallDeduplication(t *testing.T) {
 
 	// Assert - writtenAssets should still contain the URL
 	writtenAssets := resolver.WrittenAssets()
-	expectedHash := computeHash([]byte("shared-image-data"))
+	expectedHash := "70303f6f61d6d9c4123301a2c41b55d222e64966559243972abdd8083a341adc"
 	assert.Equal(t, expectedHash, writtenAssets[imageURL])
 
 	// Assert - document should still have rewritten URL
 	output := string(doc2.Content())
-	expectedLocalPath := buildExpectedPath("image", []byte("shared-image-data"), "png")
+	expectedLocalPath := buildExpectedPath("image", "70303f6f61d6d9c4123301a2c41b55d222e64966559243972abdd8083a341adc", "png")
 	assert.Contains(t, output, expectedLocalPath)
 }
 
@@ -440,6 +440,7 @@ func TestResolve_NonImageLinksIgnored(t *testing.T) {
 func TestResolve_ContentHashDeduplication_DifferentURLs(t *testing.T) {
 	// Arrange - two different URLs returning identical content
 	sharedContent := []byte("shared-image-content")
+	sharedContentHash := "69259521d1d859835a3bca63d4c4c741bc5a04095d3f07624d5dfdc1269120d2"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(sharedContent)
@@ -473,9 +474,8 @@ func TestResolve_ContentHashDeduplication_DifferentURLs(t *testing.T) {
 	assert.Equal(t, 2, len(writtenAssets), "Both URLs should be in writtenAssets")
 
 	// Both URLs should have the same content hash (content-hash deduplication)
-	expectedHash := computeHash(sharedContent)
-	assert.Equal(t, expectedHash, writtenAssets[url1], "First URL should map to content hash")
-	assert.Equal(t, expectedHash, writtenAssets[url2], "Second URL should map to same content hash")
+	assert.Equal(t, sharedContentHash, writtenAssets[url1], "First URL should map to content hash")
+	assert.Equal(t, sharedContentHash, writtenAssets[url2], "Second URL should map to same content hash")
 
 	// Both fetch events should be recorded (mechanical dedup doesn't apply to different URLs)
 	records := mockSink.GetAssetFetchRecords()
@@ -487,7 +487,7 @@ func TestResolve_ContentHashDeduplication_DifferentURLs(t *testing.T) {
 
 	// Document should have both images rewritten to same local path
 	output := string(doc.Content())
-	expectedLocalPath := buildExpectedPath("image1", sharedContent, "png")
+	expectedLocalPath := buildExpectedPath("image1", sharedContentHash, "png")
 	assert.Equal(t, 2, strings.Count(output, expectedLocalPath), "Both images should use same local path")
 }
 
@@ -532,7 +532,7 @@ func TestResolve_RelativeURLsResolved(t *testing.T) {
 
 	// Assert - document should have rewritten local path
 	output := string(doc.Content())
-	expectedLocalPath := buildExpectedPath("logo", []byte("image-data"), "png")
+	expectedLocalPath := buildExpectedPath("logo", "2b700b7786d5a3f0cb487c3afaccb889fae829504a0ad1b70881e4643360f344", "png")
 	assert.Contains(t, output, expectedLocalPath)
 }
 
@@ -547,6 +547,7 @@ func TestResolve_RelativeURLsResolved(t *testing.T) {
 func TestResolve_ContentHashDeduplication_DeterministicPath(t *testing.T) {
 	// Arrange - two different URLs with different basenames returning identical content
 	sharedContent := []byte("shared-deterministic-content")
+	sharedContentHash := "ffaaa2898a4ab725c0f03011fa0c61ae102399fbe9d77ba3ab828d3f86e38a69"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(sharedContent)
@@ -558,7 +559,7 @@ func TestResolve_ContentHashDeduplication_DeterministicPath(t *testing.T) {
 	url2 := server.URL + "/different-name.jpg" // Different basename, same content
 
 	// Pre-compute expected path based on first URL's basename
-	expectedLocalPath := buildExpectedPath("logo", sharedContent, "png")
+	expectedLocalPath := buildExpectedPath("logo", sharedContentHash, "png")
 
 	// Run multiple times to verify deterministic behavior
 	// (With the old implementation, this would occasionally fail due to map iteration randomness)
@@ -593,7 +594,7 @@ func TestResolve_ContentHashDeduplication_DeterministicPath(t *testing.T) {
 			i+1, expectedLocalPath)
 
 		// Should NOT contain a path built from the second URL's basename
-		unexpectedPath := buildExpectedPath("different-name", sharedContent, "jpg")
+		unexpectedPath := buildExpectedPath("different-name", sharedContentHash, "jpg")
 		assert.NotContains(t, output, unexpectedPath,
 			"Iteration %d: Should not contain path from second URL (which was deduplicated, not written)",
 			i+1)

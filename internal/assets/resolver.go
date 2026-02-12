@@ -2,8 +2,6 @@ package assets
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +17,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
+	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
 )
@@ -250,7 +249,12 @@ func (r *LocalResolver) resolve(
 
 			// Hash the content
 			assetData := fetchResult.Data()
-			contentHash := hashBytes(assetData)
+			contentHash, hashErr := hashutil.HashBytes(assetData, hashutil.HashAlgoSHA256)
+			if hashErr != nil {
+				// This should not happen with valid algorithms, but handle defensively
+				missingAssetErrors[assetURL.String()] = ErrCauseHashError
+				continue
+			}
 
 			// Get extension from asset URL
 			extension := getFileExtension(assetURL.Path)
@@ -557,17 +561,6 @@ func assetRequestHeaders(userAgent string) map[string]string {
 		"DNT":             "1",
 		"Connection":      "keep-alive",
 	}
-}
-
-// hashURL returns the SHA-256 hash of a URL string as hex
-func hashURL(u url.URL) string {
-	return hashBytes([]byte(u.String()))
-}
-
-// hashBytes returns the SHA-256 hash of bytes as hex
-func hashBytes(data []byte) string {
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:])
 }
 
 // getFileExtension extracts the file extension from a path, or empty string if none

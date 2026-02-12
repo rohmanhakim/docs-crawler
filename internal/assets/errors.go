@@ -23,6 +23,7 @@ const (
 	ErrCauseRequestPageForbidden  = "forbidden"
 	ErrCauseRequest5xx            = "5xx"
 	ErrCauseAssetTooLarge         = "asset too large"
+	ErrCauseHashError             = "hash error"
 )
 
 type AssetsError struct {
@@ -79,6 +80,8 @@ func mapAssetsErrorToMetadataCause(err AssetsError) metadata.ErrorCause {
 		return metadata.CauseUnknown
 	case ErrCauseAssetTooLarge:
 		return metadata.CausePolicyDisallow
+	case ErrCauseHashError:
+		return metadata.CauseContentInvalid
 	default:
 		return metadata.CauseUnknown
 	}
