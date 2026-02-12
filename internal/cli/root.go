@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rohmanhakim/docs-crawler/internal/build"
 	"github.com/rohmanhakim/docs-crawler/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +27,7 @@ var (
 	randomSeed        int64
 	allowedHosts      []string
 	allowedPathPrefix []string
+	versionFlag       bool
 )
 
 // parseStringSliceToSet converts a string slice to a map[string]struct{} set
@@ -66,6 +68,7 @@ optimized for LLM Retrieval-Augmented Generation (RAG) workflows.
 
 This tool aims to provide a deterministic and repeatable crawl process,
 producing high-quality Markdown suitable for embedding and retrieval.`,
+	Version: fmt.Sprintf("%s (commit: %s, built: %s)", build.Version, build.Commit, build.BuildTime),
 	Run: func(cmd *cobra.Command, args []string) {
 		// Check if seed URLs are provided
 		if len(seedURLs) == 0 {
@@ -128,6 +131,7 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be available to all subcommands in the docs-crawler application.
+	rootCmd.PersistentFlags().BoolVarP(&versionFlag, "version", "v", false, "print version information")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config-file", "", "config file path (e.g., /home/myuser/config.json)")
 	rootCmd.PersistentFlags().StringArrayVar(&seedURLs, "seed-url", []string{}, "one or more starting URLs (can be repeated)")
 	rootCmd.PersistentFlags().IntVar(&maxDepth, "max-depth", 5, "maximum link depth from seed URL")
@@ -249,6 +253,7 @@ func ResetFlags() {
 	randomSeed = 0
 	allowedHosts = []string{}
 	allowedPathPrefix = []string{}
+	versionFlag = false
 }
 
 // Test helper functions to set flag values from tests
@@ -306,4 +311,8 @@ func SetAllowedHostsForTest(hosts []string) {
 
 func SetAllowedPathPrefixForTest(prefixes []string) {
 	allowedPathPrefix = prefixes
+}
+
+func SetVersionFlagForTest(v bool) {
+	versionFlag = v
 }
