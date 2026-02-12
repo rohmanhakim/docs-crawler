@@ -221,7 +221,7 @@ func (r *LocalResolver) resolve(
 	// Check if there are URLs that need downloading
 	if len(deduplicatedAssetsUrls) > 0 {
 		// Create asset directory (decoupled from page - assets are shared)
-		if err := r.createAssetDir(resolveParam.OutputDir()); err != nil {
+		if err := r.ensureAssetDir(resolveParam.OutputDir()); err != nil {
 			return AssetfulMarkdownDoc{}, err
 		}
 
@@ -342,7 +342,7 @@ func (r *LocalResolver) mechanicalDeduplicate(urls []url.URL, host string, schem
 	return deduplicated
 }
 
-func (r *LocalResolver) createAssetDir(outputDir string) failure.ClassifiedError {
+func (r *LocalResolver) ensureAssetDir(outputDir string) failure.ClassifiedError {
 	assetsDir := filepath.Join(outputDir, "assets", "images")
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
 		return &AssetsError{
