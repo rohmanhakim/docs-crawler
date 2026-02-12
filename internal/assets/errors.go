@@ -10,7 +10,19 @@ import (
 type AssetsErrorCause string
 
 const (
-	ErrCauseImageDownloadFailure = "failed to download image"
+	ErrCausePathError             = "path error"
+	ErrCauseDiskFull              = "disk is full"
+	ErrCauseWriteFailure          = "write failed"
+	ErrCauseTimeout               = "timeout"
+	ErrCauseRequestTooMany        = "too many requests"
+	ErrCauseNetworkFailure        = "network issues"
+	ErrCauseRepeated403           = "repeated 403s"
+	ErrCauseReadResponseBodyError = "failed to read response body"
+	ErrCauseContentTypeInvalid    = "non-HTML content"
+	ErrCauseRedirectLimitExceeded = "reached redirect limit"
+	ErrCauseRequestPageForbidden  = "forbidden"
+	ErrCauseRequest5xx            = "5xx"
+	ErrCauseAssetTooLarge         = "asset too large"
 )
 
 type AssetsError struct {
@@ -20,7 +32,7 @@ type AssetsError struct {
 }
 
 func (e *AssetsError) Error() string {
-	return fmt.Sprintf("assets error: %s", e.Cause)
+	return fmt.Sprintf("assets error: %s, message: %s", e.Cause, e.Message)
 }
 
 func (e *AssetsError) Severity() failure.Severity {
@@ -30,6 +42,12 @@ func (e *AssetsError) Severity() failure.Severity {
 	return failure.SeverityFatal
 }
 
+// IsRetryable returns whether the error should be retried.
+// This implements the interface checked by the retry handler.
+func (e *AssetsError) IsRetryable() bool {
+	return e.Retryable
+}
+
 // mapAssetsErrorToMetadataCause maps assets-local error semantics
 // to the canonical metadata.ErrorCause table.
 //
@@ -37,8 +55,30 @@ func (e *AssetsError) Severity() failure.Severity {
 // to derive control-flow decisions.
 func mapAssetsErrorToMetadataCause(err AssetsError) metadata.ErrorCause {
 	switch err.Cause {
-	case ErrCauseImageDownloadFailure:
+	case ErrCausePathError:
+		return metadata.CauseStorageFailure
+	case ErrCauseDiskFull:
+		return metadata.CauseStorageFailure
+	case ErrCauseWriteFailure:
+		return metadata.CauseStorageFailure
+	case ErrCauseTimeout:
 		return metadata.CauseNetworkFailure
+	case ErrCauseRequestTooMany:
+		return metadata.CausePolicyDisallow
+	case ErrCauseRepeated403:
+		return metadata.CausePolicyDisallow
+	case ErrCauseReadResponseBodyError:
+		return metadata.CauseContentInvalid
+	case ErrCauseContentTypeInvalid:
+		return metadata.CauseContentInvalid
+	case ErrCauseRedirectLimitExceeded:
+		return metadata.CauseUnknown
+	case ErrCauseRequestPageForbidden:
+		return metadata.CausePolicyDisallow
+	case ErrCauseRequest5xx:
+		return metadata.CauseUnknown
+	case ErrCauseAssetTooLarge:
+		return metadata.CausePolicyDisallow
 	default:
 		return metadata.CauseUnknown
 	}

@@ -20,7 +20,7 @@ import (
 // that allows testing scheduler in isolation.
 // If mockExtractor is nil, a real extractor will be created.
 // If mockSanitizer is nil, a real sanitizer will be created.
-// If mockConvert is nil, a real convert rule will be created.
+// If mockConvert is nil, a convert mock with default success will be created.
 func createSchedulerForTest(
 	t *testing.T,
 	ctx context.Context,
@@ -45,6 +45,15 @@ func createSchedulerForTest(
 		san := sanitizer.NewHTMLSanitizer(metadataSink)
 		mockSanitizer = &san
 	}
+	// Create a convert mock with default success if none provided
+	if mockConvert == nil {
+		mockConvert = newConvertMockForTest(t)
+		setupConvertMockWithSuccess(mockConvert.(*convertMock))
+	}
+	// Create a resolver mock with default success
+	resolverMock := newResolverMockForTest(t)
+	setupResolverMockWithSuccess(resolverMock)
+
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
 		mockFinalizer,
@@ -54,12 +63,10 @@ func createSchedulerForTest(
 		mockRobot,
 		mockExtractor,
 		mockSanitizer,
+		mockConvert,
+		resolverMock,
 		mockSleeper,
 	)
-	// Inject convert mock if provided
-	if mockConvert != nil {
-		s.SetConvertRule(mockConvert)
-	}
 	return &s
 }
 

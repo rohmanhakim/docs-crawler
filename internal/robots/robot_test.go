@@ -62,6 +62,20 @@ func (m *robotTestMetadataSink) RecordFetch(
 	})
 }
 
+func (m *robotTestMetadataSink) RecordAssetFetch(
+	fetchURL string,
+	httpStatus int,
+	duration time.Duration,
+	retryCount int,
+) {
+	m.fetchEvents = append(m.fetchEvents, robotTestFetchEvent{
+		fetchURL:   fetchURL,
+		httpStatus: httpStatus,
+		duration:   duration,
+		retryCount: retryCount,
+	})
+}
+
 func (m *robotTestMetadataSink) RecordError(
 	observedAt time.Time,
 	packageName string,

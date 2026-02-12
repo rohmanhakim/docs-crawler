@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -83,7 +84,7 @@ func NewScheduler() Scheduler {
 	ext := extractor.NewDomExtractor(&recorder)
 	sanitizer := sanitizer.NewHTMLSanitizer(&recorder)
 	conversionRule := mdconvert.NewRule(&recorder)
-	resolver := assets.NewResolver(&recorder)
+	resolver := assets.NewLocalResolver(&recorder, &http.Client{}, "docs-crawler/1.0")
 	markdownConstraint := normalize.NewMarkdownConstraint(&recorder)
 	storageSink := storage.NewSink(&recorder)
 	rateLimiter := limiter.NewConcurrentRateLimiter()
@@ -97,7 +98,7 @@ func NewScheduler() Scheduler {
 		domExtractor:           &ext,
 		htmlSanitizer:          &sanitizer,
 		markdownConversionRule: conversionRule,
-		assetResolver:          resolver,
+		assetResolver:          &resolver,
 		markdownConstraint:     markdownConstraint,
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
@@ -117,10 +118,10 @@ func NewSchedulerWithDeps(
 	robot robots.Robot,
 	domExtractor extractor.Extractor,
 	sanitizer sanitizer.Sanitizer,
+	rule mdconvert.ConvertRule,
+	resolver assets.Resolver,
 	sleeper timeutil.Sleeper,
 ) Scheduler {
-	conversionRule := mdconvert.NewRule(metadataSink)
-	resolver := assets.NewResolver(metadataSink)
 	markdownConstraint := normalize.NewMarkdownConstraint(metadataSink)
 	storageSink := storage.NewSink(metadataSink)
 	frontier := frontier.NewFrontier()
@@ -133,7 +134,7 @@ func NewSchedulerWithDeps(
 		htmlFetcher:            fetcher,
 		domExtractor:           domExtractor,
 		htmlSanitizer:          sanitizer,
-		markdownConversionRule: conversionRule,
+		markdownConversionRule: rule,
 		assetResolver:          resolver,
 		markdownConstraint:     markdownConstraint,
 		storageSink:            storageSink,
@@ -383,7 +384,16 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 7. Assets Resolution
-		assetfulMarkdown, err := s.assetResolver.Resolve(markdownDoc)
+		resolveParam := assets.NewResolveParam(cfg.OutputDir(), cfg.MaxAssetSize())
+		assetfulMarkdown, err := s.assetResolver.Resolve(
+			s.ctx,
+			fetchResult.URL(),
+			cfg.SeedURLs()[0].Host,
+			cfg.SeedURLs()[0].Scheme,
+			markdownDoc,
+			resolveParam,
+			RetryParam(cfg),
+		)
 		if err != nil {
 			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
@@ -391,9 +401,8 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			totalErrors++
 			// Continue to process the markdown even if asset resolution had errors
 		}
-		// Count assets processed (for now, this is a placeholder until asset resolver exposes count)
-		// TODO: Extract actual asset count from assetfulMarkdown when available
-		totalAssets += 0
+		// Count assets processed - use the actual count of successfully resolved local assets
+		totalAssets += len(assetfulMarkdown.LocalAssets())
 
 		// 8. Markdown Normalization
 		normalizedMarkdown, err := s.markdownConstraint.Normalize(assetfulMarkdown)

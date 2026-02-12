@@ -34,3 +34,10 @@ func (e *errorRecordingSink) RecordFetch(
 
 func (e *errorRecordingSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
 }
+func (e *errorRecordingSink) RecordAssetFetch(
+	fetchUrl string,
+	httpStatus int,
+	duration time.Duration,
+	retryCount int,
+) {
+}

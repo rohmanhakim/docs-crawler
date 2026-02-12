@@ -7,8 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
+	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -410,7 +413,8 @@ func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
 	t.Logf("Total errors recorded: %d", mockFinalizer.recordedStats.totalErrors)
 }
 
-// TestScheduler_StatsAccuracy_AssetsTracked verifies that totalAssets is tracked.
+// TestScheduler_StatsAccuracy_AssetsTracked verifies that totalAssets is tracked correctly
+// by mocking the resolver to return assets and verifying the count.
 func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -419,6 +423,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockConvert := newConvertMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -429,7 +434,33 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, mockSleeper)
+	// Setup convert mock with success
+	setupConvertMockWithSuccess(mockConvert)
+
+	// Setup resolver mock to return assets
+	resolverMock := newResolverMockForTest(t)
+	assetDoc := createAssetfulMarkdownDocForTest("test content", []string{
+		"assets/images/logo-a3f7b2c.png",
+		"assets/images/diagram-b8c9d3e.svg",
+	})
+	setupResolverMockWithCustomResult(resolverMock, assetDoc)
+
+	// Create scheduler with custom resolver
+	ext := extractor.NewDomExtractor(noopSink)
+	san := sanitizer.NewHTMLSanitizer(noopSink)
+	s := scheduler.NewSchedulerWithDeps(
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFetcher,
+		mockRobot,
+		&ext,
+		&san,
+		mockConvert,
+		resolverMock,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -451,9 +482,10 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 		t.Fatal("expected stats to be recorded")
 	}
 
-	// Assets should be non-negative (currently always 0 as asset counting is not fully implemented)
-	if mockFinalizer.recordedStats.totalAssets < 0 {
-		t.Error("totalAssets should be non-negative")
+	// Verify totalAssets matches the number of local assets from the resolver
+	expectedAssets := 2
+	if mockFinalizer.recordedStats.totalAssets != expectedAssets {
+		t.Errorf("expected totalAssets to be %d, got %d", expectedAssets, mockFinalizer.recordedStats.totalAssets)
 	}
 
 	t.Logf("Total assets recorded: %d", mockFinalizer.recordedStats.totalAssets)
