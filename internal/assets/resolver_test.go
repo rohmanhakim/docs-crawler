@@ -536,3 +536,67 @@ func TestResolve_RelativeURLsResolved(t *testing.T) {
 	expectedLocalPath := buildExpectedPath("logo", []byte("image-data"), "png")
 	assert.Contains(t, output, expectedLocalPath)
 }
+
+// TestResolve_ContentHashDeduplication_DeterministicPath specifically tests that
+// when two different URLs share the same content hash, both are rewritten to use
+// the path from the first URL that was written to disk.
+//
+// This is a regression test for a bug where findPathByHash iterated over writtenAssets
+// and could return a path rebuilt from a deduplicated URL that was never written,
+// causing markdown to reference non-existent files due to Go's non-deterministic
+// map iteration order.
+func TestResolve_ContentHashDeduplication_DeterministicPath(t *testing.T) {
+	// Arrange - two different URLs with different basenames returning identical content
+	sharedContent := []byte("shared-deterministic-content")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(sharedContent)
+	}))
+	defer server.Close()
+
+	tempDir := t.TempDir()
+	url1 := server.URL + "/logo.png"
+	url2 := server.URL + "/different-name.jpg" // Different basename, same content
+
+	// Pre-compute expected path based on first URL's basename
+	expectedLocalPath := buildExpectedPath("logo", sharedContent, "png")
+
+	// Run multiple times to verify deterministic behavior
+	// (With the old implementation, this would occasionally fail due to map iteration randomness)
+	for i := 0; i < 10; i++ {
+		mockSink := &metadataSinkMock{}
+		resolver := newTestResolver(mockSink)
+
+		linkRefs := []mdconvert.LinkRef{
+			mdconvert.NewLinkRef(url1, mdconvert.KindImage),
+			mdconvert.NewLinkRef(url2, mdconvert.KindImage),
+		}
+		inputMarkdown := "![Img1](" + url1 + ")\n\n![Img2](" + url2 + ")"
+		conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+		pageUrl, _ := url.Parse(server.URL + "/page")
+
+		// Act
+		ctx := context.Background()
+		resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024)
+		doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+
+		// Assert
+		assert.NoError(t, err)
+
+		// Both URLs should be tracked
+		writtenAssets := resolver.WrittenAssets()
+		assert.Equal(t, 2, len(writtenAssets), "Both URLs should be in writtenAssets")
+
+		// Both images should be rewritten to the SAME path (from first written URL)
+		output := string(doc.Content())
+		assert.Equal(t, 2, strings.Count(output, expectedLocalPath),
+			"Iteration %d: Both images should use deterministic path from first written URL (expected %s)",
+			i+1, expectedLocalPath)
+
+		// Should NOT contain a path built from the second URL's basename
+		unexpectedPath := buildExpectedPath("different-name", sharedContent, "jpg")
+		assert.NotContains(t, output, unexpectedPath,
+			"Iteration %d: Should not contain path from second URL (which was deduplicated, not written)",
+			i+1)
+	}
+}

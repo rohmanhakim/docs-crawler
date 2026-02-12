@@ -55,6 +55,7 @@ type Resolver interface {
 type LocalResolver struct {
 	metadataSink  metadata.MetadataSink
 	writtenAssets map[string]string // key: assetURL, value: contentHash
+	hashToPath    map[string]string // key: contentHash, value: localPath (only for files actually written)
 	httpClient    *http.Client
 	userAgent     string
 }
@@ -67,6 +68,7 @@ func NewLocalResolver(
 	return LocalResolver{
 		metadataSink:  metadataSink,
 		writtenAssets: make(map[string]string),
+		hashToPath:    make(map[string]string),
 		httpClient:    httpClient,
 		userAgent:     userAgent,
 	}
@@ -268,6 +270,9 @@ func (r *LocalResolver) resolve(
 			// Record successfully written asset: URL -> contentHash
 			r.writtenAssets[assetURL.String()] = contentHash
 
+			// Store hash -> path mapping for content-hash deduplication lookups
+			r.hashToPath[contentHash] = localPath
+
 			// Call assetCallback ONLY for actual new writes (not content-hash dedups)
 			assetCallback(localPath)
 		}
@@ -290,22 +295,11 @@ func (r *LocalResolver) resolve(
 	return resolvedDoc, nil
 }
 
-// findPathByHash finds the stored path for a content hash from writtenAssets
-// This is used for content-hash deduplication
+// findPathByHash finds the stored path for a content hash.
+// This is used for content-hash deduplication.
+// Returns empty string if no file was written for this hash.
 func (r *LocalResolver) findPathByHash(hash string) string {
-	for urlStr, h := range r.writtenAssets {
-		if h == hash {
-			// Return the local path for this URL
-			// We need to reconstruct it from the URL
-			u, err := url.Parse(urlStr)
-			if err != nil {
-				return ""
-			}
-			extension := getFileExtension(u.Path)
-			return buildAssetPath(u.Path, hash, extension)
-		}
-	}
-	return ""
+	return r.hashToPath[hash]
 }
 
 func (r *LocalResolver) mechanicalDeduplicate(urls []url.URL, host string, scheme string) []url.URL {
