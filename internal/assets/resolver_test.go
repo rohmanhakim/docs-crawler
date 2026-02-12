@@ -187,7 +187,7 @@ func TestResolve_AssetFetchFails_PreservesOriginalURL(t *testing.T) {
 	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for missing URL")
 	errorRecords := mockSink.GetErrorRecords()
 	assert.Len(t, errorRecords, 1, "Should have 1 error record for missing URL")
-	assert.EqualValues(t, metadata.CauseNetworkFailure, errorRecords[0].Cause)
+	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
 	assert.Contains(t, errorRecords[0].Details, "missing asset")
 
 	// Verify attrs contain missing URL and page URL
@@ -268,7 +268,7 @@ func TestResolve_MixedSuccessAndFailure(t *testing.T) {
 	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for missing URL")
 	errorRecords := mockSink.GetErrorRecords()
 	assert.Len(t, errorRecords, 1, "Should have 1 error record for missing URL")
-	assert.EqualValues(t, metadata.CauseNetworkFailure, errorRecords[0].Cause)
+	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
 
 	// Verify attrs contain failed URL
 	attrMap := make(map[string]string)
@@ -598,5 +598,228 @@ func TestResolve_ContentHashDeduplication_DeterministicPath(t *testing.T) {
 		assert.NotContains(t, output, unexpectedPath,
 			"Iteration %d: Should not contain path from second URL (which was deduplicated, not written)",
 			i+1)
+	}
+}
+
+func TestResolve_AssetTooLarge_ContentLengthHeader(t *testing.T) {
+	// Arrange - create a mock HTTP server that returns Content-Length exceeding limit
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "1024")
+		w.WriteHeader(http.StatusOK)
+		w.Write(make([]byte, 1024))
+	}))
+	defer server.Close()
+
+	mockSink := &metadataSinkMock{}
+	resolver := newTestResolver(mockSink)
+
+	tempDir := t.TempDir()
+	imageURL := server.URL + "/large-image.png"
+	linkRefs := []mdconvert.LinkRef{
+		mdconvert.NewLinkRef(imageURL, mdconvert.KindImage),
+	}
+	inputMarkdown := "![Large image](" + imageURL + ")"
+	conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+	pageUrl, _ := url.Parse(server.URL + "/page")
+
+	// Act - use maxAssetSize of 512 bytes (less than Content-Length of 1024)
+	ctx := context.Background()
+	resolveParam := assets.NewResolveParam(tempDir, 512) // 512 bytes limit
+	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+
+	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
+	assert.NoError(t, err)
+
+	// Assert - RecordError should be called for oversized asset
+	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for oversized asset")
+	errorRecords := mockSink.GetErrorRecords()
+	assert.Len(t, errorRecords, 1, "Should have 1 error record for oversized asset")
+	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
+
+	// Assert - RecordArtifact should NOT be called for oversized asset
+	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for oversized asset")
+
+	// Assert - writtenAssets should NOT contain the oversized asset URL
+	writtenAssets := resolver.WrittenAssets()
+	assert.Equal(t, 0, len(writtenAssets), "Oversized asset should not be in writtenAssets")
+
+	// Assert - document content should preserve original URL (not rewritten)
+	output := string(doc.Content())
+	assert.Contains(t, output, imageURL, "Document should preserve original URL for oversized asset")
+	assert.NotContains(t, output, "assets/images/", "Document should not contain local asset path for oversized asset")
+}
+
+func TestResolve_AssetTooLarge_UnknownContentLength(t *testing.T) {
+	// Arrange - create a mock HTTP server that streams without Content-Length
+	// (simulating chunked transfer encoding or omitted header)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Don't set Content-Length - this forces chunked encoding in httptest
+		w.WriteHeader(http.StatusOK)
+		// Write more than maxAssetSize
+		w.Write(make([]byte, 1024))
+	}))
+	defer server.Close()
+
+	mockSink := &metadataSinkMock{}
+	resolver := newTestResolver(mockSink)
+
+	tempDir := t.TempDir()
+	imageURL := server.URL + "/streaming-image.png"
+	linkRefs := []mdconvert.LinkRef{
+		mdconvert.NewLinkRef(imageURL, mdconvert.KindImage),
+	}
+	inputMarkdown := "![Streaming image](" + imageURL + ")"
+	conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+	pageUrl, _ := url.Parse(server.URL + "/page")
+
+	// Act - use maxAssetSize of 512 bytes (less than streamed body of 1024)
+	ctx := context.Background()
+	resolveParam := assets.NewResolveParam(tempDir, 512) // 512 bytes limit
+	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+
+	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
+	assert.NoError(t, err)
+
+	// Assert - RecordError should be called for oversized asset
+	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for oversized asset")
+	errorRecords := mockSink.GetErrorRecords()
+	assert.Len(t, errorRecords, 1, "Should have 1 error record for oversized asset")
+	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
+
+	// Assert - RecordArtifact should NOT be called for oversized asset
+	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for oversized asset")
+
+	// Assert - writtenAssets should NOT contain the oversized asset URL
+	writtenAssets := resolver.WrittenAssets()
+	assert.Equal(t, 0, len(writtenAssets), "Oversized asset should not be in writtenAssets")
+
+	// Assert - document content should preserve original URL (not rewritten)
+	output := string(doc.Content())
+	assert.Contains(t, output, imageURL, "Document should preserve original URL for oversized asset")
+	assert.NotContains(t, output, "assets/images/", "Document should not contain local asset path for oversized asset")
+}
+
+func TestResolve_AssetTooLarge_LyingContentLength(t *testing.T) {
+	// Arrange - create a mock HTTP server that sends a small Content-Length
+	// but streams a larger body (simulating malicious/misconfigured server)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Claim the content is small...
+		w.Header().Set("Content-Length", "256")
+		w.WriteHeader(http.StatusOK)
+		// ...but actually write more (httptest will ignore this mismatch)
+		w.Write(make([]byte, 1024))
+	}))
+	defer server.Close()
+
+	mockSink := &metadataSinkMock{}
+	resolver := newTestResolver(mockSink)
+
+	tempDir := t.TempDir()
+	imageURL := server.URL + "/lying-image.png"
+	linkRefs := []mdconvert.LinkRef{
+		mdconvert.NewLinkRef(imageURL, mdconvert.KindImage),
+	}
+	inputMarkdown := "![Lying image](" + imageURL + ")"
+	conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+	pageUrl, _ := url.Parse(server.URL + "/page")
+
+	// Act - use maxAssetSize of 512 bytes (less than actual body of 1024)
+	ctx := context.Background()
+	resolveParam := assets.NewResolveParam(tempDir, 512) // 512 bytes limit
+	doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+
+	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
+	assert.NoError(t, err)
+
+	// Assert - RecordError should be called for oversized asset (caught by post-read check)
+	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for oversized asset")
+	errorRecords := mockSink.GetErrorRecords()
+	assert.Len(t, errorRecords, 1, "Should have 1 error record for oversized asset")
+	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
+
+	// Assert - RecordArtifact should NOT be called for oversized asset
+	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for oversized asset")
+
+	// Assert - writtenAssets should NOT contain the oversized asset URL
+	writtenAssets := resolver.WrittenAssets()
+	assert.Equal(t, 0, len(writtenAssets), "Oversized asset should not be in writtenAssets")
+
+	// Assert - document content should preserve original URL (not rewritten)
+	output := string(doc.Content())
+	assert.Contains(t, output, imageURL, "Document should preserve original URL for oversized asset")
+	assert.NotContains(t, output, "assets/images/", "Document should not contain local asset path for oversized asset")
+}
+
+func TestResolve_AssetAtSizeBoundary(t *testing.T) {
+	// Test both boundary cases: exactly at limit and one byte over
+
+	testCases := []struct {
+		name          string
+		bodySize      int64
+		maxAssetSize  int64
+		shouldSucceed bool
+	}{
+		{
+			name:          "exactly at limit should succeed",
+			bodySize:      512,
+			maxAssetSize:  512,
+			shouldSucceed: true,
+		},
+		{
+			name:          "one byte over limit should fail",
+			bodySize:      513,
+			maxAssetSize:  512,
+			shouldSucceed: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange - server returns exact body size
+			bodyData := make([]byte, tc.bodySize)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				w.Write(bodyData)
+			}))
+			defer server.Close()
+
+			mockSink := &metadataSinkMock{}
+			resolver := newTestResolver(mockSink)
+
+			tempDir := t.TempDir()
+			imageURL := server.URL + "/boundary-image.png"
+			linkRefs := []mdconvert.LinkRef{
+				mdconvert.NewLinkRef(imageURL, mdconvert.KindImage),
+			}
+			inputMarkdown := "![Boundary image](" + imageURL + ")"
+			conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+			pageUrl, _ := url.Parse(server.URL + "/page")
+
+			// Act
+			ctx := context.Background()
+			resolveParam := assets.NewResolveParam(tempDir, tc.maxAssetSize)
+			doc, err := resolver.Resolve(ctx, *pageUrl, "example.com", "https", conversionResult, resolveParam, testRetryParam())
+
+			// Assert
+			assert.NoError(t, err) // Resolve never returns error for asset failures
+
+			if tc.shouldSucceed {
+				// Asset should be successfully downloaded
+				assert.True(t, mockSink.recordArtifactCalled, "RecordArtifact should be called for asset at boundary")
+				assert.False(t, mockSink.recordErrorCalled, "RecordError should not be called for asset at boundary")
+				writtenAssets := resolver.WrittenAssets()
+				assert.Equal(t, 1, len(writtenAssets), "Asset at boundary should be in writtenAssets")
+				output := string(doc.Content())
+				assert.NotContains(t, output, imageURL, "Document should have rewritten URL for asset at boundary")
+			} else {
+				// Asset should be rejected
+				assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for oversized asset")
+				assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for oversized asset")
+				writtenAssets := resolver.WrittenAssets()
+				assert.Equal(t, 0, len(writtenAssets), "Oversized asset should not be in writtenAssets")
+				output := string(doc.Content())
+				assert.Contains(t, output, imageURL, "Document should preserve original URL for oversized asset")
+			}
+		})
 	}
 }

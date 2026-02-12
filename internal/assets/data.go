@@ -64,12 +64,12 @@ func (r ResolveParam) MaxAssetSize() int64 {
 
 type AssetfulMarkdownDoc struct {
 	content         []byte
-	missingAssets   []url.URL
+	missingAssets   map[string]AssetsErrorCause // key: URL string, value: error cause
 	unparseableURLs []string
 	localAssets     []string
 }
 
-func NewAssetfulMarkdownDoc(content []byte, missingAssets []url.URL, unparseableURLs []string, localAssets []string) AssetfulMarkdownDoc {
+func NewAssetfulMarkdownDoc(content []byte, missingAssets map[string]AssetsErrorCause, unparseableURLs []string, localAssets []string) AssetfulMarkdownDoc {
 	return AssetfulMarkdownDoc{
 		content:         content,
 		missingAssets:   missingAssets,
@@ -82,7 +82,7 @@ func (a AssetfulMarkdownDoc) Content() []byte {
 	return a.content
 }
 
-func (a AssetfulMarkdownDoc) MissingAssets() []url.URL {
+func (a AssetfulMarkdownDoc) MissingAssets() map[string]AssetsErrorCause {
 	return a.missingAssets
 }
 

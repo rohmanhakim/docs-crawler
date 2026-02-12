@@ -121,15 +121,15 @@ func (r *LocalResolver) Resolve(
 	)
 
 	// Record errors for missing URLs
-	for _, missingURL := range assetfulMarkdownDoc.MissingAssets() {
+	for urlStr, cause := range assetfulMarkdownDoc.MissingAssets() {
 		r.metadataSink.RecordError(
 			time.Now(),
 			"assets",
 			"Resolver.Resolve",
-			metadata.CauseNetworkFailure,
-			fmt.Sprintf("missing asset: %s", missingURL.String()),
+			mapAssetsErrorToMetadataCause(AssetsError{Cause: cause}),
+			fmt.Sprintf("missing asset: %s", urlStr),
 			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrMessage, missingURL.String()),
+				metadata.NewAttr(metadata.AttrMessage, urlStr),
 				metadata.NewAttr(metadata.AttrURL, pageUrl.String()),
 			},
 		)
@@ -215,8 +215,8 @@ func (r *LocalResolver) resolve(
 	// Mechanically deduplicate the asset URLs
 	deduplicatedAssetsUrls := r.mechanicalDeduplicate(imageURLs, host, scheme)
 
-	// Track missing asset URLs for this call
-	var missingAssetsUrls []url.URL
+	// Track missing asset URLs for this call (with error cause)
+	missingAssetErrors := make(map[string]AssetsErrorCause)
 
 	// Check if there are URLs that need downloading
 	if len(deduplicatedAssetsUrls) > 0 {
@@ -233,8 +233,13 @@ func (r *LocalResolver) resolve(
 			retryCount := result.Attempts() - 1
 
 			if result.Err() != nil {
-				// Record missing asset URL and log error
-				missingAssetsUrls = append(missingAssetsUrls, assetURL)
+				// Record missing asset URL with error cause
+				var assetsErr *AssetsError
+				if errors.As(result.Err(), &assetsErr) {
+					missingAssetErrors[assetURL.String()] = assetsErr.Cause
+				} else {
+					missingAssetErrors[assetURL.String()] = ErrCauseNetworkFailure
+				}
 				// Call fetchCallback even on failure with empty result (but with URL)
 				fetchCallback(retryCount, NewAssetFetchResult(assetURL, 0, 0, nil))
 				// Continue with next asset (missing assets are reported, not fatal)
@@ -263,7 +268,12 @@ func (r *LocalResolver) resolve(
 			localPath, err := r.writeAsset(resolveParam.OutputDir(), assetURL.Path, contentHash, extension, assetData)
 			if err != nil {
 				// Write failed - don't update writtenAssets, asset remains "pending"
-				missingAssetsUrls = append(missingAssetsUrls, assetURL)
+				var assetsErr *AssetsError
+				if errors.As(err, &assetsErr) {
+					missingAssetErrors[assetURL.String()] = assetsErr.Cause
+				} else {
+					missingAssetErrors[assetURL.String()] = ErrCauseWriteFailure
+				}
 				continue
 			}
 
@@ -291,7 +301,7 @@ func (r *LocalResolver) resolve(
 	content := r.constructDocument(conversionResult.GetMarkdownContent(), currentDocumentAssets)
 
 	// Create fully populated AssetfulMarkdownDoc
-	resolvedDoc := NewAssetfulMarkdownDoc(content, missingAssetsUrls, unparseableURLs, localAssets)
+	resolvedDoc := NewAssetfulMarkdownDoc(content, missingAssetErrors, unparseableURLs, localAssets)
 	return resolvedDoc, nil
 }
 
@@ -435,13 +445,26 @@ func (r *LocalResolver) performFetch(ctx context.Context, fetchUrl url.URL, user
 		}
 	}
 
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
+	// Read with hard limit to protect against:
+	// - Content-Length = -1 (unknown/omitted)
+	// - Incorrect/malicious Content-Length values
+	// - Streaming responses that exceed maxAssetSize
+	limitedReader := io.LimitReader(resp.Body, maxAssetSize+1) // +1 to detect overflow
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return AssetFetchResult{}, &AssetsError{
 			Message:   fmt.Sprintf("failed to read response body: %v", err),
 			Retryable: true,
 			Cause:     ErrCauseReadResponseBodyError,
+		}
+	}
+
+	// Check if we hit the limit (body exceeds maxAssetSize)
+	if int64(len(body)) > maxAssetSize {
+		return AssetFetchResult{}, &AssetsError{
+			Message:   fmt.Sprintf("asset too large: exceeded max %d bytes", maxAssetSize),
+			Retryable: false,
+			Cause:     ErrCauseAssetTooLarge,
 		}
 	}
 

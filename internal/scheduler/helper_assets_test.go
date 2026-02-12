@@ -90,7 +90,7 @@ func createAssetfulMarkdownDocForTest(content string, localAssets []string) asse
 	}
 	return assets.NewAssetfulMarkdownDoc(
 		[]byte(content),
-		[]url.URL{},
+		map[string]assets.AssetsErrorCause{},
 		[]string{},
 		localAssets,
 	)

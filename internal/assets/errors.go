@@ -42,6 +42,12 @@ func (e *AssetsError) Severity() failure.Severity {
 	return failure.SeverityFatal
 }
 
+// IsRetryable returns whether the error should be retried.
+// This implements the interface checked by the retry handler.
+func (e *AssetsError) IsRetryable() bool {
+	return e.Retryable
+}
+
 // mapAssetsErrorToMetadataCause maps assets-local error semantics
 // to the canonical metadata.ErrorCause table.
 //
@@ -71,6 +77,8 @@ func mapAssetsErrorToMetadataCause(err AssetsError) metadata.ErrorCause {
 		return metadata.CausePolicyDisallow
 	case ErrCauseRequest5xx:
 		return metadata.CauseUnknown
+	case ErrCauseAssetTooLarge:
+		return metadata.CausePolicyDisallow
 	default:
 		return metadata.CauseUnknown
 	}
