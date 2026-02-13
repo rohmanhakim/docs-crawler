@@ -5,11 +5,16 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/rohmanhakim/docs-crawler/internal/extractor"
+	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/net/html"
 )
 
 // compile-time interface checks
@@ -26,7 +31,14 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	// Set up frontier expectations
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 	// Set up robot expectations
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -34,9 +46,24 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -75,10 +102,17 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
+	// Set up frontier expectations
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 	// Set up robot expectations - Init is always called
 	mockRobot.On("Init", mock.Anything).Return()
 	// The malformed URL may cause an error before reaching Decide, or the URL parsing may fail.
@@ -88,9 +122,24 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 		Reason:     robots.DisallowedByRobots,
 		CrawlDelay: 0,
 	}, nil).Maybe()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -126,10 +175,17 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
+	// Set up frontier expectations
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 	// Set up robot expectations - Init is called once per execution
 	mockRobot.On("Init", mock.Anything).Return().Maybe()
 	// Expect Decide for both example1.com and example2.com
@@ -138,9 +194,24 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 
@@ -203,6 +274,13 @@ func mustParseURL(s string) *url.URL {
 	return u
 }
 
+// createMinimalHTMLNode creates a minimal valid HTML document node for testing
+func createMinimalHTMLNode() *html.Node {
+	htmlContent := "<html><body><p>Test content</p></body></html>"
+	doc, _ := html.Parse(strings.NewReader(htmlContent))
+	return doc
+}
+
 // TestScheduler_URLResolutionAndFiltering verifies that discovered URLs are properly
 // resolved to absolute URLs and filtered by host before submission.
 // It uses a stubbed sanitizer to return pre-defined URLs (relative and external),
@@ -212,10 +290,24 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockExtractor := newExtractorMockForTest(t)
+
+	// Set up frontier expectations
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// Disable auto-enqueue to control Dequeue behavior explicitly
+	mockFrontier.disableAutoEnqueue = true
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	// Set up discovered URLs:
 	// - "/relative-path" (relative, should be resolved and submitted)
@@ -244,13 +336,30 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
-
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Set up fetcher mock to return valid HTML
 	setupFetcherMockWithSuccess(mockFetcher, "https://example.com", []byte("<html><body>Test</body></html>"), 200)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, mockSanitizer, nil, nil, mockSleeper)
+	mockExtractor.On("SetExtractParam", extractor.DefaultExtractParam()).Return()
+	mockExtractor.On("Extract", mock.AnythingOfType("url.URL"), mock.AnythingOfType("[]uint8")).Return(extractor.ExtractionResult{}, nil)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		nil,
+		nil,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -287,11 +396,22 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockExtractor := newExtractorMockForTest(t)
 
+	// Set up frontier expectations
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
+	// Set up extractor mock to return a valid extraction result and expect SetExtractParam
+	setupExtractorMockWithSuccess(mockExtractor, createMinimalHTMLNode())
+	// setupExtractorMockWithSetExtractParamExpectation(mockExtractor, extractor.DefaultExtractParam())
 	// Set up discovered URLs - all external
 	discoveredURLs := []url.URL{
 		*mustParseURL("https://other.com/page1"),
@@ -309,13 +429,29 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once() // Only called for seed URL
-
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Set up fetcher mock to return valid HTML
 	setupFetcherMockWithSuccess(mockFetcher, "https://example.com", []byte("<html><body>Test</body></html>"), 200)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, mockSanitizer, nil, nil, mockSleeper)
+	mockExtractor.On("SetExtractParam", extractor.DefaultExtractParam()).Return()
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		nil,
+		nil,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -351,11 +487,26 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockExtractor := newExtractorMockForTest(t)
 
+	// Set up frontier expectations
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.disableAutoEnqueue = true
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	// Set up extractor mock to return a valid extraction result and expect SetExtractParam
+	setupExtractorMockWithSuccess(mockExtractor, createMinimalHTMLNode())
+	// setupExtractorMockWithSetExtractParamExpectation(mockExtractor, extractor.DefaultExtractParam())
 	// Set up discovered URLs - all relative
 	discoveredURLs := []url.URL{
 		*mustParseURL("/path1"),
@@ -375,13 +526,29 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
-
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
+
+	mockExtractor.On("SetExtractParam", extractor.DefaultExtractParam()).Return()
 
 	// Set up fetcher mock to return valid HTML
 	setupFetcherMockWithSuccess(mockFetcher, "https://example.com", []byte("<html><body>Test</body></html>"), 200)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, mockSanitizer, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		nil,
+		nil,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

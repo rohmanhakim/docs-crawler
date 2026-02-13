@@ -48,16 +48,6 @@ func setupExtractorMockWithSuccess(m *extractorMock, contentNode *html.Node) {
 	m.On("Extract", mock.Anything, mock.Anything).Return(result, nil)
 }
 
-// setupExtractorMockWithError sets up the extractor mock to return an error
-func setupExtractorMockWithError(m *extractorMock, err failure.ClassifiedError) {
-	m.On("Extract", mock.Anything, mock.Anything).Return(extractor.ExtractionResult{}, err)
-}
-
-// setupExtractorMockWithSetExtractParamExpectation sets up the extractor mock to expect SetExtractParam call
-func setupExtractorMockWithSetExtractParamExpectation(m *extractorMock, params extractor.ExtractParam) {
-	m.On("SetExtractParam", params).Return()
-}
-
 func verifyExtractParam(t *testing.T, actual extractor.ExtractParam, expected extractor.ExtractParam) {
 	t.Helper()
 	assert.InDelta(t, expected.BodySpecificityBias, actual.BodySpecificityBias, 0.0001, "BodySpecificityBias mismatch")

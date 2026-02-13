@@ -30,6 +30,7 @@ Allow: /`
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 
@@ -39,6 +40,15 @@ Allow: /`
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount")
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	// Clear default expectation and setup fetcher mock to return successful response
 	mockFetcher.ExpectedCalls = nil
@@ -55,7 +65,7 @@ Allow: /`
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
 	s.SetCurrentHost(testURL.Host)
 
 	// Submit URL for admission
@@ -75,6 +85,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 
@@ -85,6 +96,15 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	// Clear default expectation and setup fetcher mock to capture the context
 	mockFetcher.ExpectedCalls = nil
 	var receivedContext context.Context
@@ -93,7 +113,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 			receivedContext = args.Get(0).(context.Context)
 		}).Return(fetcher.FetchResult{}, nil).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -125,6 +145,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -136,7 +157,17 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock to return recoverable error
 	mockFetcher.ExpectedCalls = nil
@@ -147,7 +178,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, recoverableErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -173,6 +204,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -184,7 +216,17 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock to return fatal error
 	mockFetcher.ExpectedCalls = nil
@@ -195,7 +237,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, fatalErr)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -227,6 +269,7 @@ Allow: /`
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 
@@ -237,6 +280,15 @@ Allow: /`
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	// Clear default expectation and setup fetcher mock to capture crawl depth
 	mockFetcher.ExpectedCalls = nil
 	var receivedDepth int
@@ -245,7 +297,7 @@ Allow: /`
 			receivedDepth = args.Get(1).(int)
 		}).Return(fetcher.FetchResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -265,6 +317,7 @@ func TestScheduler_Fetcher_PassesFetchParam(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 
@@ -275,7 +328,16 @@ func TestScheduler_Fetcher_PassesFetchParam(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -297,6 +359,7 @@ func TestScheduler_Fetcher_ContextHandling(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 
@@ -307,9 +370,18 @@ func TestScheduler_Fetcher_ContextHandling(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	// Create scheduler without context (nil)
 	var nilCtx context.Context
-	s := createSchedulerForTest(t, nilCtx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	s := createSchedulerForTest(t, nilCtx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -334,6 +406,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -345,7 +418,17 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock with valid HTML response
 	mockFetcher.ExpectedCalls = nil
@@ -368,7 +451,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -393,6 +476,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -404,7 +488,17 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock with non-HTML response
 	mockFetcher.ExpectedCalls = nil
@@ -421,7 +515,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -457,6 +551,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			mockFinalizer := newMockFinalizer(t)
 			noopSink := &metadata.NoopSink{}
 			mockLimiter := newRateLimiterMockForTest(t)
+			mockFrontier := newFrontierMockForTest(t)
 			mockFetcher := newFetcherMockForTest(t)
 			mockRobot := NewRobotsMockForTest(t)
 			mockSleeper := newSleeperMock(t)
@@ -469,6 +564,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			}, nil).Once()
 
 			mockSleeper.On("Sleep", mock.Anything).Return()
+			mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 			// Clear default expectation and setup fetcher mock with HTTP error response
 			mockFetcher.ExpectedCalls = nil
@@ -484,7 +580,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(fetchResult, nil)
 
-			s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+			s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
 
 			tmpDir := t.TempDir()
 			configPath := filepath.Join(tmpDir, "config.json")
@@ -510,6 +606,7 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -521,7 +618,17 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock to track call count
 	mockFetcher.ExpectedCalls = nil
@@ -531,7 +638,7 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 			callCount++
 		}).Return(fetcher.FetchResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -556,6 +663,7 @@ func TestScheduler_Fetcher_ContextCancellation_Handled(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -567,12 +675,22 @@ func TestScheduler_Fetcher_ContextCancellation_Handled(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Cancel context immediately
 	cancel()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

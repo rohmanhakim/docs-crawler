@@ -11,6 +11,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
+	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
@@ -30,6 +31,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -43,6 +45,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor to return a valid content node
@@ -66,6 +69,10 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 		}).
 		Return(createAssetfulMarkdownDocForTest("# Test Markdown", nil), nil)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -73,6 +80,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -108,6 +116,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -121,6 +130,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
@@ -138,6 +148,10 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	resolvedDoc := createAssetfulMarkdownDocForTest("# Test Markdown\n\n![resolved](assets/images/test.png)", []string{"assets/images/test.png"})
 	setupResolverMockWithCustomResult(mockResolver, resolvedDoc)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -145,6 +159,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -182,6 +197,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -195,6 +211,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
@@ -211,6 +228,10 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 	// Setup resolver to return a fatal error
 	setupResolverMockWithFatalError(mockResolver)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -218,6 +239,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -253,6 +275,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -266,6 +289,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
@@ -282,6 +306,10 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	// Setup resolver to return a recoverable error
 	setupResolverMockWithRecoverableError(mockResolver)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -289,6 +317,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -324,6 +353,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -337,6 +367,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Track call order
@@ -384,6 +415,10 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 			callOrder = append(callOrder, "Resolve")
 		}).Return(createAssetfulMarkdownDocForTest("# Test", nil), nil)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/page.html")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -391,6 +426,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -459,6 +495,7 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -472,6 +509,7 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
@@ -488,6 +526,10 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 	// Setup resolver - should be called exactly once
 	setupResolverMockWithSuccess(mockResolver)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -495,6 +537,7 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -529,6 +572,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -543,6 +587,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
@@ -559,6 +604,10 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	// Setup resolver to return a recoverable error (not fatal)
 	setupResolverMockWithRecoverableError(mockResolver)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -566,6 +615,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -607,6 +657,7 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -621,6 +672,7 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
@@ -637,6 +689,10 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	// Setup resolver to return a fatal error using mock.Anything to ensure it gets called
 	setupResolverMockWithFatalError(mockResolver)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -644,6 +700,7 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -687,6 +744,7 @@ func createSchedulerWithAllMocks(
 	metadataSink metadata.MetadataSink,
 	mockLimiter *rateLimiterMock,
 	mockRobot *robotsMock,
+	mockFrontier *frontierMock,
 	mockFetcher *fetcherMock,
 	mockExtractor extractor.Extractor,
 	mockSanitizer sanitizer.Sanitizer,
@@ -713,11 +771,22 @@ func createSchedulerWithAllMocks(
 	mockNormalize := newNormalizeMockForTest(t)
 	setupNormalizeMockWithSuccess(mockNormalize)
 
+	// Setup frontier mock expectations that are common to all tests
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0)
+	mockFrontier.On("IsDepthExhausted", mock.Anything).Return(true)
+	mockFrontier.On("CurrentMinDepth").Return(-1)
+	mockFrontier.On("Submit", mock.Anything).Return()
+	// Provide a default Dequeue to return no more URLs after the test's specific token
+	mockFrontier.On("Dequeue").Return(frontier.CrawlToken{}, false)
+	// Dequeue is expected to be set up by each test explicitly using SetupDequeueToReturn
+
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
 		mockFinalizer,
 		metadataSink,
 		mockLimiter,
+		mockFrontier,
 		mockFetcher,
 		mockRobot,
 		mockExtractor,
