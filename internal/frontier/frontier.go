@@ -40,7 +40,17 @@ import (
  - owns crawl identity, ordering, and admission rules, but it never drives the pipeline
 */
 
-type Frontier struct {
+type Frontier interface {
+	Init(cfg config.Config)
+	Submit(admission CrawlAdmissionCandidate)
+	Enqueue(incomingToken CrawlToken)
+	IsDepthExhausted(depth int) bool
+	CurrentMinDepth() int
+	VisitedCount() int
+	Dequeue() (CrawlToken, bool)
+}
+
+type CrawlFrontier struct {
 	mu            sync.RWMutex
 	queuesByDepth map[int]*FIFOQueue[CrawlToken]
 	visitedUrl    Set[string]
@@ -49,18 +59,14 @@ type Frontier struct {
 	maxPages      int
 }
 
-func NewFrontier() Frontier {
-	return Frontier{
+func NewCrawlFrontier() CrawlFrontier {
+	return CrawlFrontier{
 		queuesByDepth: make(map[int]*FIFOQueue[CrawlToken]),
 		visitedUrl:    NewSet[string](),
 	}
 }
 
-func (f *Frontier) NewCrawlToken(url url.URL) CrawlToken {
-	return CrawlToken{}
-}
-
-func (f *Frontier) Init(cfg config.Config) {
+func (f *CrawlFrontier) Init(cfg config.Config) {
 	f.maxDepth = cfg.MaxDepth()
 	f.maxPages = cfg.MaxPages()
 }
@@ -70,7 +76,7 @@ Submit
 - Assumes the URL is already admitted.
 - It MUST NOT perform robots, scope, or policy checks.
 */
-func (f *Frontier) Submit(admission CrawlAdmissionCandidate) {
+func (f *CrawlFrontier) Submit(admission CrawlAdmissionCandidate) {
 	f.mu.Lock() // Lock for write
 	defer f.mu.Unlock()
 
@@ -82,7 +88,7 @@ func (f *Frontier) Submit(admission CrawlAdmissionCandidate) {
 
 	// return if new URL depth is higher than the allowed max depth from config
 	// maxDepth = 0 means unlimited
-	if admission.discoveryMetadata.Depth > f.maxDepth && f.maxDepth != 0 {
+	if admission.discoveryMetadata.depth > f.maxDepth && f.maxDepth != 0 {
 		return
 	}
 
@@ -90,10 +96,10 @@ func (f *Frontier) Submit(admission CrawlAdmissionCandidate) {
 	canonicalized := urlutil.Canonicalize(admission.targetURL)
 
 	// deduplicate canonicalized URL
-	f.deduplicate(canonicalized, admission.discoveryMetadata.Depth)
+	f.deduplicate(canonicalized, admission.discoveryMetadata.depth)
 }
 
-func (f *Frontier) Enqueue(incomingToken CrawlToken) {
+func (f *CrawlFrontier) Enqueue(incomingToken CrawlToken) {
 	if f.queuesByDepth[incomingToken.depth] == nil {
 		f.queuesByDepth[incomingToken.depth] = NewFIFOQueue[CrawlToken]()
 	}
@@ -108,7 +114,7 @@ func (f *Frontier) Enqueue(incomingToken CrawlToken) {
 // Returns true if the depth level has no pending URLs or does not exist.
 // This allows the scheduler to enforce strict BFS by detecting when it's
 // safe to advance to the next depth level.
-func (f *Frontier) IsDepthExhausted(depth int) bool {
+func (f *CrawlFrontier) IsDepthExhausted(depth int) bool {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
@@ -119,7 +125,7 @@ func (f *Frontier) IsDepthExhausted(depth int) bool {
 // CurrentMinDepth returns the minimum depth that still has pending URLs.
 // Returns -1 if the frontier is completely empty.
 // This provides the scheduler with visibility into the current BFS progress.
-func (f *Frontier) CurrentMinDepth() int {
+func (f *CrawlFrontier) CurrentMinDepth() int {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
@@ -134,7 +140,7 @@ func (f *Frontier) CurrentMinDepth() int {
 // VisitedCount returns the total number of unique URLs that have been
 // submitted to the frontier (i.e., the size of the visited URL set).
 // This represents the total unique URLs admitted for crawling.
-func (f *Frontier) VisitedCount() int {
+func (f *CrawlFrontier) VisitedCount() int {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
@@ -143,7 +149,7 @@ func (f *Frontier) VisitedCount() int {
 
 // Get next URL from the queue,
 // returns false on the second returned values if empty
-func (f *Frontier) Dequeue() (CrawlToken, bool) {
+func (f *CrawlFrontier) Dequeue() (CrawlToken, bool) {
 	f.mu.Lock() // Lock for write (modifies queues)
 	defer f.mu.Unlock()
 
@@ -165,7 +171,7 @@ func (f *Frontier) Dequeue() (CrawlToken, bool) {
 
 // Check is canonicalized URL has been visited before
 // return true if visited; false if has not been visited
-func (f *Frontier) deduplicate(canonicalizedUrl url.URL, depth int) {
+func (f *CrawlFrontier) deduplicate(canonicalizedUrl url.URL, depth int) {
 	// if already visited skip
 	if f.visitedUrl.Contains(canonicalizedUrl.String()) {
 		return

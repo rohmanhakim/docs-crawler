@@ -10,6 +10,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
+	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
@@ -26,6 +27,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -40,7 +42,17 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor to return a valid content node
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -66,6 +78,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 		mockFinalizer,
 		noopSink,
 		mockLimiter,
+		mockFrontier,
 		mockRobot,
 		mockFetcher,
 		mockExtractor,
@@ -100,6 +113,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -114,7 +128,17 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -133,6 +157,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 		mockFinalizer,
 		noopSink,
 		mockLimiter,
+		mockFrontier,
 		mockRobot,
 		mockFetcher,
 		mockExtractor,
@@ -169,6 +194,7 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -183,7 +209,17 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -202,6 +238,7 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 		mockFinalizer,
 		noopSink,
 		mockLimiter,
+		mockFrontier,
 		mockRobot,
 		mockFetcher,
 		mockExtractor,
@@ -236,6 +273,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -250,7 +288,17 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -269,6 +317,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockFinalizer,
 		noopSink,
 		mockLimiter,
+		mockFrontier,
 		mockRobot,
 		mockFetcher,
 		mockExtractor,
@@ -303,12 +352,22 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
+
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -318,6 +377,7 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 	}, nil).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Track call order
 	callOrder := []string{}
@@ -364,6 +424,7 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 		mockFinalizer,
 		noopSink,
 		mockLimiter,
+		mockFrontier,
 		mockRobot,
 		mockFetcher,
 		mockExtractor,
@@ -426,6 +487,7 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -440,7 +502,17 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -459,6 +531,7 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 		mockFinalizer,
 		noopSink,
 		mockLimiter,
+		mockFrontier,
 		mockRobot,
 		mockFetcher,
 		mockExtractor,
@@ -493,6 +566,7 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
@@ -508,7 +582,17 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -532,6 +616,7 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 		mockFinalizer,
 		noopSink,
 		mockLimiter,
+		mockFrontier,
 		mockRobot,
 		mockFetcher,
 		mockExtractor,

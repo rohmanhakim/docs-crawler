@@ -23,7 +23,8 @@ func newRateLimiterMockForTest(t *testing.T) *rateLimiterMock {
 	m.On("SetCrawlDelay", mock.Anything, mock.Anything).Return()
 	m.On("Backoff", mock.Anything).Return()
 	m.On("ResetBackoff", mock.Anything).Return()
-	m.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	// Note: ResolveDelay expectation is not set here because different tests
+	// need different return values. Each test should set its own expectation.
 	return m
 }
 

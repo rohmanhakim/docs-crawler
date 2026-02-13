@@ -11,6 +11,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
+	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
@@ -30,6 +31,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -44,7 +46,17 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor to return a valid content node
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -79,6 +91,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -115,6 +128,7 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -129,7 +143,17 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -157,6 +181,7 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -194,6 +219,7 @@ func TestScheduler_Normalize_FatalError_AbortsCrawl(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
@@ -209,7 +235,17 @@ func TestScheduler_Normalize_FatalError_AbortsCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -235,6 +271,7 @@ func TestScheduler_Normalize_FatalError_AbortsCrawl(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -271,6 +308,7 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -285,7 +323,17 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -311,6 +359,7 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -347,6 +396,7 @@ func TestScheduler_Normalize_MethodCallOrder(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -361,7 +411,17 @@ func TestScheduler_Normalize_MethodCallOrder(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Track call order
 	callOrder := []string{}
@@ -421,6 +481,7 @@ func TestScheduler_Normalize_MethodCallOrder(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -495,6 +556,7 @@ func TestScheduler_Normalize_CalledExactlyOncePerPage(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -509,7 +571,17 @@ func TestScheduler_Normalize_CalledExactlyOncePerPage(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -535,6 +607,7 @@ func TestScheduler_Normalize_CalledExactlyOncePerPage(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -570,6 +643,7 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -585,7 +659,17 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -611,6 +695,7 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -653,6 +738,7 @@ func TestScheduler_Normalize_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -668,7 +754,17 @@ func TestScheduler_Normalize_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -694,6 +790,7 @@ func TestScheduler_Normalize_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 		noopSink,
 		mockLimiter,
 		mockRobot,
+		mockFrontier,
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
@@ -737,6 +834,7 @@ func createSchedulerWithAllMocksAndNormalize(
 	metadataSink metadata.MetadataSink,
 	mockLimiter *rateLimiterMock,
 	mockRobot *robotsMock,
+	mockFrontier *frontierMock,
 	mockFetcher *fetcherMock,
 	mockExtractor extractor.Extractor,
 	mockSanitizer sanitizer.Sanitizer,
@@ -769,6 +867,7 @@ func createSchedulerWithAllMocksAndNormalize(
 		mockFinalizer,
 		metadataSink,
 		mockLimiter,
+		mockFrontier,
 		mockFetcher,
 		mockRobot,
 		mockExtractor,

@@ -25,7 +25,7 @@ func TestFrontier_EnforceBFS(t *testing.T) {
 	// GIVEN a frontier with no depth/page limits (simplify scenario)
 	cfg := config.Config{} // assume zero-values mean "no limits"
 
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(cfg)
 
 	/*
@@ -50,7 +50,7 @@ func TestFrontier_EnforceBFS(t *testing.T) {
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
 		A,
 		frontier.SourceSeed,
-		frontier.DiscoveryMetadata{Depth: 0},
+		frontier.NewDiscoveryMetadata(0, nil),
 	))
 
 	// Dequeue A
@@ -66,12 +66,12 @@ func TestFrontier_EnforceBFS(t *testing.T) {
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
 		B,
 		frontier.SourceCrawl,
-		frontier.DiscoveryMetadata{Depth: 1},
+		frontier.NewDiscoveryMetadata(1, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
 		C,
 		frontier.SourceCrawl,
-		frontier.DiscoveryMetadata{Depth: 1},
+		frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// Dequeue B
@@ -87,7 +87,7 @@ func TestFrontier_EnforceBFS(t *testing.T) {
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
 		D,
 		frontier.SourceCrawl,
-		frontier.DiscoveryMetadata{Depth: 2},
+		frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	/*
@@ -126,7 +126,7 @@ func TestFrontier_EnforceBFS(t *testing.T) {
 
 func TestFrontier_DoesNotAllowsDuplicateURL(t *testing.T) {
 	// GIVEN a fresh frontier
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	A := mustURL(t, "https://example.com/docs")
@@ -135,13 +135,13 @@ func TestFrontier_DoesNotAllowsDuplicateURL(t *testing.T) {
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
 		A,
 		frontier.SourceSeed,
-		frontier.DiscoveryMetadata{Depth: 0},
+		frontier.NewDiscoveryMetadata(0, nil),
 	))
 
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
 		A, // same URL, same canonical form
 		frontier.SourceCrawl,
-		frontier.DiscoveryMetadata{Depth: 1},
+		frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// THEN only ONE crawl token should ever be dequeued
@@ -168,7 +168,7 @@ func TestFrontier_DoesNotAllowsDuplicateURL(t *testing.T) {
 // This maintains the BFS guarantee
 func TestFrontier_BFOrderingMaintained(t *testing.T) {
 	// GIVEN a frontier
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	/*
@@ -205,24 +205,24 @@ func TestFrontier_BFOrderingMaintained(t *testing.T) {
 
 	// Seed A at depth 0
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		A, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		A, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 
 	// Process A, discover B
 	f.Dequeue()
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		B, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		B, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// Process B, discover C (depth 2)
 	f.Dequeue()
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		C, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		C, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	// Now simulate D being discovered at depth 1 (from another branch)
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		D, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		D, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// D (depth 1) MUST be dequeued BEFORE C (depth 2)
@@ -257,7 +257,7 @@ func TestFrontier_DepthLimitEnforced(t *testing.T) {
 		t.Fatalf("failed to build config: %v", err)
 	}
 
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(cfg)
 
 	deepURL := mustURL(t, "https://example.com/deep")
@@ -266,7 +266,7 @@ func TestFrontier_DepthLimitEnforced(t *testing.T) {
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
 		deepURL,
 		frontier.SourceCrawl,
-		frontier.DiscoveryMetadata{Depth: 5}, // Exceeds MaxDepth of 2
+		frontier.NewDiscoveryMetadata(5, nil), // Exceeds MaxDepth of 2
 	))
 
 	// THEN it should NOT be in the queue
@@ -282,7 +282,7 @@ func TestFrontier_DepthLimitEnforced(t *testing.T) {
 // processed before any depth-2 URL
 func TestFrontier_WideTreeBFMaintained(t *testing.T) {
 	// GIVEN a frontier
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	/*
@@ -305,27 +305,27 @@ func TestFrontier_WideTreeBFMaintained(t *testing.T) {
 
 	// Submit root
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		root, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		root, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 
 	// Process root, discover A, B, C
 	f.Dequeue()
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		A, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		A, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// Process A early, discover D (depth 2) before B and C are even submitted
 	f.Dequeue()
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		D, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		D, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	// Now submit B and C (depth 1)
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		B, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		B, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		C, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		C, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// BFS requires: B, C (depth 1) must come before D (depth 2)
@@ -373,7 +373,7 @@ func TestFrontier_PageCountLimitEnforced(t *testing.T) {
 		t.Fatalf("failed to build config: %v", err)
 	}
 
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(cfg)
 
 	urls := []string{
@@ -389,7 +389,7 @@ func TestFrontier_PageCountLimitEnforced(t *testing.T) {
 	for i, rawURL := range urls {
 		u := mustURL(t, rawURL)
 		f.Submit(frontier.NewCrawlAdmissionCandidate(
-			u, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+			u, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 		))
 
 		// Dequeue immediately to simulate "crawling"
@@ -419,7 +419,7 @@ func TestFrontier_PageCountLimitEnforced(t *testing.T) {
 // This happens when a URL is submitted at depth N, but depth N-1 was never created.
 func TestFrontier_NilQueueDereference(t *testing.T) {
 	// GIVEN a frontier
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	A := mustURL(t, "https://example.com/a")
@@ -427,13 +427,13 @@ func TestFrontier_NilQueueDereference(t *testing.T) {
 
 	// Submit A at depth 0
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		A, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		A, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 
 	// Submit C at depth 2 (skipping depth 1 entirely)
 	// This sets currentDepth to 2, but queuesByDepth[1] is nil
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		C, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		C, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	// Dequeue A (depth 0)
@@ -466,7 +466,7 @@ func TestFrontier_NilQueueDereference(t *testing.T) {
 // Test case to verify thread-safety when submitting and dequeueing
 func TestFrontier_ConcurrentSubmitDequeue(t *testing.T) {
 	// GIVEN a frontier with no limits
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	const numWorkers = 10
@@ -487,7 +487,7 @@ func TestFrontier_ConcurrentSubmitDequeue(t *testing.T) {
 				u := mustURL(t, fmt.Sprintf("https://example.com/w%d-p%d", workerID, i))
 				depth := (workerID + i) % 5 // Mix of depths 0-4
 				f.Submit(frontier.NewCrawlAdmissionCandidate(
-					u, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: depth},
+					u, frontier.SourceSeed, frontier.NewDiscoveryMetadata(depth, nil),
 				))
 			}
 		}(w)
@@ -545,13 +545,13 @@ func TestFrontier_UnlimitedLimits(t *testing.T) {
 		WithMaxPages(0). // 0 = unlimited
 		Build()
 
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(cfg)
 
 	// Should accept URLs at any depth
 	deepURL := mustURL(t, "https://example.com/a/b/c/d/e/f")
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		deepURL, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 100},
+		deepURL, frontier.SourceSeed, frontier.NewDiscoveryMetadata(100, nil),
 	))
 
 	token, ok := f.Dequeue()
@@ -565,7 +565,7 @@ func TestFrontier_UnlimitedLimits(t *testing.T) {
 
 // Test empty frontier
 func TestFrontier_Empty(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	_, ok := f.Dequeue()
@@ -614,15 +614,15 @@ func TestFrontier_URLStructDeduplicationBug(t *testing.T) {
 
 	// The current frontier implementation uses Set[string] with canonicalized URLs,
 	// so this deduplication works correctly. This test documents WHY we made that change.
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	// Submit same URL twice (parsed separately)
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		url1, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		url1, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		url2, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		url2, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// Should only dequeue one
@@ -648,7 +648,7 @@ func TestFrontier_URLStructDeduplicationBug(t *testing.T) {
 // TestFrontier_IsDepthExhausted_EmptyFrontier verifies that all depths
 // are reported as exhausted when the frontier is empty.
 func TestFrontier_IsDepthExhausted_EmptyFrontier(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	// All depths should be exhausted for an empty frontier
@@ -666,7 +666,7 @@ func TestFrontier_IsDepthExhausted_EmptyFrontier(t *testing.T) {
 // TestFrontier_IsDepthExhausted_WithPendingURLs verifies that depth exhaustion
 // is correctly reported when URLs exist at various depths.
 func TestFrontier_IsDepthExhausted_WithPendingURLs(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	A := mustURL(t, "https://example.com/a")
@@ -675,10 +675,10 @@ func TestFrontier_IsDepthExhausted_WithPendingURLs(t *testing.T) {
 
 	// Submit URLs at depths 0 and 2
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		A, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		A, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		B, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		B, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	// Depth 0 should NOT be exhausted (has A)
@@ -716,7 +716,7 @@ func TestFrontier_IsDepthExhausted_WithPendingURLs(t *testing.T) {
 
 	// Submit C at depth 1
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		C, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		C, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// Depth 1 should NOT be exhausted now
@@ -728,7 +728,7 @@ func TestFrontier_IsDepthExhausted_WithPendingURLs(t *testing.T) {
 // TestFrontier_IsDepthExhausted_TracksBFSProgression demonstrates how
 // IsDepthExhausted can be used to track BFS level completion.
 func TestFrontier_IsDepthExhausted_TracksBFSProgression(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	root := mustURL(t, "https://example.com/root")
@@ -738,7 +738,7 @@ func TestFrontier_IsDepthExhausted_TracksBFSProgression(t *testing.T) {
 
 	// Setup: root (depth 0) discovers children (depth 1)
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		root, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		root, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 
 	// Before processing: depth 0 not exhausted
@@ -756,10 +756,10 @@ func TestFrontier_IsDepthExhausted_TracksBFSProgression(t *testing.T) {
 
 	// Submit children at depth 1
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		child1, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		child1, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		child2, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		child2, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// Depth 1 not exhausted
@@ -770,7 +770,7 @@ func TestFrontier_IsDepthExhausted_TracksBFSProgression(t *testing.T) {
 	// Process child1, discover grandchild (depth 2)
 	f.Dequeue()
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		grandchild, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		grandchild, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	// Depth 1 still not exhausted (child2 pending)
@@ -795,7 +795,7 @@ func TestFrontier_IsDepthExhausted_TracksBFSProgression(t *testing.T) {
 // TestFrontier_CurrentMinDepth_EmptyFrontier verifies that CurrentMinDepth
 // returns -1 for an empty frontier.
 func TestFrontier_CurrentMinDepth_EmptyFrontier(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	minDepth := f.CurrentMinDepth()
@@ -807,7 +807,7 @@ func TestFrontier_CurrentMinDepth_EmptyFrontier(t *testing.T) {
 // TestFrontier_CurrentMinDepth_SingleDepth verifies CurrentMinDepth with
 // URLs at a single depth level.
 func TestFrontier_CurrentMinDepth_SingleDepth(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	A := mustURL(t, "https://example.com/a")
@@ -815,10 +815,10 @@ func TestFrontier_CurrentMinDepth_SingleDepth(t *testing.T) {
 
 	// Submit URLs at depth 2 only
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		A, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 2},
+		A, frontier.SourceSeed, frontier.NewDiscoveryMetadata(2, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		B, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		B, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	// CurrentMinDepth should be 2 (skipping empty 0 and 1)
@@ -846,7 +846,7 @@ func TestFrontier_CurrentMinDepth_SingleDepth(t *testing.T) {
 // TestFrontier_CurrentMinDepth_MultipleDepths verifies CurrentMinDepth
 // correctly tracks the minimum depth with pending URLs across multiple levels.
 func TestFrontier_CurrentMinDepth_MultipleDepths(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	urlD0 := mustURL(t, "https://example.com/d0")
@@ -855,13 +855,13 @@ func TestFrontier_CurrentMinDepth_MultipleDepths(t *testing.T) {
 
 	// Submit at depths 0, 1, and 2
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urlD0, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		urlD0, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urlD1, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		urlD1, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urlD2, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		urlD2, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	// CurrentMinDepth should be 0
@@ -897,7 +897,7 @@ func TestFrontier_CurrentMinDepth_MultipleDepths(t *testing.T) {
 // TestFrontier_CurrentMinDepth_WithGaps verifies CurrentMinDepth handles
 // gaps in depth levels (e.g., URLs at depth 0 and 2, but not 1).
 func TestFrontier_CurrentMinDepth_WithGaps(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	urlD0 := mustURL(t, "https://example.com/d0")
@@ -906,13 +906,13 @@ func TestFrontier_CurrentMinDepth_WithGaps(t *testing.T) {
 
 	// Submit at depths 0 and 2 (gap at depth 1)
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urlD0, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		urlD0, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urlD2a, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		urlD2a, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urlD2b, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		urlD2b, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 
 	// CurrentMinDepth should be 0
@@ -931,7 +931,7 @@ func TestFrontier_CurrentMinDepth_WithGaps(t *testing.T) {
 	// Submit at depth 1 (fill the gap)
 	urlD1 := mustURL(t, "https://example.com/d1")
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urlD1, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		urlD1, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// CurrentMinDepth should now report 1 (lower than 2)
@@ -943,7 +943,7 @@ func TestFrontier_CurrentMinDepth_WithGaps(t *testing.T) {
 // TestFrontier_DepthAPIs_Consistency verifies that IsDepthExhausted and
 // CurrentMinDepth return consistent results.
 func TestFrontier_DepthAPIs_Consistency(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	urls := make([]url.URL, 5)
@@ -953,13 +953,13 @@ func TestFrontier_DepthAPIs_Consistency(t *testing.T) {
 
 	// Submit URLs at depths 0, 1, and 3
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urls[0], frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		urls[0], frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urls[1], frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		urls[1], frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		urls[2], frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 3},
+		urls[2], frontier.SourceCrawl, frontier.NewDiscoveryMetadata(3, nil),
 	))
 
 	// Consistency check: CurrentMinDepth should return the smallest non-exhausted depth
@@ -1010,7 +1010,7 @@ func TestFrontier_DepthAPIs_Consistency(t *testing.T) {
 // TestFrontier_DepthAPIs_ConcurrentAccess verifies thread-safety of the
 // depth exhaustion APIs under concurrent access.
 func TestFrontier_DepthAPIs_ConcurrentAccess(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	const numSubmitters = 5
@@ -1028,7 +1028,7 @@ func TestFrontier_DepthAPIs_ConcurrentAccess(t *testing.T) {
 				u := mustURL(t, fmt.Sprintf("https://example.com/s%d-u%d", id, j))
 				depth := (id + j) % 5 // Mix depths 0-4
 				f.Submit(frontier.NewCrawlAdmissionCandidate(
-					u, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: depth},
+					u, frontier.SourceSeed, frontier.NewDiscoveryMetadata(depth, nil),
 				))
 			}
 		}(i)
@@ -1075,7 +1075,7 @@ func TestFrontier_DepthAPIs_ConcurrentAccess(t *testing.T) {
 
 // TestFrontier_IsDepthExhausted_NegativeDepth verifies behavior with negative depth.
 func TestFrontier_IsDepthExhausted_NegativeDepth(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	// Negative depths should always be exhausted (they don't exist)
@@ -1094,7 +1094,7 @@ func TestFrontier_IsDepthExhausted_NegativeDepth(t *testing.T) {
 // TestFrontier_VisitedCount_EmptyFrontier verifies that VisitedCount returns 0
 // for an empty frontier that has never had any URLs submitted.
 func TestFrontier_VisitedCount_EmptyFrontier(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	count := f.VisitedCount()
@@ -1106,7 +1106,7 @@ func TestFrontier_VisitedCount_EmptyFrontier(t *testing.T) {
 // TestFrontier_VisitedCount_AfterSubmit verifies that VisitedCount correctly
 // tracks the number of unique URLs submitted to the frontier.
 func TestFrontier_VisitedCount_AfterSubmit(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	A := mustURL(t, "https://example.com/a")
@@ -1120,7 +1120,7 @@ func TestFrontier_VisitedCount_AfterSubmit(t *testing.T) {
 
 	// Submit first URL
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		A, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		A, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	if count := f.VisitedCount(); count != 1 {
 		t.Errorf("Expected VisitedCount() = 1 after first submit, got %d", count)
@@ -1128,7 +1128,7 @@ func TestFrontier_VisitedCount_AfterSubmit(t *testing.T) {
 
 	// Submit second URL
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		B, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		B, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 	if count := f.VisitedCount(); count != 2 {
 		t.Errorf("Expected VisitedCount() = 2 after second submit, got %d", count)
@@ -1136,7 +1136,7 @@ func TestFrontier_VisitedCount_AfterSubmit(t *testing.T) {
 
 	// Submit third URL
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		C, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+		C, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 	))
 	if count := f.VisitedCount(); count != 3 {
 		t.Errorf("Expected VisitedCount() = 3 after third submit, got %d", count)
@@ -1146,7 +1146,7 @@ func TestFrontier_VisitedCount_AfterSubmit(t *testing.T) {
 // TestFrontier_VisitedCount_Deduplication verifies that VisitedCount only
 // counts unique URLs, not duplicates.
 func TestFrontier_VisitedCount_Deduplication(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	A := mustURL(t, "https://example.com/a")
@@ -1154,7 +1154,7 @@ func TestFrontier_VisitedCount_Deduplication(t *testing.T) {
 	// Submit the same URL multiple times
 	for i := 0; i < 5; i++ {
 		f.Submit(frontier.NewCrawlAdmissionCandidate(
-			A, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: i},
+			A, frontier.SourceSeed, frontier.NewDiscoveryMetadata(i, nil),
 		))
 	}
 
@@ -1167,7 +1167,7 @@ func TestFrontier_VisitedCount_Deduplication(t *testing.T) {
 // TestFrontier_VisitedCount_AfterDequeue verifies that VisitedCount does not
 // decrease after URLs are dequeued (the visited set is append-only).
 func TestFrontier_VisitedCount_AfterDequeue(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	A := mustURL(t, "https://example.com/a")
@@ -1176,13 +1176,13 @@ func TestFrontier_VisitedCount_AfterDequeue(t *testing.T) {
 
 	// Submit URLs
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		A, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		A, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		B, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		B, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		C, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		C, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// Should have 3 visited URLs
@@ -1204,7 +1204,7 @@ func TestFrontier_VisitedCount_AfterDequeue(t *testing.T) {
 // TestFrontier_VisitedCount_MixedUniqueAndDuplicates tests VisitedCount
 // with a mix of unique URLs and duplicates.
 func TestFrontier_VisitedCount_MixedUniqueAndDuplicates(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	// Create URLs: A, B, C, then A again, D, B again
@@ -1220,7 +1220,7 @@ func TestFrontier_VisitedCount_MixedUniqueAndDuplicates(t *testing.T) {
 	// Submit all URLs
 	for i, u := range urls {
 		f.Submit(frontier.NewCrawlAdmissionCandidate(
-			u, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: i % 3},
+			u, frontier.SourceSeed, frontier.NewDiscoveryMetadata(i%3, nil),
 		))
 	}
 
@@ -1233,7 +1233,7 @@ func TestFrontier_VisitedCount_MixedUniqueAndDuplicates(t *testing.T) {
 // TestFrontier_VisitedCount_ConcurrentAccess verifies thread-safety of
 // VisitedCount under concurrent submissions.
 func TestFrontier_VisitedCount_ConcurrentAccess(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	const numWorkers = 10
@@ -1252,7 +1252,7 @@ func TestFrontier_VisitedCount_ConcurrentAccess(t *testing.T) {
 				uniqueID := i % expectedUnique
 				u := mustURL(t, fmt.Sprintf("https://example.com/page%d", uniqueID))
 				f.Submit(frontier.NewCrawlAdmissionCandidate(
-					u, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: workerID % 3},
+					u, frontier.SourceSeed, frontier.NewDiscoveryMetadata(workerID%3, nil),
 				))
 			}
 		}(w)
@@ -1302,7 +1302,7 @@ func TestFrontier_VisitedCount_WithMaxPagesLimit(t *testing.T) {
 		WithMaxPages(3). // Limit to 3 pages
 		Build()
 
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(cfg)
 
 	// Submit 5 URLs
@@ -1317,7 +1317,7 @@ func TestFrontier_VisitedCount_WithMaxPagesLimit(t *testing.T) {
 	for _, rawURL := range urls {
 		u := mustURL(t, rawURL)
 		f.Submit(frontier.NewCrawlAdmissionCandidate(
-			u, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+			u, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 		))
 	}
 
@@ -1330,7 +1330,7 @@ func TestFrontier_VisitedCount_WithMaxPagesLimit(t *testing.T) {
 // TestFrontier_VisitedCount_Canonicalization verifies that VisitedCount
 // uses canonicalized URLs for deduplication.
 func TestFrontier_VisitedCount_Canonicalization(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	// These URLs are different but should canonicalize to the same form
@@ -1341,16 +1341,16 @@ func TestFrontier_VisitedCount_Canonicalization(t *testing.T) {
 
 	// Submit all URLs
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		url1, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		url1, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		url2, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		url2, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		url3, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		url3, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		url4, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+		url4, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 	))
 
 	// After canonicalization, all these should be deduplicated
@@ -1364,14 +1364,14 @@ func TestFrontier_VisitedCount_Canonicalization(t *testing.T) {
 // TestFrontier_VisitedCount_Integration provides an integration test that
 // verifies VisitedCount works correctly throughout a realistic crawl scenario.
 func TestFrontier_VisitedCount_Integration(t *testing.T) {
-	f := frontier.NewFrontier()
+	f := frontier.NewCrawlFrontier()
 	f.Init(config.Config{})
 
 	// Simulate a realistic crawl scenario
 	// Root page (depth 0)
 	root := mustURL(t, "https://example.com/")
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		root, frontier.SourceSeed, frontier.DiscoveryMetadata{Depth: 0},
+		root, frontier.SourceSeed, frontier.NewDiscoveryMetadata(0, nil),
 	))
 
 	if count := f.VisitedCount(); count != 1 {
@@ -1388,7 +1388,7 @@ func TestFrontier_VisitedCount_Integration(t *testing.T) {
 	for _, childURL := range children {
 		u := mustURL(t, childURL)
 		f.Submit(frontier.NewCrawlAdmissionCandidate(
-			u, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 1},
+			u, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(1, nil),
 		))
 	}
 
@@ -1406,7 +1406,7 @@ func TestFrontier_VisitedCount_Integration(t *testing.T) {
 	for _, gcURL := range grandchildren {
 		u := mustURL(t, gcURL)
 		f.Submit(frontier.NewCrawlAdmissionCandidate(
-			u, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 2},
+			u, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(2, nil),
 		))
 	}
 
@@ -1426,7 +1426,7 @@ func TestFrontier_VisitedCount_Integration(t *testing.T) {
 	// Try submitting duplicate URLs
 	duplicate := mustURL(t, "https://example.com/about") // already visited
 	f.Submit(frontier.NewCrawlAdmissionCandidate(
-		duplicate, frontier.SourceCrawl, frontier.DiscoveryMetadata{Depth: 3},
+		duplicate, frontier.SourceCrawl, frontier.NewDiscoveryMetadata(3, nil),
 	))
 
 	// Count should still be 7

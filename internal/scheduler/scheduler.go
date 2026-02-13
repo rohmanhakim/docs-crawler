@@ -63,7 +63,7 @@ type Scheduler struct {
 	metadataSink           metadata.MetadataSink
 	crawlFinalizer         metadata.CrawlFinalizer
 	robot                  robots.Robot
-	frontier               *frontier.Frontier
+	frontier               frontier.Frontier
 	htmlFetcher            fetcher.Fetcher
 	domExtractor           extractor.Extractor
 	htmlSanitizer          sanitizer.Sanitizer
@@ -80,7 +80,7 @@ type Scheduler struct {
 func NewScheduler() Scheduler {
 	recorder := metadata.NewRecorder("sample-single-sync-worker")
 	cachedRobot := robots.NewCachedRobot(&recorder)
-	frontier := frontier.NewFrontier()
+	frontier := frontier.NewCrawlFrontier()
 	fetcher := fetcher.NewHtmlFetcher(&recorder)
 	ext := extractor.NewDomExtractor(&recorder)
 	sanitizer := sanitizer.NewHTMLSanitizer(&recorder)
@@ -115,6 +115,7 @@ func NewSchedulerWithDeps(
 	crawlFinalizer metadata.CrawlFinalizer,
 	metadataSink metadata.MetadataSink,
 	rateLimiter limiter.RateLimiter,
+	frontier frontier.Frontier,
 	fetcher fetcher.Fetcher,
 	robot robots.Robot,
 	domExtractor extractor.Extractor,
@@ -125,13 +126,13 @@ func NewSchedulerWithDeps(
 	sleeper timeutil.Sleeper,
 ) Scheduler {
 	storageSink := storage.NewSink(metadataSink)
-	frontier := frontier.NewFrontier()
+	// frontier := frontier.NewFrontier()
 	return Scheduler{
 		ctx:                    ctx,
 		metadataSink:           metadataSink,
 		crawlFinalizer:         crawlFinalizer,
 		robot:                  robot,
-		frontier:               &frontier,
+		frontier:               frontier,
 		htmlFetcher:            fetcher,
 		domExtractor:           domExtractor,
 		htmlSanitizer:          sanitizer,
@@ -191,9 +192,10 @@ func (s *Scheduler) SubmitUrlForAdmission(
 	candidate := frontier.NewCrawlAdmissionCandidate(
 		robotsDecision.Url,
 		sourceContext,
-		frontier.DiscoveryMetadata{
-			Depth: depth,
-		},
+		frontier.NewDiscoveryMetadata(
+			depth,
+			nil,
+		),
 	)
 
 	// Submit Allowed URL for Admission by Frontier
@@ -408,7 +410,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			build.FullVersion(),
 			fetchResult.FetchedAt(),
 			cfg.HashAlgo(),
-			nextCrawlToken.Depth()+1,
+			nextCrawlToken.Depth(),
 			cfg.AllowedPathPrefix(),
 		)
 		normalizedMarkdown, err := s.markdownConstraint.Normalize(
