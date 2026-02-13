@@ -64,7 +64,8 @@ func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		nil, // mockConvert - will use default success mock
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 
@@ -128,7 +129,8 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		nil, // mockConvert - will use default success mock
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 
@@ -198,7 +200,8 @@ func TestScheduler_Sanitizer_FatalError_AbortsCrawl(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		nil, // mockConvert - will use default success mock
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 
@@ -271,6 +274,7 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 		mockExtractor,
 		mockSanitizer,
 		mockConvert,
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 
@@ -343,7 +347,8 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		nil, // mockConvert - will use default success mock
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 
@@ -411,7 +416,8 @@ func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		nil, // mockConvert - will use default success mock
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 
@@ -499,7 +505,8 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		nil, // mockConvert - will use default success mock
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 
@@ -585,7 +592,8 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		nil, // mockConvert - will use default success mock
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 
@@ -654,7 +662,8 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil,
+		nil, // mockConvert - will use default success mock
+		nil, // mockNormalize - will use default success mock
 		mockSleeper,
 	)
 

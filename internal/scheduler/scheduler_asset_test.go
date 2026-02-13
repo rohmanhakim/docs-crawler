@@ -709,6 +709,10 @@ func createSchedulerWithAllMocks(
 		setupConvertMockWithSuccess(mockConvert.(*convertMock))
 	}
 
+	// Create a normalize mock with default success
+	mockNormalize := newNormalizeMockForTest(t)
+	setupNormalizeMockWithSuccess(mockNormalize)
+
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
 		mockFinalizer,
@@ -720,6 +724,7 @@ func createSchedulerWithAllMocks(
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockNormalize,
 		mockSleeper,
 	)
 	return &s

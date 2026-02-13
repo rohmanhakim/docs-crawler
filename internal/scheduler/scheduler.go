@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
+	"github.com/rohmanhakim/docs-crawler/internal/build"
 	"github.com/rohmanhakim/docs-crawler/internal/config"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
@@ -68,7 +69,7 @@ type Scheduler struct {
 	htmlSanitizer          sanitizer.Sanitizer
 	markdownConversionRule mdconvert.ConvertRule
 	assetResolver          assets.Resolver
-	markdownConstraint     normalize.MarkdownConstraint
+	markdownConstraint     normalize.Constraint
 	storageSink            storage.Sink
 	writeResults           []storage.WriteResult
 	currentHost            string
@@ -99,7 +100,7 @@ func NewScheduler() Scheduler {
 		htmlSanitizer:          &sanitizer,
 		markdownConversionRule: conversionRule,
 		assetResolver:          &resolver,
-		markdownConstraint:     markdownConstraint,
+		markdownConstraint:     &markdownConstraint,
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
 		sleeper:                &sleeper,
@@ -120,9 +121,9 @@ func NewSchedulerWithDeps(
 	sanitizer sanitizer.Sanitizer,
 	rule mdconvert.ConvertRule,
 	resolver assets.Resolver,
+	constraint normalize.Constraint,
 	sleeper timeutil.Sleeper,
 ) Scheduler {
-	markdownConstraint := normalize.NewMarkdownConstraint(metadataSink)
 	storageSink := storage.NewSink(metadataSink)
 	frontier := frontier.NewFrontier()
 	return Scheduler{
@@ -136,7 +137,7 @@ func NewSchedulerWithDeps(
 		htmlSanitizer:          sanitizer,
 		markdownConversionRule: rule,
 		assetResolver:          resolver,
-		markdownConstraint:     markdownConstraint,
+		markdownConstraint:     constraint,
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
 		sleeper:                sleeper,
@@ -403,7 +404,18 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		totalAssets += len(assetfulMarkdown.LocalAssets())
 
 		// 8. Markdown Normalization
-		normalizedMarkdown, err := s.markdownConstraint.Normalize(assetfulMarkdown)
+		normalizeParam := normalize.NewNormalizeParam(
+			build.FullVersion(),
+			fetchResult.FetchedAt(),
+			cfg.HashAlgo(),
+			nextCrawlToken.Depth()+1,
+			cfg.AllowedPathPrefix(),
+		)
+		normalizedMarkdown, err := s.markdownConstraint.Normalize(
+			fetchResult.URL(),
+			assetfulMarkdown,
+			normalizeParam,
+		)
 		if err != nil {
 			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
