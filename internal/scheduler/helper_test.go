@@ -21,6 +21,7 @@ import (
 // If mockExtractor is nil, a real extractor will be created.
 // If mockSanitizer is nil, a real sanitizer will be created.
 // If mockConvert is nil, a convert mock with default success will be created.
+// If mockNormalize is nil, a normalize mock with default success will be created.
 func createSchedulerForTest(
 	t *testing.T,
 	ctx context.Context,
@@ -32,6 +33,7 @@ func createSchedulerForTest(
 	mockExtractor extractor.Extractor,
 	mockSanitizer sanitizer.Sanitizer,
 	mockConvert mdconvert.ConvertRule,
+	mockNormalize *normalizeMock,
 	mockSleeper timeutil.Sleeper,
 ) *scheduler.Scheduler {
 	t.Helper()
@@ -53,6 +55,11 @@ func createSchedulerForTest(
 	// Create a resolver mock with default success
 	resolverMock := newResolverMockForTest(t)
 	setupResolverMockWithSuccess(resolverMock)
+	// Create a normalize mock with default success if none provided
+	if mockNormalize == nil {
+		mockNormalize = newNormalizeMockForTest(t)
+		setupNormalizeMockWithSuccess(mockNormalize)
+	}
 
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
@@ -65,6 +72,7 @@ func createSchedulerForTest(
 		mockSanitizer,
 		mockConvert,
 		resolverMock,
+		mockNormalize, // Pass the mock pointer which implements normalize.Constraint
 		mockSleeper,
 	)
 	return &s
