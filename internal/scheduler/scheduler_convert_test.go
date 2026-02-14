@@ -37,7 +37,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -54,6 +54,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor to return a valid content node
@@ -127,7 +128,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -144,6 +145,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -212,7 +214,7 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -229,6 +231,7 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -293,7 +296,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -310,6 +313,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -383,7 +387,7 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -391,6 +395,7 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 	}, nil).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Track call order
@@ -513,7 +518,7 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -530,6 +535,7 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -596,7 +602,7 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Only expect one Decide call for the seed URL
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
@@ -614,6 +620,7 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor

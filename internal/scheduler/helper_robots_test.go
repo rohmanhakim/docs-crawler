@@ -1,6 +1,7 @@
 package scheduler_test
 
 import (
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -12,8 +13,8 @@ type robotsMock struct {
 	mock.Mock
 }
 
-func (r *robotsMock) Init(userAgent string) {
-	r.Called(userAgent)
+func (r *robotsMock) Init(userAgent string, httpClient *http.Client) {
+	r.Called(userAgent, httpClient)
 }
 
 func (r *robotsMock) Decide(targetURL url.URL) (robots.Decision, *robots.RobotsError) {

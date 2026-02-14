@@ -36,7 +36,7 @@ Allow: /`
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -54,6 +54,7 @@ Allow: /`
 
 	// Clear default expectation and setup fetcher mock to return successful response
 	mockFetcher.ExpectedCalls = nil
+	mockFetcher.On("Init", mock.Anything).Return()
 	testURL, _ := url.Parse(server.URL + "/page.html")
 	htmlBody := []byte("<html><body><h1>Test Page</h1></body></html>")
 	fetchResult := fetcher.NewFetchResultForTest(
@@ -107,7 +108,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -125,6 +126,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 
 	// Clear default expectation and setup fetcher mock to capture the context
 	mockFetcher.ExpectedCalls = nil
+	mockFetcher.On("Init", mock.Anything).Return()
 	var receivedContext context.Context
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -184,7 +186,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -201,10 +203,12 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock to return recoverable error
 	mockFetcher.ExpectedCalls = nil
+	mockFetcher.On("Init", mock.Anything).Return()
 	recoverableErr := &mockClassifiedError{
 		msg:      "network timeout",
 		severity: failure.SeverityRecoverable,
@@ -259,7 +263,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -276,10 +280,12 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock to return fatal error
 	mockFetcher.ExpectedCalls = nil
+	mockFetcher.On("Init", mock.Anything).Return()
 	fatalErr := &mockClassifiedError{
 		msg:      "invalid URL scheme",
 		severity: failure.SeverityFatal,
@@ -339,7 +345,7 @@ Allow: /`
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -357,6 +363,7 @@ Allow: /`
 
 	// Clear default expectation and setup fetcher mock to capture crawl depth
 	mockFetcher.ExpectedCalls = nil
+	mockFetcher.On("Init", mock.Anything).Return()
 	var receivedDepth int
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -403,7 +410,7 @@ func TestScheduler_Fetcher_PassesFetchParam(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -461,7 +468,7 @@ func TestScheduler_Fetcher_ContextHandling(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -525,7 +532,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -542,10 +549,12 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock with valid HTML response
 	mockFetcher.ExpectedCalls = nil
+	mockFetcher.On("Init", mock.Anything).Return()
 	testURL, _ := url.Parse("http://example.com/page.html")
 	htmlBody := []byte(`<html>
 		<body>
@@ -611,7 +620,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -632,6 +641,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 
 	// Clear default expectation and setup fetcher mock with non-HTML response
 	mockFetcher.ExpectedCalls = nil
+	mockFetcher.On("Init", mock.Anything).Return()
 	testURL, _ := url.Parse("http://example.com/document.pdf")
 	pdfBody := []byte("%PDF-1.4 fake pdf content")
 	fetchResult := fetcher.NewFetchResultForTest(
@@ -702,7 +712,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			mockStorage := newStorageMockForTest(t)
 			mockSleeper := newSleeperMock(t)
 
-			mockRobot.On("Init", mock.Anything).Return()
+			mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 			mockRobot.OnDecide(mock.Anything, robots.Decision{
 				Allowed:    true,
 				Reason:     robots.EmptyRuleSet,
@@ -714,6 +724,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 
 			// Clear default expectation and setup fetcher mock with HTTP error response
 			mockFetcher.ExpectedCalls = nil
+			mockFetcher.On("Init", mock.Anything).Return()
 			testURL, _ := url.Parse("http://example.com/page.html")
 			fetchResult := fetcher.NewFetchResultForTest(
 				*testURL,
@@ -773,7 +784,7 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -794,6 +805,7 @@ func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
 
 	// Clear default expectation and setup fetcher mock to track call count
 	mockFetcher.ExpectedCalls = nil
+	mockFetcher.On("Init", mock.Anything).Return()
 	callCount := 0
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -846,7 +858,7 @@ func TestScheduler_Fetcher_ContextCancellation_Handled(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -863,6 +875,7 @@ func TestScheduler_Fetcher_ContextCancellation_Handled(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 

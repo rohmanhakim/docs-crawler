@@ -42,12 +42,13 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 	// Set up robot expectations
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -119,7 +120,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 	// Set up robot expectations - Init is always called
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// The malformed URL may cause an error before reaching Decide, or the URL parsing may fail.
 	// Set up a permissive Decode expectation that allows any call
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -127,6 +128,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 		Reason:     robots.DisallowedByRobots,
 		CrawlDelay: 0,
 	}, nil).Maybe()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -194,13 +196,14 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 	// Set up robot expectations - Init is called once per execution
-	mockRobot.On("Init", mock.Anything).Return().Maybe()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return().Maybe()
 	// Expect Decide for both example1.com and example2.com
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -337,7 +340,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 	setupSanitizerMockWithSuccess(mockSanitizer, discoveredURLs)
 
 	// Set up robot expectations - Init called once, Decide called for each URL
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Decide calls for all URLs that pass through SubmitUrlForAdmission
 	// The key assertion is that external URLs (other.com, different.com) are filtered out
 	// and only example.com URLs are submitted (seed + resolved relative URLs + absolute same-host)
@@ -346,6 +349,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -436,12 +440,13 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 	setupSanitizerMockWithSuccess(mockSanitizer, discoveredURLs)
 
 	// Set up robot expectations - only the seed URL should be processed
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once() // Only called for seed URL
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -534,7 +539,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 	setupSanitizerMockWithSuccess(mockSanitizer, discoveredURLs)
 
 	// Set up robot expectations - Init called once, Decide for seed + all resolved URLs
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Decide calls for seed URL and all resolved URLs
 	// The key assertion is that all 3 relative URLs are resolved and submitted
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -542,6 +547,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 

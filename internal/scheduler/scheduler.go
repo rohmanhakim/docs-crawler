@@ -60,6 +60,7 @@ import (
 
 type Scheduler struct {
 	ctx                    context.Context
+	httpClient             *http.Client
 	metadataSink           metadata.MetadataSink
 	crawlFinalizer         metadata.CrawlFinalizer
 	robot                  robots.Robot
@@ -85,7 +86,7 @@ func NewScheduler() Scheduler {
 	ext := extractor.NewDomExtractor(&recorder)
 	sanitizer := sanitizer.NewHTMLSanitizer(&recorder)
 	conversionRule := mdconvert.NewRule(&recorder)
-	resolver := assets.NewLocalResolver(&recorder, &http.Client{}, "docs-crawler/1.0")
+	resolver := assets.NewLocalResolver(&recorder)
 	markdownConstraint := normalize.NewMarkdownConstraint(&recorder)
 	storageSink := storage.NewLocalSink(&recorder)
 	rateLimiter := limiter.NewConcurrentRateLimiter()
@@ -95,7 +96,7 @@ func NewScheduler() Scheduler {
 		crawlFinalizer:         &recorder,
 		robot:                  &cachedRobot,
 		frontier:               &frontier,
-		htmlFetcher:            &fetcher,
+		htmlFetcher:            fetcher,
 		domExtractor:           &ext,
 		htmlSanitizer:          &sanitizer,
 		markdownConversionRule: conversionRule,
@@ -205,6 +206,7 @@ func (s *Scheduler) SubmitUrlForAdmission(
 // Current implementation uses a single recorder and single execution path.
 // This does not imply a global ordering guarantee.
 // TODO: In the future consider implementing global ordering guarantee
+// TODO: split execute crwaling into two phases: Init() and Execute(). Init() is up to just before the crawl loop
 func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error) {
 	// Track crawl start time for duration calculation
 	crawlStartTime := time.Now()
@@ -261,16 +263,24 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		return CrawlingExecution{}, err
 	}
 
-	// 1.1 Initialize rate limiter
+	// 1.1 Initialize HTTP Client
+	s.httpClient = createHttpClient(
+		cfg.MaxIdleConns(),
+		cfg.MaxIdleConnsPerHost(),
+		cfg.IdleConnTimeout(),
+		cfg.Timeout(),
+	)
+
+	// 1.2 Initialize rate limiter
 	s.rateLimiter.SetBaseDelay(cfg.BaseDelay())
 	s.rateLimiter.SetJitter(cfg.Jitter())
 	s.rateLimiter.SetRandomSeed(cfg.RandomSeed())
 
-	// 1.2 Initialize Robots and Frontier
-	s.robot.Init(cfg.UserAgent())
+	// 1.3 Initialize Robots and Frontier
+	s.robot.Init(cfg.UserAgent(), s.httpClient)
 	s.frontier.Init(cfg)
 
-	// 1.3 Configure DOM Extractor with extraction parameters from config
+	// 1.4 Configure DOM Extractor with extraction parameters from config
 	extractParam := extractor.ExtractParam{
 		BodySpecificityBias:  cfg.BodySpecificityBias(),
 		LinkDensityThreshold: cfg.LinkDensityThreshold(),
@@ -289,6 +299,12 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		},
 	}
 	s.domExtractor.SetExtractParam(extractParam)
+
+	// 1.5 Initialize Fetcher
+	s.htmlFetcher.Init(s.httpClient)
+
+	// 1.6 Initialize Asset Resolver
+	s.assetResolver.Init(s.httpClient, cfg.UserAgent())
 
 	// 2. Fetch robots.txt & decide the crawling policy for this hostname based on that
 	s.currentHost = cfg.SeedURLs()[0].Host
@@ -450,6 +466,26 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	return NewCrawlingExecution(s.writeResults, totalAssets), nil
 }
 
+func createHttpClient(
+	maxIdleConns int,
+	maxIdleConnsPerHost int,
+	idleConnTimeout time.Duration,
+	baseTimeout time.Duration,
+) *http.Client {
+	transport := &http.Transport{
+		MaxIdleConns:        maxIdleConns,
+		MaxIdleConnsPerHost: maxIdleConnsPerHost,
+		IdleConnTimeout:     idleConnTimeout,
+	}
+
+	client := &http.Client{
+		Timeout:   baseTimeout,
+		Transport: transport,
+	}
+
+	return client
+}
+
 // recordRobotsErrorAndBackoff records a robots error using metadataSink and
 // triggers exponential backoff on the rate limiter if the error cause warrants it.
 // This method handles ErrCauseHttpTooManyRequests (429) and ErrCauseHttpServerError (5xx)
@@ -499,7 +535,7 @@ func RetryParam(cfg config.Config) retry.RetryParam {
 // InitWith initializes the dependencies with the given data.
 // This is a test helper method.
 func (s *Scheduler) InitWith(userAgent string, baseDelay time.Duration, jitter time.Duration, randomSeed int64) {
-	s.robot.Init(userAgent)
+	s.robot.Init(userAgent, s.httpClient)
 	s.rateLimiter.SetBaseDelay(baseDelay)
 	s.rateLimiter.SetJitter(jitter)
 	s.rateLimiter.SetRandomSeed(randomSeed)

@@ -2,6 +2,7 @@ package scheduler_test
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -15,6 +16,11 @@ import (
 // resolverMock is a testify mock for the assets.Resolver
 type resolverMock struct {
 	mock.Mock
+}
+
+// Init mocks the Init method
+func (r *resolverMock) Init(httpClient *http.Client, userAgent string) {
+	r.Called(httpClient, userAgent)
 }
 
 // Resolve mocks the Resolve method
@@ -38,6 +44,8 @@ func (r *resolverMock) Resolve(
 func newResolverMockForTest(t *testing.T) *resolverMock {
 	t.Helper()
 	m := new(resolverMock)
+	// Expect Init to be called during scheduler initialization
+	m.On("Init", mock.Anything, mock.Anything).Return()
 	return m
 }
 

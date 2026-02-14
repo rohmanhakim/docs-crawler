@@ -40,11 +40,17 @@ type HtmlFetcher struct {
 
 func NewHtmlFetcher(
 	metadataSink metadata.MetadataSink,
-) HtmlFetcher {
-	return HtmlFetcher{
+) *HtmlFetcher {
+	return &HtmlFetcher{
 		metadataSink: metadataSink,
-		httpClient:   &http.Client{},
+		httpClient:   nil,
 	}
+}
+
+// Init initializes the HtmlFetcher with an HTTP client.
+// This must be called before Fetch is invoked.
+func (h *HtmlFetcher) Init(httpClient *http.Client) {
+	h.httpClient = httpClient
 }
 
 func (h *HtmlFetcher) Fetch(

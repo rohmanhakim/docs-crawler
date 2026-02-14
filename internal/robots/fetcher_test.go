@@ -51,8 +51,9 @@ func (m *mockMetadataSink) RecordAssetFetch(
 func TestNewRobotsFetcher(t *testing.T) {
 	sink := &mockMetadataSink{}
 	userAgent := "TestBot/1.0"
+	httpClient := &http.Client{Timeout: 30 * time.Second}
 
-	fetcher := robots.NewRobotsFetcher(sink, userAgent, nil)
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, userAgent, nil)
 
 	if fetcher == nil {
 		t.Fatal("NewRobotsFetcher returned nil")
@@ -97,7 +98,8 @@ Sitemap: https://example.com/sitemap.xml
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
-	fetcher := robots.NewRobotsFetcher(sink, "TestBot/1.0", nil)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, "TestBot/1.0", nil)
 
 	// Extract host from server URL
 	serverURL := server.URL
@@ -169,7 +171,8 @@ func TestRobotsFetcher_Fetch_NotFound(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
-	fetcher := robots.NewRobotsFetcher(sink, "TestBot/1.0", nil)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, "TestBot/1.0", nil)
 
 	serverURL := server.URL
 	parts := strings.Split(serverURL, "://")
@@ -200,7 +203,8 @@ func TestRobotsFetcher_Fetch_ServerError(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
-	fetcher := robots.NewRobotsFetcher(sink, "TestBot/1.0", nil)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, "TestBot/1.0", nil)
 
 	serverURL := server.URL
 	parts := strings.Split(serverURL, "://")
@@ -230,7 +234,8 @@ func TestRobotsFetcher_Fetch_TooManyRequests(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
-	fetcher := robots.NewRobotsFetcher(sink, "TestBot/1.0", nil)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, "TestBot/1.0", nil)
 
 	serverURL := server.URL
 	parts := strings.Split(serverURL, "://")
@@ -261,7 +266,8 @@ func TestRobotsFetcher_Fetch_LargeFile(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
-	fetcher := robots.NewRobotsFetcher(sink, "TestBot/1.0", nil)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, "TestBot/1.0", nil)
 
 	serverURL := server.URL
 	parts := strings.Split(serverURL, "://")
@@ -293,7 +299,8 @@ func TestRobotsFetcher_Fetch_ContextCancellation(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
-	fetcher := robots.NewRobotsFetcher(sink, "TestBot/1.0", nil)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, "TestBot/1.0", nil)
 
 	serverURL := server.URL
 	parts := strings.Split(serverURL, "://")
@@ -540,7 +547,7 @@ Allow: /public/`,
 				} else if expectedDelay != nil && actualDelay == nil {
 					t.Errorf("expected crawl delay %v, got nil", *expectedDelay)
 				} else if expectedDelay != nil && actualDelay != nil && *expectedDelay != *actualDelay {
-					t.Errorf("expected crawl delay %v, got %v", *expectedDelay, *actualDelay)
+					t.Errorf("expected crawl delay %v, got %v", *expectedDelay, actualDelay)
 				}
 			}
 		})
@@ -682,7 +689,8 @@ func TestRobotsFetcher_Fetch_WithRedirects(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
-	fetcher := robots.NewRobotsFetcher(sink, "TestBot/1.0", nil)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, "TestBot/1.0", nil)
 
 	serverURL := server.URL
 	parts := strings.Split(serverURL, "://")

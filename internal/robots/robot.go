@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -28,7 +29,7 @@ Split robots API into:
 
 // Robot handles robots.txt fetching and decision making for URL crawling permissions.
 type Robot interface {
-	Init(userAgent string)
+	Init(userAgent string, httpClient *http.Client)
 	Decide(targetURL url.URL) (Decision, *RobotsError)
 }
 
@@ -46,23 +47,23 @@ func NewCachedRobot(metadataSink metadata.MetadataSink) CachedRobot {
 	}
 }
 
-// Init initializes the Robot with a user-agent.
+// Init initializes the Robot with a user-agent and HTTP client.
 // The RobotsFetcher is created internally with a memory cache.
-func (r *CachedRobot) Init(userAgent string) {
+func (r *CachedRobot) Init(userAgent string, httpClient *http.Client) {
 	// Create an in-memory cache for robots.txt files
 	memCache := cache.NewMemoryCache()
 
 	// Create the fetcher internally with the cache
-	fetcher := NewRobotsFetcher(r.metadataSink, userAgent, memCache)
+	fetcher := NewRobotsFetcher(httpClient, r.metadataSink, userAgent, memCache)
 
 	r.fetcher = fetcher
 	r.userAgent = userAgent
 }
 
-// InitWithCache initializes the Robot with the given user-agent and a custom cache implementation.
+// InitWithCache initializes the Robot with the given user-agent, HTTP client, and a custom cache implementation.
 // This is useful for testing with mock caches.
-func (r *CachedRobot) InitWithCache(userAgent string, cacheImpl cache.Cache) {
-	fetcher := NewRobotsFetcher(r.metadataSink, userAgent, cacheImpl)
+func (r *CachedRobot) InitWithCache(userAgent string, httpClient *http.Client, cacheImpl cache.Cache) {
+	fetcher := NewRobotsFetcher(httpClient, r.metadataSink, userAgent, cacheImpl)
 
 	r.fetcher = fetcher
 	r.userAgent = userAgent

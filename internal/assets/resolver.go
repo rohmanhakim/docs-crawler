@@ -48,6 +48,8 @@ type Resolver interface {
 		resolveParam ResolveParam,
 		retryParam retry.RetryParam,
 	) (AssetfulMarkdownDoc, failure.ClassifiedError)
+
+	Init(httpClient *http.Client, userAgent string)
 }
 
 type LocalResolver struct {
@@ -60,16 +62,19 @@ type LocalResolver struct {
 
 func NewLocalResolver(
 	metadataSink metadata.MetadataSink,
-	httpClient *http.Client,
-	userAgent string,
 ) LocalResolver {
 	return LocalResolver{
 		metadataSink:  metadataSink,
 		writtenAssets: make(map[string]string),
 		hashToPath:    make(map[string]string),
-		httpClient:    httpClient,
-		userAgent:     userAgent,
 	}
+}
+
+// Init initializes the resolver with an HTTP client and user agent.
+// This must be called before using the resolver.
+func (r *LocalResolver) Init(httpClient *http.Client, userAgent string) {
+	r.httpClient = httpClient
+	r.userAgent = userAgent
 }
 
 func (r *LocalResolver) WrittenAssets() map[string]string {

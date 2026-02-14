@@ -2,6 +2,7 @@ package scheduler_test
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"testing"
 	"time"
@@ -15,6 +16,10 @@ import (
 // fetcherMock is a testify mock for the Fetcher
 type fetcherMock struct {
 	mock.Mock
+}
+
+func (f *fetcherMock) Init(httpClient *http.Client) {
+	f.Called(httpClient)
 }
 
 func (f *fetcherMock) Fetch(
