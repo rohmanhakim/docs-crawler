@@ -222,6 +222,11 @@ func TestNormalize_ConstraintViolations(t *testing.T) {
 			fixture:   "fail/paragraph_before_h1.md",
 			invariant: "N4 - content belongs to hierarchy",
 		},
+		{
+			name:      "empty section - consecutive same level headings",
+			fixture:   "fail/empty_section_consecutive.md",
+			invariant: "N5 - no empty sections",
+		},
 	}
 
 	for _, tc := range testCases {

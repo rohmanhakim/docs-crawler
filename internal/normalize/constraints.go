@@ -121,9 +121,12 @@ func validateStructure(content []byte) failure.ClassifiedError {
 	doc := markdown.Parse(content, p)
 
 	// Collect headings and validate structure via AST walk
-	var headings []*ast.Heading
+	var headings []headingInfo
 	var hasContentBeforeH1 bool
 	var insideCodeBlock bool
+	contentAfterHeading := make(map[int]bool) // Tracks if heading[i] has content before next same/higher level heading
+	currentHeadingIdx := -1
+	nodeIdx := 0
 
 	ast.WalkFunc(doc, func(node ast.Node, entering bool) ast.WalkStatus {
 		switch n := node.(type) {
@@ -133,25 +136,58 @@ func validateStructure(content []byte) failure.ClassifiedError {
 				if insideCodeBlock {
 					return ast.Terminate
 				}
-				headings = append(headings, n)
+				currentHeadingIdx = len(headings)
+				headings = append(headings, headingInfo{node: n, index: nodeIdx})
 			}
 
 		case *ast.CodeBlock:
 			if entering {
 				insideCodeBlock = true
+				// Code blocks count as content
+				if currentHeadingIdx >= 0 {
+					contentAfterHeading[currentHeadingIdx] = true
+				}
 			} else {
 				insideCodeBlock = false
 			}
 
-		case *ast.Text, *ast.Paragraph, *ast.List, *ast.Table:
+		case *ast.Text:
+			if entering {
+				// Text nodes only count as content if not just whitespace
+				if currentHeadingIdx >= 0 {
+					contentAfterHeading[currentHeadingIdx] = true
+				}
+				// Track if we have content before first H1
+				if len(headings) == 0 {
+					hasContentBeforeH1 = true
+				}
+			}
+
+		case *ast.Paragraph, *ast.List, *ast.Table:
 			if entering {
 				// Track if we have content before first H1
+				if len(headings) == 0 {
+					hasContentBeforeH1 = true
+				}
+				// Track content after current heading for N5
+				if currentHeadingIdx >= 0 {
+					contentAfterHeading[currentHeadingIdx] = true
+				}
+			}
+
+		case *ast.BlockQuote:
+			if entering {
+				// Blockquotes count as content
+				if currentHeadingIdx >= 0 {
+					contentAfterHeading[currentHeadingIdx] = true
+				}
 				if len(headings) == 0 {
 					hasContentBeforeH1 = true
 				}
 			}
 		}
 
+		nodeIdx++
 		return ast.GoToNext
 	})
 
@@ -167,7 +203,7 @@ func validateStructure(content []byte) failure.ClassifiedError {
 	// Validate N1: Exactly one H1
 	h1Count := 0
 	for _, h := range headings {
-		if h.Level == 1 {
+		if h.node.Level == 1 {
 			h1Count++
 		}
 	}
@@ -201,15 +237,34 @@ func validateStructure(content []byte) failure.ClassifiedError {
 	prevLevel := 0
 	for _, h := range headings {
 		// Check for level skip (N3)
-		if h.Level > prevLevel+1 && prevLevel != 0 {
+		if h.node.Level > prevLevel+1 && prevLevel != 0 {
 			return &NormalizationError{
-				Message:   fmt.Sprintf("heading level skipped: H%d follows H%d", h.Level, prevLevel),
+				Message:   fmt.Sprintf("heading level skipped: H%d follows H%d", h.node.Level, prevLevel),
 				Retryable: false,
 				Cause:     ErrCauseSkippedHeadingLevels,
 			}
 		}
 
-		prevLevel = h.Level
+		prevLevel = h.node.Level
+	}
+
+	// Validate N5: No empty sections
+	// A heading must not exist without content before the next heading of same or higher level
+	for i := 0; i < len(headings); i++ {
+		// Find the next heading with same or higher level
+		for j := i + 1; j < len(headings); j++ {
+			if headings[j].node.Level <= headings[i].node.Level {
+				// Next same/higher level heading found - check if current heading has content
+				if !contentAfterHeading[i] {
+					return &NormalizationError{
+						Message:   fmt.Sprintf("empty section: H%d heading has no content before next H%d", headings[i].node.Level, headings[j].node.Level),
+						Retryable: false,
+						Cause:     ErrCauseEmptySection,
+					}
+				}
+				break
+			}
+		}
 	}
 
 	return nil

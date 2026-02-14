@@ -3,6 +3,7 @@ package normalize
 import (
 	"time"
 
+	"github.com/gomarkdown/markdown/ast"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 )
 
@@ -160,4 +161,10 @@ func (p NormalizeParam) AllowedPathPrefixes() []string {
 	prefixes := make([]string, len(p.allowedPathPrefixes))
 	copy(prefixes, p.allowedPathPrefixes)
 	return prefixes
+}
+
+// headingInfo tracks a heading and its position for N5 validation
+type headingInfo struct {
+	node  *ast.Heading
+	index int // Position in document order
 }
