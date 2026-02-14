@@ -35,6 +35,7 @@ func createSchedulerForTest(
 	mockSanitizer sanitizer.Sanitizer,
 	mockConvert mdconvert.ConvertRule,
 	mockNormalize *normalizeMock,
+	mockStorage *storageMock,
 	mockSleeper timeutil.Sleeper,
 ) *scheduler.Scheduler {
 	t.Helper()
@@ -74,7 +75,8 @@ func createSchedulerForTest(
 		mockSanitizer,
 		mockConvert,
 		resolverMock,
-		mockNormalize, // Pass the mock pointer which implements normalize.Constraint
+		mockNormalize,
+		mockStorage,
 		mockSleeper,
 	)
 	return &s

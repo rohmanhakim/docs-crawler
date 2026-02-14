@@ -5,7 +5,26 @@ import (
 )
 
 type CrawlingExecution struct {
-	WriteResults []storage.WriteResult
+	writeResults []storage.WriteResult
+	totalAssets  int
+}
+
+func NewCrawlingExecution(
+	writeResults []storage.WriteResult,
+	totalAssets int,
+) CrawlingExecution {
+	return CrawlingExecution{
+		writeResults: writeResults,
+		totalAssets:  totalAssets,
+	}
+}
+
+func (c *CrawlingExecution) WriteResults() []storage.WriteResult {
+	return c.writeResults
+}
+
+func (c *CrawlingExecution) TotalAssets() int {
+	return c.totalAssets
 }
 
 type PipelineOutcome struct {

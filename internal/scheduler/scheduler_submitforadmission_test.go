@@ -39,7 +39,23 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	// Set current host
 	testURL, _ := url.Parse("https://example.com/page.html")
@@ -83,7 +99,23 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -127,7 +159,23 @@ func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -171,7 +219,23 @@ func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	host := testURL.Host
@@ -224,9 +288,25 @@ func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay(t *testin
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	host := testURL.Host
@@ -281,7 +361,23 @@ func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	host := testURL1.Host
 	s.SetCurrentHost(host)
@@ -344,7 +440,24 @@ func TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	// Submit URL from first host
 	s.SetCurrentHost(host1)
@@ -388,7 +501,23 @@ func TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	host := testURL.Host
@@ -434,9 +563,24 @@ func TestSubmitUrlForAdmission_PreservesSourceContextAndDepth(t *testing.T) {
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
-
 	mockFetcher := newFetcherMockForTest(t)
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	mockStorage := newStorageMockForTest(t)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
 	s.SetCurrentHost(testURL.Host)
@@ -527,7 +671,23 @@ func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
 			mockLimiter := newRateLimiterMockForTest(t)
 			mockFrontier := newFrontierMockForTest(t)
 			mockFetcher := newFetcherMockForTest(t)
-			s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+			mockStorage := newStorageMockForTest(t)
+			s := createSchedulerForTest(
+				t,
+				ctx,
+				mockFinalizer,
+				noopSink,
+				mockLimiter,
+				mockFrontier,
+				mockRobot,
+				mockFetcher,
+				nil,
+				nil,
+				nil,
+				nil,
+				mockStorage,
+				nil,
+			)
 
 			s.SetCurrentHost(testURL.Host)
 

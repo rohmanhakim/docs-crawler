@@ -10,14 +10,17 @@ import (
 type StorageErrorCause string
 
 const (
-	ErrCauseDiskFull     = "disk is full"
-	ErrCauseWriteFailure = "write failed"
+	ErrCauseDiskFull              StorageErrorCause = "disk is full"
+	ErrCauseWriteFailure          StorageErrorCause = "write failed"
+	ErrCauseHashComputationFailed StorageErrorCause = "hash computation failed"
+	ErrCausePathError             StorageErrorCause = "path error"
 )
 
 type StorageError struct {
 	Message   string
 	Retryable bool
 	Cause     StorageErrorCause
+	Path      string
 }
 
 func (e *StorageError) Error() string {
@@ -42,6 +45,10 @@ func mapStorageErrorToMetadataCause(err *StorageError) metadata.ErrorCause {
 		return metadata.CauseStorageFailure
 	case ErrCauseWriteFailure:
 		return metadata.CauseStorageFailure
+	case ErrCausePathError:
+		return metadata.CauseStorageFailure
+	case ErrCauseHashComputationFailed:
+		return metadata.CauseInvariantViolation
 	default:
 		return metadata.CauseUnknown
 	}

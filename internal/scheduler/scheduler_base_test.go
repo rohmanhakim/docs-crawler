@@ -13,6 +13,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/html"
 )
@@ -32,6 +33,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -48,6 +50,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 	}, nil).Once()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	s := createSchedulerForTest(
 		t,
@@ -62,6 +65,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -105,6 +109,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
 	// Set up frontier expectations
@@ -138,6 +143,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -178,6 +184,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
 	// Set up frontier expectations
@@ -196,6 +203,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	}, nil).Maybe()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	s := createSchedulerForTest(
 		t,
@@ -210,6 +218,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -296,6 +305,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -344,6 +354,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 
 	mockExtractor.On("SetExtractParam", extractor.DefaultExtractParam()).Return()
 	mockExtractor.On("Extract", mock.AnythingOfType("url.URL"), mock.AnythingOfType("[]uint8")).Return(extractor.ExtractionResult{}, nil)
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	s := createSchedulerForTest(
 		t,
@@ -358,6 +369,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 		mockSanitizer,
 		nil,
 		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -402,6 +414,7 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -436,6 +449,7 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 	setupFetcherMockWithSuccess(mockFetcher, "https://example.com", []byte("<html><body>Test</body></html>"), 200)
 
 	mockExtractor.On("SetExtractParam", extractor.DefaultExtractParam()).Return()
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	s := createSchedulerForTest(
 		t,
@@ -450,6 +464,7 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 		mockSanitizer,
 		nil,
 		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -493,6 +508,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -530,6 +546,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	mockExtractor.On("SetExtractParam", extractor.DefaultExtractParam()).Return()
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	// Set up fetcher mock to return valid HTML
 	setupFetcherMockWithSuccess(mockFetcher, "https://example.com", []byte("<html><body>Test</body></html>"), 200)
@@ -547,6 +564,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 		mockSanitizer,
 		nil,
 		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
