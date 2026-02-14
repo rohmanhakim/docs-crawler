@@ -17,6 +17,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
+	"github.com/rohmanhakim/docs-crawler/pkg/fileutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
@@ -219,8 +220,12 @@ func (r *LocalResolver) resolve(
 	// Check if there are URLs that need downloading
 	if len(deduplicatedAssetsUrls) > 0 {
 		// Create asset directory (decoupled from page - assets are shared)
-		if err := r.ensureAssetDir(resolveParam.OutputDir()); err != nil {
-			return AssetfulMarkdownDoc{}, err
+		if err := fileutil.EnsureDir(resolveParam.OutputDir(), "assets", "images"); err != nil {
+			return AssetfulMarkdownDoc{}, &AssetsError{
+				Message:   fmt.Sprintf("%v", err),
+				Retryable: false,
+				Cause:     ErrCausePathError,
+			}
 		}
 
 		// Fetch each asset with retry
@@ -257,7 +262,7 @@ func (r *LocalResolver) resolve(
 			}
 
 			// Get extension from asset URL
-			extension := getFileExtension(assetURL.Path)
+			extension := fileutil.GetFileExtension(assetURL.Path)
 
 			// Check if content hash already exists (content-hash deduplication)
 			if existingPath := r.findPathByHash(contentHash); existingPath != "" {
@@ -343,18 +348,6 @@ func (r *LocalResolver) mechanicalDeduplicate(urls []url.URL, host string, schem
 	}
 
 	return deduplicated
-}
-
-func (r *LocalResolver) ensureAssetDir(outputDir string) failure.ClassifiedError {
-	assetsDir := filepath.Join(outputDir, "assets", "images")
-	if err := os.MkdirAll(assetsDir, 0755); err != nil {
-		return &AssetsError{
-			Message:   fmt.Sprintf("%v", err),
-			Retryable: false,
-			Cause:     ErrCausePathError,
-		}
-	}
-	return nil
 }
 
 func (r *LocalResolver) fetchAssetWithRetry(
@@ -515,7 +508,7 @@ func (r *LocalResolver) constructLocalPaths(imageUrls []url.URL, host string, sc
 			localPath := r.findPathByHash(contentHash)
 			if localPath == "" {
 				// No existing path found, build new path
-				extension := getFileExtension(canonical.Path)
+				extension := fileutil.GetFileExtension(canonical.Path)
 				localPath = buildAssetPath(canonical.Path, contentHash, extension)
 			}
 
@@ -561,16 +554,6 @@ func assetRequestHeaders(userAgent string) map[string]string {
 		"DNT":             "1",
 		"Connection":      "keep-alive",
 	}
-}
-
-// getFileExtension extracts the file extension from a path, or empty string if none
-func getFileExtension(path string) string {
-	ext := filepath.Ext(path)
-	if ext == "" {
-		return ""
-	}
-	// Remove the leading dot
-	return strings.TrimPrefix(ext, ".")
 }
 
 // buildAssetPath builds the relative path for an asset using the format:
