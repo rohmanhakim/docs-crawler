@@ -14,6 +14,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
+	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -33,6 +34,7 @@ func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -66,6 +68,8 @@ func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
 		}).
 		Return(createSanitizedHTMLDocForTest(nil), nil)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -77,8 +81,9 @@ func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil, // mockConvert - will use default success mock
-		nil, // mockNormalize - will use default success mock
+		nil,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -114,6 +119,7 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -143,6 +149,8 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 	mockSanitizer.On("Sanitize", mock.Anything).
 		Return(createSanitizedHTMLDocForTest(nil), nil)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -154,8 +162,9 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil, // mockConvert - will use default success mock
-		nil, // mockNormalize - will use default success mock
+		nil,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -176,7 +185,7 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 	assert.NoError(t, err)
 	// Sanitizer should be called
 	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
-	t.Logf("Execution completed with %d write results", len(exec.WriteResults))
+	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
 // TestScheduler_Sanitizer_FatalError_AbortsCrawl verifies that fatal sanitizer errors
@@ -192,6 +201,7 @@ func TestScheduler_Sanitizer_FatalError_AbortsCrawl(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -237,8 +247,9 @@ func TestScheduler_Sanitizer_FatalError_AbortsCrawl(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil, // mockConvert - will use default success mock
-		nil, // mockNormalize - will use default success mock
+		nil,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -273,6 +284,7 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
@@ -323,7 +335,8 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 		mockExtractor,
 		mockSanitizer,
 		mockConvert,
-		nil, // mockNormalize - will use default success mock
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -364,6 +377,7 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -408,8 +422,9 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil, // mockConvert - will use default success mock
-		nil, // mockNormalize - will use default success mock
+		nil,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -444,6 +459,7 @@ func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 
@@ -478,6 +494,8 @@ func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
 	mockSanitizer.On("Sanitize", contentNode).
 		Return(createSanitizedHTMLDocForTest([]url.URL{}), nil).Once()
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -489,8 +507,9 @@ func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil, // mockConvert - will use default success mock
-		nil, // mockNormalize - will use default success mock
+		nil,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -527,6 +546,7 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -579,6 +599,8 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 			callOrder = append(callOrder, "Sanitize")
 		}).Return(createSanitizedHTMLDocForTest(nil), nil)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -590,8 +612,9 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil, // mockConvert - will use default success mock
-		nil, // mockNormalize - will use default success mock
+		nil,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -649,6 +672,7 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -678,6 +702,8 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 	mockSanitizer.On("Sanitize", contentNode).
 		Return(createSanitizedHTMLDocForTest(nil), nil).Once()
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -689,8 +715,9 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil, // mockConvert - will use default success mock
-		nil, // mockNormalize - will use default success mock
+		nil,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -725,6 +752,7 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	// Only expect one Decide call for the seed URL - no discovered URLs should be submitted
@@ -771,8 +799,9 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		nil, // mockConvert - will use default success mock
-		nil, // mockNormalize - will use default success mock
+		nil,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 

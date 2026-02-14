@@ -87,7 +87,7 @@ func NewScheduler() Scheduler {
 	conversionRule := mdconvert.NewRule(&recorder)
 	resolver := assets.NewLocalResolver(&recorder, &http.Client{}, "docs-crawler/1.0")
 	markdownConstraint := normalize.NewMarkdownConstraint(&recorder)
-	storageSink := storage.NewSink(&recorder)
+	storageSink := storage.NewLocalSink(&recorder)
 	rateLimiter := limiter.NewConcurrentRateLimiter()
 	sleeper := timeutil.NewRealSleeper()
 	return Scheduler{
@@ -101,7 +101,7 @@ func NewScheduler() Scheduler {
 		markdownConversionRule: conversionRule,
 		assetResolver:          &resolver,
 		markdownConstraint:     &markdownConstraint,
-		storageSink:            storageSink,
+		storageSink:            &storageSink,
 		rateLimiter:            rateLimiter,
 		sleeper:                &sleeper,
 	}
@@ -123,10 +123,9 @@ func NewSchedulerWithDeps(
 	rule mdconvert.ConvertRule,
 	resolver assets.Resolver,
 	constraint normalize.Constraint,
+	storageSink storage.Sink,
 	sleeper timeutil.Sleeper,
 ) Scheduler {
-	storageSink := storage.NewSink(metadataSink)
-	// frontier := frontier.NewFrontier()
 	return Scheduler{
 		ctx:                    ctx,
 		metadataSink:           metadataSink,
@@ -427,7 +426,11 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 9. Write Artifact
-		writeResult, err := s.storageSink.Write(normalizedMarkdown)
+		writeResult, err := s.storageSink.Write(
+			cfg.OutputDir(),
+			normalizedMarkdown,
+			cfg.HashAlgo(),
+		)
 		if err != nil {
 			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err
@@ -444,9 +447,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	}
 
 	// Stats are recorded by defer - return successful execution result
-	return CrawlingExecution{
-		WriteResults: s.writeResults,
-	}, nil
+	return NewCrawlingExecution(s.writeResults, totalAssets), nil
 }
 
 // recordRobotsErrorAndBackoff records a robots error using metadataSink and

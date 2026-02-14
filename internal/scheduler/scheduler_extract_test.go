@@ -13,6 +13,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -28,6 +29,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -53,7 +55,22 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -84,6 +101,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -109,7 +127,22 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -151,6 +184,7 @@ func TestScheduler_Extract_MethodCallOrder(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -182,7 +216,22 @@ func TestScheduler_Extract_MethodCallOrder(t *testing.T) {
 			callOrder = append(callOrder, "Fetch")
 		}).Return(fetcher.FetchResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -213,6 +262,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -232,6 +282,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	// Clear default fetcher expectation and setup with valid HTML
 	mockFetcher.ExpectedCalls = nil
@@ -257,7 +308,22 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -278,7 +344,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 
 	// The crawl should complete without extraction errors
 	assert.NoError(t, err, "Crawl should complete without errors")
-	t.Logf("Execution result: writeResults=%d", len(exec.WriteResults))
+	t.Logf("Execution result: writeResults=%d", len(exec.WriteResults()))
 }
 
 // TestScheduler_Extract_DefaultParamsStructure verifies the structure of default extraction parameters.
@@ -318,6 +384,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -337,6 +404,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	// Setup fetcher with valid HTML that should produce a non-nil extraction result
 	mockFetcher.ExpectedCalls = nil
@@ -363,7 +431,22 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -381,7 +464,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 
 	// Should complete without fatal extraction errors
 	assert.NoError(t, err)
-	t.Logf("Execution completed: writeResults=%d", len(exec.WriteResults))
+	t.Logf("Execution completed: writeResults=%d", len(exec.WriteResults()))
 }
 
 // TestScheduler_Extract_InvalidHTMLHandled verifies that invalid HTML is handled gracefully.
@@ -394,6 +477,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -429,7 +513,22 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

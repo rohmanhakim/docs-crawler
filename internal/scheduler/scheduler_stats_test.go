@@ -13,6 +13,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -28,6 +29,7 @@ func TestScheduler_FinalStats_AccurateEmptyFrontier(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -46,9 +48,25 @@ func TestScheduler_FinalStats_AccurateEmptyFrontier(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	// Create a scheduler with minimal config that results in empty frontier
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	// Create a temp config file with seed URL
 	tmpDir := t.TempDir()
@@ -115,6 +133,7 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -134,8 +153,24 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	// Create a temp config file
 	tmpDir := t.TempDir()
@@ -179,6 +214,7 @@ func TestScheduler_FinalStats_DurationNonNegative(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -198,8 +234,24 @@ func TestScheduler_FinalStats_DurationNonNegative(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -248,6 +300,7 @@ func TestScheduler_GracefulShutdown_ConfigError(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -265,7 +318,22 @@ func TestScheduler_GracefulShutdown_ConfigError(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	// Try to execute with non-existent config
 	_, err := s.ExecuteCrawling("/nonexistent/path/config.json")
@@ -289,6 +357,7 @@ func TestScheduler_GracefulShutdown_InvalidConfig(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -306,7 +375,22 @@ func TestScheduler_GracefulShutdown_InvalidConfig(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.json")
@@ -334,6 +418,7 @@ func TestScheduler_GracefulShutdown_MissingSeedUrls(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -351,7 +436,22 @@ func TestScheduler_GracefulShutdown_MissingSeedUrls(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "empty.json")
@@ -381,6 +481,7 @@ func TestScheduler_StatsAccuracy_PagesTracked(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -400,8 +501,24 @@ func TestScheduler_StatsAccuracy_PagesTracked(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -448,6 +565,7 @@ func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -467,8 +585,24 @@ func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -510,6 +644,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
@@ -530,6 +665,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	// Setup convert mock with success
 	setupConvertMockWithSuccess(mockConvert)
@@ -560,6 +696,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 		mockConvert,
 		resolverMock,
 		normalizeMock,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -603,6 +740,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -622,8 +760,24 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -665,6 +819,7 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -682,7 +837,22 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, nil)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -723,6 +893,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -742,8 +913,24 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
@@ -791,6 +978,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -809,8 +997,24 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
-	s := createSchedulerForTest(t, ctx, mockFinalizer, errorSink, mockLimiter, mockFrontier, mockRobot, mockFetcher, nil, nil, nil, nil, mockSleeper)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		errorSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")

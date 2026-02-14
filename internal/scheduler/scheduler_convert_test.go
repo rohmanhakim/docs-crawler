@@ -15,6 +15,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
+	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/html"
@@ -34,6 +35,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -72,6 +74,8 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 		}).
 		Return(createConversionResultForTest("# Test", nil), nil)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -84,7 +88,8 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 		mockExtractor,
 		mockSanitizer,
 		mockConvert,
-		nil, // mockNormalize - will use default success mock
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -120,6 +125,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -151,6 +157,8 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	// Setup convert to return successful result
 	setupConvertMockWithSuccess(mockConvert)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -162,8 +170,9 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 		mockFetcher,
 		mockExtractor,
 		mockSanitizer,
-		mockConvert, // Pass the mockConvert so assertions work
-		nil,         // mockNormalize - will use default success mock
+		mockConvert,
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -184,7 +193,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	assert.NoError(t, execErr)
 	// Convert should be called
 	mockConvert.AssertCalled(t, "Convert", mock.Anything)
-	t.Logf("Execution completed with %d write results", len(exec.WriteResults))
+	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
 // TestScheduler_Convert_FatalError_AbortsCrawl verifies that fatal conversion errors
@@ -201,6 +210,7 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -244,7 +254,8 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 		mockExtractor,
 		mockSanitizer,
 		mockConvert,
-		nil, // mockNormalize - will use default success mock
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -280,6 +291,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -323,7 +335,8 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockExtractor,
 		mockSanitizer,
 		mockConvert,
-		nil, // mockNormalize - will use default success mock
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -359,6 +372,7 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockFrontier.On("Init", mock.Anything).Return()
 	mockFrontier.On("VisitedCount").Return(0).Maybe()
@@ -418,6 +432,8 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 			callOrder = append(callOrder, "Convert")
 		}).Return(createConversionResultForTest("# Test", nil), nil)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -430,7 +446,8 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 		mockExtractor,
 		mockSanitizer,
 		mockConvert,
-		nil, // mockNormalize - will use default success mock
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -494,6 +511,7 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -525,6 +543,8 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 	// Setup convert - should be called exactly once
 	setupConvertMockWithSuccess(mockConvert)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -537,7 +557,8 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 		mockExtractor,
 		mockSanitizer,
 		mockConvert,
-		nil, // mockNormalize - will use default success mock
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -573,6 +594,7 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	// Only expect one Decide call for the seed URL
@@ -622,7 +644,8 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 		mockExtractor,
 		mockSanitizer,
 		mockConvert,
-		nil, // mockNormalize - will use default success mock
+		nil,
+		mockStorage,
 		mockSleeper,
 	)
 

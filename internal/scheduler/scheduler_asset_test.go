@@ -17,6 +17,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/html"
@@ -37,6 +38,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -73,6 +75,8 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	seedURL, _ := url.Parse("http://example.com/")
 	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -86,6 +90,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -122,6 +127,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -152,6 +158,8 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	seedURL, _ := url.Parse("http://example.com/")
 	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -165,6 +173,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -185,7 +194,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	assert.NoError(t, execErr)
 	// Resolve should be called
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-	t.Logf("Execution completed with %d write results", len(exec.WriteResults))
+	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
 // TestScheduler_Resolve_FatalError_AbortsCrawl verifies that fatal asset resolution errors
@@ -203,6 +212,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -245,6 +255,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -281,6 +292,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -310,6 +322,8 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	seedURL, _ := url.Parse("http://example.com/")
 	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -323,6 +337,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -359,6 +374,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -419,6 +435,8 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 	seedURL, _ := url.Parse("http://example.com/page.html")
 	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -432,6 +450,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -501,6 +520,7 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -530,6 +550,8 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 	seedURL, _ := url.Parse("http://example.com/")
 	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -543,6 +565,7 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -578,6 +601,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	// Only expect one Decide call for the seed URL
@@ -608,6 +632,8 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	seedURL, _ := url.Parse("http://example.com/")
 	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
 	s := createSchedulerWithAllMocks(
 		t,
 		ctx,
@@ -621,6 +647,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -645,7 +672,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	// Verify that execution completed (Write was called)
-	t.Logf("Execution completed with %d write results", len(exec.WriteResults))
+	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
 // TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls verifies that when Resolve()
@@ -663,6 +690,7 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything).Return()
 	// Only expect one Decide call for the seed URL
@@ -706,6 +734,7 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 		mockSanitizer,
 		mockConvert,
 		mockResolver,
+		mockStorage,
 		mockSleeper,
 	)
 
@@ -750,6 +779,7 @@ func createSchedulerWithAllMocks(
 	mockSanitizer sanitizer.Sanitizer,
 	mockConvert mdconvert.ConvertRule,
 	mockResolver assets.Resolver,
+	mockStorage *storageMock,
 	mockSleeper *sleeperMock,
 ) *scheduler.Scheduler {
 	t.Helper()
@@ -794,6 +824,7 @@ func createSchedulerWithAllMocks(
 		mockConvert,
 		mockResolver,
 		mockNormalize,
+		mockStorage,
 		mockSleeper,
 	)
 	return &s
