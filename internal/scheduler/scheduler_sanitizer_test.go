@@ -36,7 +36,7 @@ func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -53,6 +53,7 @@ func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor to return a valid content node
@@ -121,7 +122,7 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -138,6 +139,7 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -203,7 +205,7 @@ func TestScheduler_Sanitizer_FatalError_AbortsCrawl(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -220,6 +222,7 @@ func TestScheduler_Sanitizer_FatalError_AbortsCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -287,7 +290,7 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -304,6 +307,7 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -379,7 +383,7 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -396,6 +400,7 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -461,7 +466,7 @@ func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 
 	// Expect Decide calls for: seed URL, seed URL robots check, and discovered URL
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -480,6 +485,7 @@ func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -548,7 +554,7 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -565,6 +571,7 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Track call order
@@ -674,7 +681,7 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -691,6 +698,7 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -754,7 +762,7 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 
-	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Only expect one Decide call for the seed URL - no discovered URLs should be submitted
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
@@ -772,6 +780,7 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor

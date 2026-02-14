@@ -56,6 +56,12 @@ type Config struct {
 	// ===============
 	// Maximum time of a single fetch request in millisecond
 	timeout time.Duration
+	// Maximum number of idle connections across all hosts
+	maxIdleConns int
+	// Maximum number of idle connections per host
+	maxIdleConnsPerHost int
+	// Maximum time to keep idle connections alive
+	idleConnTimeout time.Duration
 	// User agent that will be used in the request header. In raw string
 	userAgent string
 	// Maximum size of assets to download in bytes. 0 means unlimited.
@@ -135,6 +141,9 @@ type configDTO struct {
 	BackoffMultiplier      float64             `json:"backoffMultiplier,omitempty"`
 	BackoffMaxDuration     time.Duration       `json:"backoffMaxDuration,omitempty"`
 	Timeout                time.Duration       `json:"timeout,omitempty"`
+	MaxIdleConns           int                 `json:"maxIdleConns,omitempty"`
+	MaxIdleConnsPerHost    int                 `json:"maxIdleConnsPerHost,omitempty"`
+	IdleConnTimeout        time.Duration       `json:"idleConnTimeout,omitempty"`
 	UserAgent              string              `json:"userAgent,omitempty"`
 	MaxAssetSize           int64               `json:"maxAssetSize,omitempty"`
 	OutputDir              string              `json:"outputDir,omitempty"`
@@ -216,6 +225,17 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	}
 	// DryRun is a boolean, check if explicitly set (we use the DTO value as-is since bool zero value is false)
 	cfg.dryRun = dto.DryRun
+
+	// HTTP client parameters - only override if non-zero value is provided
+	if dto.MaxIdleConns != 0 {
+		cfg.maxIdleConns = dto.MaxIdleConns
+	}
+	if dto.MaxIdleConnsPerHost != 0 {
+		cfg.maxIdleConnsPerHost = dto.MaxIdleConnsPerHost
+	}
+	if dto.IdleConnTimeout != 0 {
+		cfg.idleConnTimeout = dto.IdleConnTimeout
+	}
 
 	// Extraction parameters - only override if non-zero value is provided
 	// For float64, we check if value is not 0 (which is also the zero value)
@@ -302,6 +322,9 @@ func WithDefault(seedUrls []url.URL) *Config {
 		backoffMultiplier:      2.0,
 		backoffMaxDuration:     10 * time.Second,
 		timeout:                time.Second * 10,
+		maxIdleConns:           10,
+		maxIdleConnsPerHost:    3,
+		idleConnTimeout:        30 * time.Second,
 		userAgent:              "docs-crawler/1.0",
 		maxAssetSize:           0, // 0 means unlimited
 		outputDir:              "output",
@@ -474,6 +497,21 @@ func (c *Config) WithHashAlgo(algo hashutil.HashAlgo) *Config {
 	return c
 }
 
+func (c *Config) WithMaxIdleConns(maxIdleConns int) *Config {
+	c.maxIdleConns = maxIdleConns
+	return c
+}
+
+func (c *Config) WithMaxIdleConnsPerHost(maxIdleConnsPerHost int) *Config {
+	c.maxIdleConnsPerHost = maxIdleConnsPerHost
+	return c
+}
+
+func (c *Config) WithIdleConnTimeout(idleConnTimeout time.Duration) *Config {
+	c.idleConnTimeout = idleConnTimeout
+	return c
+}
+
 func (c *Config) Build() (Config, error) {
 	if len(c.seedURLs) == 0 {
 		return Config{}, fmt.Errorf("%w: seedUrls cannot be empty", ErrInvalidConfig)
@@ -618,4 +656,16 @@ func (c Config) ThresholdMaxLinkDensity() float64 {
 
 func (c Config) HashAlgo() hashutil.HashAlgo {
 	return hashutil.HashAlgo(c.hashAlgo)
+}
+
+func (c Config) MaxIdleConns() int {
+	return c.maxIdleConns
+}
+
+func (c Config) MaxIdleConnsPerHost() int {
+	return c.maxIdleConnsPerHost
+}
+
+func (c Config) IdleConnTimeout() time.Duration {
+	return c.idleConnTimeout
 }

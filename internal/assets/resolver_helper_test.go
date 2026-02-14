@@ -2,7 +2,6 @@ package assets_test
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -136,7 +135,7 @@ func (m *metadataSinkMock) Reset() {
 // The contentHash should be the full SHA-256 hash string.
 func buildExpectedPath(originalName string, contentHash string, ext string) string {
 	shortHash := contentHash[:7]
-	return fmt.Sprintf("assets/images/%s-%s.%s", originalName, shortHash, ext)
+	return "assets/images/" + originalName + "-" + shortHash + "." + ext
 }
 
 // testRetryParam returns a retry param with minimal delays for testing
@@ -152,11 +151,9 @@ func testRetryParam() retry.RetryParam {
 
 // newTestResolver creates a LocalResolver with test dependencies
 func newTestResolver(mockSink *metadataSinkMock) assets.LocalResolver {
-	return assets.NewLocalResolver(
-		mockSink,
-		&http.Client{Timeout: 5 * time.Second},
-		"test-user-agent",
-	)
+	resolver := assets.NewLocalResolver(mockSink)
+	resolver.Init(&http.Client{Timeout: 5 * time.Second}, "test-user-agent")
+	return resolver
 }
 
 // resolveWithTestParams is a helper that calls Resolve with test retry params

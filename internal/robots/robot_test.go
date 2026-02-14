@@ -143,7 +143,8 @@ func setupTestServerWithStatus(statusCode int, robotsContent string) *httptest.S
 func TestRobot_NewRobot(t *testing.T) {
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	if robot == (robots.CachedRobot{}) {
 		t.Error("NewRobot should return a non-empty Robot")
@@ -154,7 +155,8 @@ func TestRobot_NewRobotWithCache(t *testing.T) {
 	sink := &robotTestMetadataSink{}
 	customCache := cache.NewMemoryCache()
 	robot := robots.NewCachedRobot(sink)
-	robot.InitWithCache("test-agent/1.0", customCache)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.InitWithCache("test-agent/1.0", httpClient, customCache)
 
 	if robot == (robots.CachedRobot{}) {
 		t.Error("NewRobotWithCache should return a non-empty Robot")
@@ -171,7 +173,8 @@ Allow: /`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	serverURL, _ := url.Parse(server.URL + "/page.html")
 	decision, err := robot.Decide(*serverURL)
@@ -199,7 +202,8 @@ Disallow: /`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	serverURL, _ := url.Parse(server.URL + "/page.html")
 	decision, err := robot.Decide(*serverURL)
@@ -227,7 +231,8 @@ Disallow: /private/`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	// Test disallowed path
 	privateURL, _ := url.Parse(server.URL + "/private/page.html")
@@ -265,7 +270,8 @@ Allow: /docs/public/`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	// Test that /docs/public/ is allowed despite /docs/ being disallowed
 	publicDocsURL, _ := url.Parse(server.URL + "/docs/public/page.html")
@@ -306,7 +312,8 @@ Allow: /`
 	// Test with good bot (should be allowed)
 	sink := &robotTestMetadataSink{}
 	goodBot := robots.NewCachedRobot(sink)
-	goodBot.Init("good-bot/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	goodBot.Init("good-bot/1.0", httpClient)
 
 	serverURL, _ := url.Parse(server.URL + "/page.html")
 	decision, err := goodBot.Decide(*serverURL)
@@ -322,7 +329,8 @@ Allow: /`
 	// Test with bad bot (should be disallowed)
 	sink2 := &robotTestMetadataSink{}
 	badBot := robots.NewCachedRobot(sink2)
-	badBot.InitWithCache("bad-bot/1.0", cache.NewMemoryCache())
+	httpClient2 := &http.Client{Timeout: 30 * time.Second}
+	badBot.InitWithCache("bad-bot/1.0", httpClient2, cache.NewMemoryCache())
 
 	decision, err = badBot.Decide(*serverURL)
 
@@ -345,7 +353,8 @@ Disallow: /*.pdf$`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	// Test PDF file (should be disallowed)
 	pdfURL, _ := url.Parse(server.URL + "/document.pdf")
@@ -383,7 +392,8 @@ Allow: /`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	serverURL, _ := url.Parse(server.URL + "/page.html")
 	decision, err := robot.Decide(*serverURL)
@@ -410,7 +420,8 @@ func TestRobot_Decide_NoRobotsFile_404(t *testing.T) {
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	serverURL, _ := url.Parse(server.URL + "/page.html")
 	decision, err := robot.Decide(*serverURL)
@@ -448,7 +459,8 @@ Allow: /`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	serverURL, _ := url.Parse(server.URL + "/page.html")
 
@@ -478,7 +490,8 @@ Allow: /`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	testCases := []struct {
 		path     string
@@ -521,7 +534,8 @@ Disallow: /`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	// Root should be allowed (exact match with /$)
 	rootURL, _ := url.Parse(server.URL + "/")
@@ -557,7 +571,8 @@ Allow: /`
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	testURL, _ := url.Parse(server.URL + "/test/page.html")
 	decision, err := robot.Decide(*testURL)
@@ -579,7 +594,8 @@ func TestRobot_Decide_ServerError(t *testing.T) {
 
 	sink := &robotTestMetadataSink{}
 	robot := robots.NewCachedRobot(sink)
-	robot.Init("test-agent/1.0")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
 
 	serverURL, _ := url.Parse(server.URL + "/page.html")
 	_, err := robot.Decide(*serverURL)

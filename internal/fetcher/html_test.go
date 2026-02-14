@@ -122,6 +122,7 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
@@ -177,6 +178,7 @@ func TestHtmlFetcher_Fetch_NonHTMLContent(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
@@ -222,6 +224,7 @@ func TestHtmlFetcher_Fetch_HTTP404(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
@@ -252,6 +255,7 @@ func TestHtmlFetcher_Fetch_HTTP403(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
@@ -284,6 +288,7 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(2)
@@ -337,6 +342,7 @@ func TestHtmlFetcher_Fetch_HTTP429_Retryable(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(2)
@@ -376,6 +382,7 @@ func TestHtmlFetcher_Fetch_SuccessAfterRetry(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
@@ -421,6 +428,7 @@ func TestHtmlFetcher_FetchResult_Accessors(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
@@ -530,6 +538,7 @@ func TestFetchError_Classification(t *testing.T) {
 
 			sink := &mockMetadataSink{}
 			f := fetcher.NewHtmlFetcher(sink)
+			f.Init(&http.Client{})
 
 			fetchUrl, _ := url.Parse(server.URL)
 			retryParam := createTestRetryParam(1) // Single attempt to test classification
@@ -594,6 +603,7 @@ func TestHtmlFetcher_NoMetadataSinkPanics(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
@@ -640,6 +650,7 @@ func TestHtmlFetcher_Fetch_ReadResponseBodyError(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{})
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(1) // single attempt; since error is retryable, exhaustion yields RetryError

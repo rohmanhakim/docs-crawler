@@ -54,27 +54,12 @@ type cachedResult struct {
 }
 
 // NewRobotsFetcher creates a new RobotsFetcher with the given dependencies.
+// The httpClient must be provided from outside (e.g., from the scheduler).
 // The cache parameter is optional - if nil, no caching will be performed.
 func NewRobotsFetcher(
-	metadataSink metadata.MetadataSink,
-	userAgent string,
-	cache cache.Cache,
-) *RobotsFetcher {
-	return &RobotsFetcher{
-		// TODO: Make Timeout be provider from config
-		httpClient: &http.Client{Timeout: 30 * time.Second},
-		userAgent:  userAgent,
-		cache:      cache,
-	}
-}
-
-// NewRobotsFetcherWithClient creates a new RobotsFetcher with a custom HTTP client.
-// This is useful for testing.
-// The cache parameter is optional - if nil, no caching will be performed.
-func NewRobotsFetcherWithClient(
-	metadataSink metadata.MetadataSink,
-	userAgent string,
 	httpClient *http.Client,
+	metadataSink metadata.MetadataSink,
+	userAgent string,
 	cache cache.Cache,
 ) *RobotsFetcher {
 	return &RobotsFetcher{

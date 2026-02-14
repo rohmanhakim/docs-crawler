@@ -68,6 +68,17 @@ func TestWithDefault(t *testing.T) {
 		t.Errorf("expected Timeout 10s, got %v", builtCfg.Timeout())
 	}
 
+	// Verify HTTP client configuration defaults
+	if builtCfg.MaxIdleConns() != 10 {
+		t.Errorf("expected MaxIdleConns 10, got %d", builtCfg.MaxIdleConns())
+	}
+	if builtCfg.MaxIdleConnsPerHost() != 3 {
+		t.Errorf("expected MaxIdleConnsPerHost 3, got %d", builtCfg.MaxIdleConnsPerHost())
+	}
+	if builtCfg.IdleConnTimeout() != 30*time.Second {
+		t.Errorf("expected IdleConnTimeout 30s, got %v", builtCfg.IdleConnTimeout())
+	}
+
 	// Verify other fields
 	if builtCfg.UserAgent() != "docs-crawler/1.0" {
 		t.Errorf("expected UserAgent 'docs-crawler/1.0', got '%s'", builtCfg.UserAgent())
@@ -563,6 +574,17 @@ func TestWithConfigFile_ValidCompleteConfig(t *testing.T) {
 		t.Errorf("expected BackoffMaxDuration 20s, got %v", loadedConfig.BackoffMaxDuration())
 	}
 
+	// Verify HTTP client configuration from complete config
+	if loadedConfig.MaxIdleConns() != 15 {
+		t.Errorf("expected MaxIdleConns 15, got %d", loadedConfig.MaxIdleConns())
+	}
+	if loadedConfig.MaxIdleConnsPerHost() != 5 {
+		t.Errorf("expected MaxIdleConnsPerHost 5, got %d", loadedConfig.MaxIdleConnsPerHost())
+	}
+	if loadedConfig.IdleConnTimeout() != 45*time.Second {
+		t.Errorf("expected IdleConnTimeout 45s, got %v", loadedConfig.IdleConnTimeout())
+	}
+
 	// Verify extraction parameters from complete config
 	if loadedConfig.BodySpecificityBias() != 0.85 {
 		t.Errorf("expected BodySpecificityBias 0.85, got %f", loadedConfig.BodySpecificityBias())
@@ -878,6 +900,43 @@ func TestWithHashAlgo(t *testing.T) {
 	}
 }
 
+// Test HTTP client configuration builder methods
+func TestWithMaxIdleConns(t *testing.T) {
+	testMaxIdleConns := 20
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithMaxIdleConns(testMaxIdleConns).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.MaxIdleConns() != testMaxIdleConns {
+		t.Errorf("expected MaxIdleConns %d, got %d", testMaxIdleConns, cfg.MaxIdleConns())
+	}
+}
+
+func TestWithMaxIdleConnsPerHost(t *testing.T) {
+	testMaxIdleConnsPerHost := 5
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithMaxIdleConnsPerHost(testMaxIdleConnsPerHost).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.MaxIdleConnsPerHost() != testMaxIdleConnsPerHost {
+		t.Errorf("expected MaxIdleConnsPerHost %d, got %d", testMaxIdleConnsPerHost, cfg.MaxIdleConnsPerHost())
+	}
+}
+
+func TestWithIdleConnTimeout(t *testing.T) {
+	testIdleConnTimeout := 45 * time.Second
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithIdleConnTimeout(testIdleConnTimeout).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.IdleConnTimeout() != testIdleConnTimeout {
+		t.Errorf("expected IdleConnTimeout %v, got %v", testIdleConnTimeout, cfg.IdleConnTimeout())
+	}
+}
+
 // Note: Zero values in JSON with `omitempty` tags are omitted during marshaling,
 // so they cannot override defaults. To set zero values, users must either:
 // 1. Modify the Config struct after loading, or
@@ -915,6 +974,9 @@ func completeConfigJson() string {
     "backoffMultiplier": 2.5,
     "backoffMaxDuration": 20000000000,
     "timeout": 30000000000,
+    "maxIdleConns": 15,
+    "maxIdleConnsPerHost": 5,
+    "idleConnTimeout": 45000000000,
     "userAgent": "TestBot/1.0",
     "outputDir": "test_output",
     "dryRun": true,
