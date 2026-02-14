@@ -137,3 +137,27 @@ func NewNormalizeParam(
 		allowedPathPrefixes: allowedPathPrefixes,
 	}
 }
+
+// Getter methods for NormalizeParam fields (added for testing)
+func (p NormalizeParam) AppVersion() string {
+	return p.appVersion
+}
+
+func (p NormalizeParam) FetchedAt() time.Time {
+	return p.fetchedAt
+}
+
+func (p NormalizeParam) HashAlgo() hashutil.HashAlgo {
+	return p.hashAlgo
+}
+
+func (p NormalizeParam) CrawlDepth() int {
+	return p.crawlDepth
+}
+
+func (p NormalizeParam) AllowedPathPrefixes() []string {
+	// Return a copy to prevent mutation
+	prefixes := make([]string, len(p.allowedPathPrefixes))
+	copy(prefixes, p.allowedPathPrefixes)
+	return prefixes
+}

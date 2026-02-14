@@ -9,14 +9,17 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
+	"github.com/rohmanhakim/docs-crawler/internal/build"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/normalize"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/html"
@@ -878,4 +881,456 @@ func createSchedulerWithAllMocksAndNormalize(
 		mockSleeper,
 	)
 	return &s
+}
+
+// TestScheduler_NormalizeParam_CreatedWithCorrectValues verifies that NormalizeParam
+// is constructed with the correct values from build version, fetch result, config, and crawl token.
+func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
+	ctx := context.Background()
+
+	// Define expected values
+	expectedVersion := build.FullVersion()
+	expectedFetchedAt := time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)
+	expectedHashAlgo := hashutil.HashAlgoSHA256
+	expectedAllowedPathPrefix := []string{"/docs", "/api"}
+	expectedDepth := 0 // seed URL depth
+
+	// Create test URL
+	testURL, _ := url.Parse("https://example.com/docs/page.html")
+
+	// Create fetch result with specific fetchedAt time (will be used by scheduler)
+	fetchResult := fetcher.NewFetchResultForTest(
+		*testURL,
+		[]byte("<html><body><div>Test</div></body></html>"),
+		200,
+		"text/html",
+		map[string]string{"Content-Type": "text/html"},
+		expectedFetchedAt,
+	)
+
+	// Create config with specific values
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	configData := `{
+		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"maxDepth": 3,
+		"allowedPathPrefix": ["/docs", "/api"],
+		"hashAlgo": "sha256"
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	assert.NoError(t, err)
+
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := new(fetcherMock)
+	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockExtractor := newExtractorMockForTest(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
+	mockResolver := newResolverMockForTest(t)
+	mockNormalize := newNormalizeMockForTest(t)
+
+	// Setup robots
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once()
+
+	// Setup frontier - disable auto-enqueue so we can control Dequeue
+	mockFrontier.disableAutoEnqueue = true
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
+	// Setup sleeper and limiter
+	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
+
+	// Setup extractor
+	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
+	mockExtractor.On("Extract", mock.Anything, mock.Anything).
+		Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
+	mockExtractor.On("SetExtractParam", mock.Anything).Return()
+
+	// Setup sanitizer
+	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
+
+	// Setup convert
+	setupConvertMockWithSuccess(mockConvert)
+
+	// Setup resolver
+	setupResolverMockWithSuccess(mockResolver)
+
+	// Setup fetcher to return our fetchResult with specific fetchedAt
+	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(fetchResult, nil)
+
+	// Capture the NormalizeParam passed to Normalize
+	var capturedParam normalize.NormalizeParam
+
+	mockNormalize.On("Normalize", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			// Capture the NormalizeParam (3rd argument)
+			capturedParam = args.Get(2).(normalize.NormalizeParam)
+		}).
+		Return(createNormalizedMarkdownDocForTest("# Test"), nil)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		mockConvert,
+		mockNormalize,
+		mockSleeper,
+	)
+
+	// Override current host (needed for some internal logic)
+	s.SetCurrentHost("example.com")
+
+	// Execute crawl - this will process the seed URL and call Normalize
+	_, execErr := s.ExecuteCrawling(configPath)
+	assert.NoError(t, execErr)
+
+	// Verify Normalize was called
+	mockNormalize.AssertCalled(t, "Normalize", mock.Anything, mock.Anything, mock.Anything)
+
+	// Now verify the NormalizeParam values using getter methods
+	assert.Equal(t, expectedVersion, capturedParam.AppVersion(), "appVersion should match build.FullVersion()")
+	assert.Equal(t, expectedFetchedAt, capturedParam.FetchedAt(), "fetchedAt should match fetchResult.FetchedAt()")
+	assert.Equal(t, string(expectedHashAlgo), string(capturedParam.HashAlgo()), "hashAlgo should match cfg.HashAlgo()")
+	assert.Equal(t, expectedDepth, capturedParam.CrawlDepth(), "crawlDepth should match nextCrawlToken.Depth() (seed=0)")
+	assert.Equal(t, expectedAllowedPathPrefix, capturedParam.AllowedPathPrefixes(), "allowedPathPrefixes should match config.AllowedPathPrefix()")
+}
+
+// TestScheduler_NormalizeParam_UsesTokenDepth verifies that the crawl depth
+// in NormalizeParam correctly reflects the token's depth.
+func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
+	ctx := context.Background()
+
+	// We'll test with depth 1 (non-seed)
+	expectedDepth := 1
+
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := new(fetcherMock)
+	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockExtractor := newExtractorMockForTest(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
+	mockResolver := newResolverMockForTest(t)
+	mockNormalize := newNormalizeMockForTest(t)
+
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once()
+
+	// Disable auto-enqueue to control Dequeue behavior
+	mockFrontier.disableAutoEnqueue = true
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+
+	// First dequeue: token with depth 1 (non-seed page)
+	tokenDepth1 := frontier.NewCrawlToken(*mustParseURL("https://example.com/page1"), 1)
+	mockFrontier.OnDequeue(tokenDepth1, true).Once()
+	// Second dequeue: exit loop
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
+
+	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
+	mockExtractor.On("Extract", mock.Anything, mock.Anything).
+		Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
+	mockExtractor.On("SetExtractParam", mock.Anything).Return()
+
+	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
+	setupConvertMockWithSuccess(mockConvert)
+	setupResolverMockWithSuccess(mockResolver)
+
+	// Setup fetcher
+	testURL, _ := url.Parse("https://example.com/page1")
+	fetchResult := fetcher.NewFetchResultForTest(
+		*testURL,
+		[]byte("<html><body><h1>Test Title</h1>\n\nContent</body></html>"),
+		200,
+		"text/html",
+		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
+	)
+	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(fetchResult, nil)
+
+	var capturedDepth int
+	mockNormalize.On("Normalize", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			param := args.Get(2).(normalize.NormalizeParam)
+			capturedDepth = param.CrawlDepth()
+		}).
+		Return(createNormalizedMarkdownDocForTest("# Test"), nil)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		mockConvert,
+		mockNormalize,
+		mockSleeper,
+	)
+	s.SetCurrentHost("example.com")
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	configData := `{
+		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"maxDepth": 3
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	assert.NoError(t, err)
+
+	_, execErr := s.ExecuteCrawling(configPath)
+	assert.NoError(t, execErr)
+
+	// Verify the captured depth is 1 (from the token), not 0 (seed depth)
+	assert.Equal(t, expectedDepth, capturedDepth, "NormalizeParam CrawlDepth should match the crawl token's depth")
+}
+
+// TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix verifies that
+// allowedPathPrefixes in NormalizeParam come from the config.
+func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
+	ctx := context.Background()
+
+	// Define expected prefixes
+	expectedPrefixes := []string{"/blog", "/articles", "/docs"}
+
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := new(fetcherMock)
+	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockExtractor := newExtractorMockForTest(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
+	mockResolver := newResolverMockForTest(t)
+	mockNormalize := newNormalizeMockForTest(t)
+
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once()
+
+	mockFrontier.disableAutoEnqueue = true
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
+
+	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
+	mockExtractor.On("Extract", mock.Anything, mock.Anything).
+		Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
+	mockExtractor.On("SetExtractParam", mock.Anything).Return()
+
+	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
+	setupConvertMockWithSuccess(mockConvert)
+	setupResolverMockWithSuccess(mockResolver)
+
+	// Setup fetcher
+	testURL, _ := url.Parse("https://example.com")
+	fetchResult := fetcher.NewFetchResultForTest(
+		*testURL,
+		[]byte("<html><body><div>Test</div></body></html>"),
+		200,
+		"text/html",
+		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
+	)
+	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(fetchResult, nil)
+
+	var capturedPrefixes []string
+	mockNormalize.On("Normalize", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			param := args.Get(2).(normalize.NormalizeParam)
+			capturedPrefixes = param.AllowedPathPrefixes()
+		}).
+		Return(createNormalizedMarkdownDocForTest("# Test"), nil)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		mockConvert,
+		mockNormalize,
+		mockSleeper,
+	)
+	s.SetCurrentHost("example.com")
+
+	// Create config with specific allowedPathPrefix
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	configData := `{
+		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"maxDepth": 2,
+		"allowedPathPrefix": ["/blog", "/articles", "/docs"]
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	assert.NoError(t, err)
+
+	_, execErr := s.ExecuteCrawling(configPath)
+	assert.NoError(t, execErr)
+
+	// Verify the captured allowedPathPrefixes match the config
+	assert.Equal(t, expectedPrefixes, capturedPrefixes, "allowedPathPrefixes should match config.AllowedPathPrefix()")
+}
+
+// TestScheduler_NormalizeParam_UsesConfigHashAlgo verifies that hashAlgo
+// in NormalizeParam comes from the config.
+func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
+	ctx := context.Background()
+
+	expectedHashAlgo := hashutil.HashAlgoSHA256
+
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := new(fetcherMock)
+	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockExtractor := newExtractorMockForTest(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
+	mockResolver := newResolverMockForTest(t)
+	mockNormalize := newNormalizeMockForTest(t)
+
+	mockRobot.On("Init", mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once()
+
+	mockFrontier.disableAutoEnqueue = true
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
+	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
+
+	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
+	mockExtractor.On("Extract", mock.Anything, mock.Anything).
+		Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
+	mockExtractor.On("SetExtractParam", mock.Anything).Return()
+
+	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
+	setupConvertMockWithSuccess(mockConvert)
+	setupResolverMockWithSuccess(mockResolver)
+
+	// Setup fetcher
+	testURL, _ := url.Parse("https://example.com")
+	fetchResult := fetcher.NewFetchResultForTest(
+		*testURL,
+		[]byte("<html><body><div>Test</div></body></html>"),
+		200,
+		"text/html",
+		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
+	)
+	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(fetchResult, nil)
+
+	var capturedHashAlgo hashutil.HashAlgo
+	mockNormalize.On("Normalize", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			param := args.Get(2).(normalize.NormalizeParam)
+			capturedHashAlgo = param.HashAlgo()
+		}).
+		Return(createNormalizedMarkdownDocForTest("# Test"), nil)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		mockExtractor,
+		mockSanitizer,
+		mockConvert,
+		mockNormalize,
+		mockSleeper,
+	)
+	s.SetCurrentHost("example.com")
+
+	// Create config with explicit hashAlgo (default is sha256, but we specify it)
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	configData := `{
+		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"maxDepth": 2,
+		"hashAlgo": "sha256"
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	assert.NoError(t, err)
+
+	_, execErr := s.ExecuteCrawling(configPath)
+	assert.NoError(t, execErr)
+
+	// Verify the captured hashAlgo matches the config
+	assert.Equal(t, string(expectedHashAlgo), string(capturedHashAlgo), "hashAlgo should match cfg.HashAlgo()")
 }
