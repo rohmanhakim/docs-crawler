@@ -50,8 +50,8 @@ type HtmlFetcher struct {
 
 func NewHtmlFetcher(
 	metadataSink metadata.MetadataSink,
-) *HtmlFetcher {
-	return &HtmlFetcher{
+) HtmlFetcher {
+	return HtmlFetcher{
 		metadataSink: metadataSink,
 		httpClient:   nil,
 	}

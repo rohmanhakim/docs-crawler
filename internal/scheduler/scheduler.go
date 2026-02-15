@@ -96,7 +96,7 @@ func NewScheduler() Scheduler {
 		crawlFinalizer:         &recorder,
 		robot:                  &cachedRobot,
 		frontier:               &frontier,
-		htmlFetcher:            fetcher,
+		htmlFetcher:            &fetcher,
 		domExtractor:           &ext,
 		htmlSanitizer:          &sanitizer,
 		markdownConversionRule: conversionRule,
