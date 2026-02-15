@@ -161,8 +161,14 @@ func (s *Scheduler) SubmitUrlForAdmission(
 	sourceContext frontier.SourceContext,
 	depth int,
 ) failure.ClassifiedError {
-	// Fetch robots.txt
-	robotsDecision, robotsError := s.robot.Decide(url)
+	// Canonicalize the URL before any checks to ensure:
+	// - Consistent robots.txt enforcement (e.g., /docs/ and /docs are the same)
+	// - Proper deduplication (query params and fragments are normalized)
+	// - Deterministic crawl behavior
+	canonicalURL := urlutil.Canonicalize(url)
+
+	// Fetch robots.txt using the canonicalized URL
+	robotsDecision, robotsError := s.robot.Decide(canonicalURL)
 	// Robots infrastructure failure → scheduler-level error
 	if robotsError != nil {
 		return robotsError
@@ -170,7 +176,7 @@ func (s *Scheduler) SubmitUrlForAdmission(
 
 	// Reset backoff after successful robots request
 	if s.rateLimiter != nil {
-		s.rateLimiter.ResetBackoff(url.Host)
+		s.rateLimiter.ResetBackoff(canonicalURL.Host)
 	}
 
 	if robotsDecision.CrawlDelay > 0 && s.rateLimiter != nil {
@@ -189,6 +195,7 @@ func (s *Scheduler) SubmitUrlForAdmission(
 	}
 
 	// Only submit to frontier if robots allowed
+	// Use the canonical URL from the robots decision to ensure consistency
 	candidate := frontier.NewCrawlAdmissionCandidate(
 		robotsDecision.Url,
 		sourceContext,

@@ -713,6 +713,207 @@ func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
 	}
 }
 
+// TestSubmitUrlForAdmission_CanonicalizesBeforeRobotsCheck verifies that URLs are
+// canonicalized BEFORE the robots.txt check is performed. This ensures that:
+// - URLs like /docs/ and /docs are treated as the same path
+// - Query parameters are stripped before robots check
+// - Fragments are removed before robots check
+// This is critical for proper robots.txt enforcement and avoiding duplicate crawling.
+func TestSubmitUrlForAdmission_CanonicalizesBeforeRobotsCheck(t *testing.T) {
+	testCases := []struct {
+		name         string
+		inputURL     string
+		expectedPath string // The path that should be sent to robots
+	}{
+		{
+			name:         "trailing slash removed",
+			inputURL:     "https://example.com/docs/",
+			expectedPath: "/docs",
+		},
+		{
+			name:         "no trailing slash stays same",
+			inputURL:     "https://example.com/docs",
+			expectedPath: "/docs",
+		},
+		{
+			name:         "query parameters removed",
+			inputURL:     "https://example.com/docs?utm_source=twitter",
+			expectedPath: "/docs",
+		},
+		{
+			name:         "fragment removed",
+			inputURL:     "https://example.com/docs#section",
+			expectedPath: "/docs",
+		},
+		{
+			name:         "both query and fragment removed",
+			inputURL:     "https://example.com/docs?utm=1#section",
+			expectedPath: "/docs",
+		},
+		{
+			name:         "multiple trailing slashes removed",
+			inputURL:     "https://example.com/docs///",
+			expectedPath: "/docs",
+		},
+		{
+			name:         "root path with trailing slash preserved",
+			inputURL:     "https://example.com/",
+			expectedPath: "/",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			inputURL, _ := url.Parse(tc.inputURL)
+
+			// Track what URL was passed to robots.Decide()
+			var receivedURLForRobots url.URL
+			mockRobot := NewRobotsMockForTest(t)
+			mockRobot.On("Decide", mock.Anything).Run(func(args mock.Arguments) {
+				receivedURLForRobots = args.Get(0).(url.URL)
+			}).Return(robots.Decision{
+				Allowed:    true,
+				Reason:     robots.EmptyRuleSet,
+				CrawlDelay: 0,
+			}, nil).Once()
+
+			ctx := context.Background()
+			mockFinalizer := newMockFinalizer(t)
+			noopSink := &metadata.NoopSink{}
+			mockLimiter := newRateLimiterMockForTest(t)
+			mockFrontier := newFrontierMockForTest(t)
+			mockFetcher := newFetcherMockForTest(t)
+			mockStorage := newStorageMockForTest(t)
+			s := createSchedulerForTest(
+				t,
+				ctx,
+				mockFinalizer,
+				noopSink,
+				mockLimiter,
+				mockFrontier,
+				mockRobot,
+				mockFetcher,
+				nil,
+				nil,
+				nil,
+				nil,
+				mockStorage,
+				nil,
+			)
+
+			s.SetCurrentHost(inputURL.Host)
+
+			// WHEN: submitting URL for admission
+			err := s.SubmitUrlForAdmission(*inputURL, frontier.SourceSeed, 0)
+
+			// THEN: no error should be returned
+			if err != nil {
+				t.Fatalf("Expected no error, got: %v", err)
+			}
+
+			// AND: robots should have been called
+			mockRobot.AssertNumberOfCalls(t, "Decide", 1)
+
+			// AND: the URL passed to robots should have the expected canonicalized path
+			if receivedURLForRobots.Path != tc.expectedPath {
+				t.Errorf("Expected robots to receive path %q, but got %q", tc.expectedPath, receivedURLForRobots.Path)
+			}
+
+			// AND: there should be no query parameters in the URL passed to robots
+			if receivedURLForRobots.RawQuery != "" {
+				t.Errorf("Expected robots to receive no query params, but got %q", receivedURLForRobots.RawQuery)
+			}
+
+			// AND: there should be no fragment in the URL passed to robots
+			if receivedURLForRobots.Fragment != "" {
+				t.Errorf("Expected robots to receive no fragment, but got %q", receivedURLForRobots.Fragment)
+			}
+		})
+	}
+}
+
+// TestSubmitUrlForAdmission_EquivalentURLsTreatedAsSame verifies that all equivalent URLs
+// are processed correctly. The key assertion is that robots receives canonicalized URLs,
+// ensuring consistent robots.txt enforcement. The actual deduplication is handled by frontier.
+func TestSubmitUrlForAdmission_EquivalentURLsTreatedAsSame(t *testing.T) {
+	// These URLs are semantically equivalent after canonicalization
+	urls := []string{
+		"https://example.com/docs/",
+		"https://example.com/docs",
+		"https://example.com/docs?ref=1",
+		"https://example.com/docs#section",
+	}
+
+	// Track what URLs were passed to robots
+	var receivedURLs []url.URL
+	mockRobot := NewRobotsMockForTest(t)
+	mockRobot.On("Decide", mock.Anything).Run(func(args mock.Arguments) {
+		receivedURLs = append(receivedURLs, args.Get(0).(url.URL))
+	}).Return(robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil)
+
+	ctx := context.Background()
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		nil,
+	)
+
+	host := "example.com"
+	s.SetCurrentHost(host)
+
+	// Submit all equivalent URLs
+	for _, urlStr := range urls {
+		u, _ := url.Parse(urlStr)
+		err := s.SubmitUrlForAdmission(*u, frontier.SourceCrawl, 1)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+	}
+
+	// THEN: robots should be called for each submission
+	mockRobot.AssertNumberOfCalls(t, "Decide", len(urls))
+
+	// AND: all URLs received by robots should be identical (canonicalized)
+	// This is the key assertion - robots receives the same canonical URL for all equivalent inputs
+	if len(receivedURLs) != len(urls) {
+		t.Fatalf("Expected %d URLs received by robots, got %d", len(urls), len(receivedURLs))
+	}
+
+	expectedPath := "/docs"
+	for i, receivedURL := range receivedURLs {
+		if receivedURL.Path != expectedPath {
+			t.Errorf("URL[%d]: expected path %q, got %q", i, expectedPath, receivedURL.Path)
+		}
+		if receivedURL.RawQuery != "" {
+			t.Errorf("URL[%d]: expected no query, got %q", i, receivedURL.RawQuery)
+		}
+		if receivedURL.Fragment != "" {
+			t.Errorf("URL[%d]: expected no fragment, got %q", i, receivedURL.Fragment)
+		}
+	}
+}
+
 // getTestPath returns the test path for each test case
 func getTestPath(testName string) string {
 	switch testName {
