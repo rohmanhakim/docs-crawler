@@ -52,7 +52,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 
 	// Clear default fetcher expectation and setup for no fetch calls
 	mockFetcher.ExpectedCalls = nil
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, nil)
 
@@ -125,7 +125,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 
 	// Clear default fetcher expectation
 	mockFetcher.ExpectedCalls = nil
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, nil)
 
@@ -209,7 +209,7 @@ func TestScheduler_Extract_MethodCallOrder(t *testing.T) {
 
 	// Clear default fetcher expectation
 	mockFetcher.ExpectedCalls = nil
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 
 	// Track call order
 	callOrder := []string{}
@@ -289,7 +289,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 
 	// Clear default fetcher expectation and setup with valid HTML
 	mockFetcher.ExpectedCalls = nil
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	testURL, _ := url.Parse("http://example.com/page.html")
 	htmlBody := []byte(`<!DOCTYPE html>
 <html>
@@ -412,7 +412,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 
 	// Setup fetcher with valid HTML that should produce a non-nil extraction result
 	mockFetcher.ExpectedCalls = nil
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	testURL, _ := url.Parse("http://example.com/page.html")
 	htmlBody := []byte(`<!DOCTYPE html>
 <html>
@@ -505,7 +505,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 
 	// Setup fetcher with invalid HTML (plain text instead of HTML)
 	mockFetcher.ExpectedCalls = nil
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	testURL, _ := url.Parse("http://example.com/page.txt")
 	textBody := []byte("This is just plain text, not HTML.")
 	fetchResult := fetcher.NewFetchResultForTest(

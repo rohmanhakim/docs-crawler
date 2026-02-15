@@ -301,7 +301,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 	s.domExtractor.SetExtractParam(extractParam)
 
 	// 1.5 Initialize Fetcher
-	s.htmlFetcher.Init(s.httpClient)
+	s.htmlFetcher.Init(s.httpClient, cfg.UserAgent())
 
 	// 1.6 Initialize Asset Resolver
 	s.assetResolver.Init(s.httpClient, cfg.UserAgent())
@@ -330,11 +330,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		}
 
 		// 3. Fetch Page URL
-		fetchParam := fetcher.NewFetchParam(
-			nextCrawlToken.URL(),
-			cfg.UserAgent(),
-		)
-		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), fetchParam, RetryParam(cfg))
+		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryParam(cfg))
 		if err != nil {
 			if err.Severity() == failure.SeverityFatal {
 				return CrawlingExecution{}, err

@@ -54,7 +54,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor to return a valid content node
@@ -145,7 +145,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -231,7 +231,7 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -313,7 +313,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -395,7 +395,7 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 	}, nil).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Track call order
@@ -535,7 +535,7 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor
@@ -620,7 +620,7 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup extractor

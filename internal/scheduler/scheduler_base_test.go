@@ -48,7 +48,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -128,7 +128,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 		Reason:     robots.DisallowedByRobots,
 		CrawlDelay: 0,
 	}, nil).Maybe()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -203,7 +203,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -349,7 +349,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -446,7 +446,7 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once() // Only called for seed URL
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -547,7 +547,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Maybe()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 

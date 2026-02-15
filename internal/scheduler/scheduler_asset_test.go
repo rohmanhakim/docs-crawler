@@ -47,7 +47,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -137,7 +137,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -223,7 +223,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -304,7 +304,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -387,7 +387,7 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -534,7 +534,7 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -617,7 +617,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 
@@ -707,7 +707,7 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockSleeper.On("Sleep", mock.Anything).Return()
 

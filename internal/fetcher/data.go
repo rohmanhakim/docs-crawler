@@ -7,18 +7,6 @@ import (
 
 // HTTP boundary
 
-type FetchParam struct {
-	fetchUrl  url.URL
-	userAgent string
-}
-
-func NewFetchParam(fetchUrl url.URL, userAgent string) FetchParam {
-	return FetchParam{
-		fetchUrl:  fetchUrl,
-		userAgent: userAgent,
-	}
-}
-
 type FetchResult struct {
 	url       url.URL
 	body      []byte

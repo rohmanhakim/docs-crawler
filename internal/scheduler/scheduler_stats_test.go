@@ -47,7 +47,7 @@ func TestScheduler_FinalStats_AccurateEmptyFrontier(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -153,7 +153,7 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -235,7 +235,7 @@ func TestScheduler_FinalStats_DurationNonNegative(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -503,7 +503,7 @@ func TestScheduler_StatsAccuracy_PagesTracked(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -588,7 +588,7 @@ func TestScheduler_StatsAccuracy_ErrorsTracked(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -669,7 +669,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -765,7 +765,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -919,7 +919,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -1004,7 +1004,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 

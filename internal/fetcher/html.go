@@ -23,7 +23,7 @@ Responsibilities
 - Handle redirects safely
 - Classify responses
 
-Fetch Semantics
+# Fetch Semantics
 
 - Only successful HTML responses are processed
 - Non-HTML content is discarded
@@ -32,10 +32,20 @@ Fetch Semantics
 
 The fetcher never parses content; it only returns bytes and metadata.
 */
+type Fetcher interface {
+	Init(httpClient *http.Client, userAgent string)
+	Fetch(
+		ctx context.Context,
+		crawlDepth int,
+		fetchUrl url.URL,
+		retryParam retry.RetryParam,
+	) (FetchResult, failure.ClassifiedError)
+}
 
 type HtmlFetcher struct {
 	metadataSink metadata.MetadataSink
 	httpClient   *http.Client
+	userAgent    string
 }
 
 func NewHtmlFetcher(
@@ -47,22 +57,23 @@ func NewHtmlFetcher(
 	}
 }
 
-// Init initializes the HtmlFetcher with an HTTP client.
+// Init initializes the HtmlFetcher with an HTTP client and user agent.
 // This must be called before Fetch is invoked.
-func (h *HtmlFetcher) Init(httpClient *http.Client) {
+func (h *HtmlFetcher) Init(httpClient *http.Client, userAgent string) {
 	h.httpClient = httpClient
+	h.userAgent = userAgent
 }
 
 func (h *HtmlFetcher) Fetch(
 	ctx context.Context,
 	crawlDepth int,
-	fetchParam FetchParam,
+	fetchUrl url.URL,
 	retryParam retry.RetryParam,
 ) (FetchResult, failure.ClassifiedError) {
 	callerMethod := "HtmlFetcher.Fetch"
 	startTime := time.Now()
 
-	retryResult := h.fetchWithRetry(ctx, fetchParam.fetchUrl, fetchParam.userAgent, retryParam)
+	retryResult := h.fetchWithRetry(ctx, fetchUrl, h.userAgent, retryParam)
 	result := retryResult.Value()
 	err := retryResult.Err()
 
@@ -83,7 +94,7 @@ func (h *HtmlFetcher) Fetch(
 	}
 
 	h.metadataSink.RecordFetch(
-		fetchParam.fetchUrl.String(),
+		fetchUrl.String(),
 		statusCode,
 		duration,
 		contentType,
@@ -95,10 +106,10 @@ func (h *HtmlFetcher) Fetch(
 		// Use errors.Is to decide between FetchError or RetryError
 		if errors.Is(err, &retry.RetryError{}) {
 			// It's a RetryError
-			h.recordRetryError(callerMethod, fetchParam.fetchUrl, err)
+			h.recordRetryError(callerMethod, fetchUrl, err)
 		} else {
 			// It's a FetchError
-			h.recordFetchError(callerMethod, fetchParam.fetchUrl, err)
+			h.recordFetchError(callerMethod, fetchUrl, err)
 		}
 
 		return FetchResult{}, err

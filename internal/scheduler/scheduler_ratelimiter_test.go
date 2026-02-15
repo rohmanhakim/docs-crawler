@@ -33,7 +33,7 @@ func TestRateLimiter_SetBaseDelay_Called(t *testing.T) {
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("SetCrawlDelay", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResetBackoff", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{Allowed: true, Reason: robots.EmptyRuleSet}, nil)
@@ -158,7 +158,7 @@ func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("SetCrawlDelay", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResetBackoff", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{Allowed: true, Reason: robots.EmptyRuleSet}, nil)
@@ -224,7 +224,7 @@ func TestRateLimiter_SetRandomSeed_CalledWithConfigValue(t *testing.T) {
 	mockLimiter.On("SetRandomSeed", int64(42)).Return()
 	mockLimiter.On("SetCrawlDelay", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResetBackoff", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{Allowed: true, Reason: robots.EmptyRuleSet}, nil)
@@ -497,7 +497,7 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 
 	s := createSchedulerForTest(
 		t,
@@ -576,7 +576,7 @@ func TestResetBackoff_CalledOnSuccessfulRobotsRequest(t *testing.T) {
 	mockLimiter.On("ResetBackoff", host).Return()
 	mockRobot.OnDecide(mock.Anything, decision, nil)
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 
 	s := createSchedulerForTest(
 		t,
@@ -643,7 +643,7 @@ func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 	mockLimiter.On("Backoff", host).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 
 	s := createSchedulerForTest(
 		t,
@@ -706,7 +706,7 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 
 	s := createSchedulerForTest(
 		t,
@@ -785,7 +785,7 @@ func TestSleeper_ResolveDelayAndSleepCalled(t *testing.T) {
 	mockSleeper.On("Sleep", delay).Return()
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
-	mockFetcher.On("Init", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 
 	s := createSchedulerForTest(
 		t,

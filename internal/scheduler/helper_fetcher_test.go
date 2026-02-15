@@ -18,17 +18,17 @@ type fetcherMock struct {
 	mock.Mock
 }
 
-func (f *fetcherMock) Init(httpClient *http.Client) {
-	f.Called(httpClient)
+func (f *fetcherMock) Init(httpClient *http.Client, userAgent string) {
+	f.Called(httpClient, userAgent)
 }
 
 func (f *fetcherMock) Fetch(
 	ctx context.Context,
 	crawlDepth int,
-	fetchParam fetcher.FetchParam,
+	fetchUrl url.URL,
 	retryParam retry.RetryParam,
 ) (fetcher.FetchResult, failure.ClassifiedError) {
-	args := f.Called(ctx, crawlDepth, fetchParam, retryParam)
+	args := f.Called(ctx, crawlDepth, fetchUrl, retryParam)
 	result := args.Get(0).(fetcher.FetchResult)
 	var err failure.ClassifiedError
 	if args.Get(1) != nil {
@@ -54,6 +54,8 @@ const defaultValidHTML = `<!DOCTYPE html>
 func newFetcherMockForTest(t *testing.T) *fetcherMock {
 	t.Helper()
 	m := new(fetcherMock)
+	// Set up default expectation for Init
+	m.On("Init", mock.Anything, mock.Anything).Return()
 	// Set up default expectation to return valid HTML with meaningful content
 	// This ensures the extractor won't fail with "no content" errors
 	testURL, _ := url.Parse("https://example.com/test")

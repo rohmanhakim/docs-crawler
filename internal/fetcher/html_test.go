@@ -122,12 +122,12 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
 
-	result, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -178,12 +178,12 @@ func TestHtmlFetcher_Fetch_NonHTMLContent(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
 
-	_, err := f.Fetch(context.Background(), 1, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	_, err := f.Fetch(context.Background(), 1, *fetchUrl, retryParam)
 
 	if err == nil {
 		t.Fatal("expected error for non-HTML content, got nil")
@@ -224,12 +224,12 @@ func TestHtmlFetcher_Fetch_HTTP404(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
 
-	_, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 	if err == nil {
 		t.Fatal("expected error for 404, got nil")
@@ -255,12 +255,12 @@ func TestHtmlFetcher_Fetch_HTTP403(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
 
-	_, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 	if err == nil {
 		t.Fatal("expected error for 403, got nil")
@@ -288,12 +288,12 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(2)
 
-	_, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 	if err == nil {
 		t.Fatal("expected error after retries exhausted, got nil")
@@ -342,12 +342,12 @@ func TestHtmlFetcher_Fetch_HTTP429_Retryable(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(2)
 
-	_, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 	if err == nil {
 		t.Fatal("expected error after retries exhausted, got nil")
@@ -382,12 +382,12 @@ func TestHtmlFetcher_Fetch_SuccessAfterRetry(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
 
-	result, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 	if err != nil {
 		t.Fatalf("expected success after retry, got error: %v", err)
@@ -428,12 +428,12 @@ func TestHtmlFetcher_FetchResult_Accessors(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
 
-	result, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -538,12 +538,12 @@ func TestFetchError_Classification(t *testing.T) {
 
 			sink := &mockMetadataSink{}
 			f := fetcher.NewHtmlFetcher(sink)
-			f.Init(&http.Client{})
+			f.Init(&http.Client{}, "test-user-agent")
 
 			fetchUrl, _ := url.Parse(server.URL)
 			retryParam := createTestRetryParam(1) // Single attempt to test classification
 
-			_, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+			_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 			if err == nil {
 				t.Fatal("expected error")
@@ -603,13 +603,13 @@ func TestHtmlFetcher_NoMetadataSinkPanics(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(3)
 
 	// Should not panic
-	_, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -650,12 +650,12 @@ func TestHtmlFetcher_Fetch_ReadResponseBodyError(t *testing.T) {
 
 	sink := &mockMetadataSink{}
 	f := fetcher.NewHtmlFetcher(sink)
-	f.Init(&http.Client{})
+	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
 	retryParam := createTestRetryParam(1) // single attempt; since error is retryable, exhaustion yields RetryError
 
-	_, err := f.Fetch(context.Background(), 0, fetcher.NewFetchParam(*fetchUrl, "test-user-agent"), retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
 
 	if err == nil {
 		t.Fatal("expected error for read response body failure, got nil")
