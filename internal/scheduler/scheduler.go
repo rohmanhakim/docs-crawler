@@ -528,15 +528,6 @@ func RetryParam(cfg config.Config) retry.RetryParam {
 // and other scheduler internals. They are not part of the public API.
 // ---------------------------------------------------------------------------
 
-// InitWith initializes the dependencies with the given data.
-// This is a test helper method.
-func (s *Scheduler) InitWith(userAgent string, baseDelay time.Duration, jitter time.Duration, randomSeed int64) {
-	s.robot.Init(userAgent, s.httpClient)
-	s.rateLimiter.SetBaseDelay(baseDelay)
-	s.rateLimiter.SetJitter(jitter)
-	s.rateLimiter.SetRandomSeed(randomSeed)
-}
-
 // SetCurrentHost sets the current host.
 // This is a test helper method to simulate the host context.
 func (s *Scheduler) SetCurrentHost(host string) {
@@ -560,10 +551,4 @@ func (s *Scheduler) DequeueFromFrontier() (frontier.CrawlToken, bool) {
 		return frontier.CrawlToken{}, false
 	}
 	return s.frontier.Dequeue()
-}
-
-// SetConvertRule sets the markdown conversion rule for testing.
-// This is a test helper method to inject mock conversion rules.
-func (s *Scheduler) SetConvertRule(rule mdconvert.ConvertRule) {
-	s.markdownConversionRule = rule
 }
