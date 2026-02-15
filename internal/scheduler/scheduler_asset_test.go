@@ -105,8 +105,13 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify Resolve was called with the conversion result from Convert
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -189,11 +194,15 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error
-	assert.NoError(t, execErr)
+	assert.NoError(t, execErr, "Failed to execute")
 	// Resolve should be called
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
@@ -272,8 +281,12 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal resolver error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal resolve error")
@@ -355,8 +368,12 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should not return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should not return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable resolve error should not abort crawl")
@@ -469,8 +486,13 @@ func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify all stages were called
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -585,8 +607,13 @@ func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify Resolve was called exactly once
 	mockResolver.AssertNumberOfCalls(t, "Resolve", 1)
@@ -669,8 +696,12 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should NOT return error for recoverable error
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should NOT return error for recoverable error
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable resolver error should NOT abort the crawl
 	assert.NoError(t, execErr, "Recoverable resolve error should not abort crawl")
@@ -757,8 +788,12 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal resolver error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal resolve error")

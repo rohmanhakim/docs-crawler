@@ -104,8 +104,13 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, execErr, "Failed to execute")
 
 	// Verify convert was called with the sanitized HTML doc
 	mockConvert.AssertCalled(t, "Convert", mock.Anything)
@@ -188,11 +193,15 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error
-	assert.NoError(t, execErr)
+	assert.NoError(t, execErr, "Failed to execute")
 	// Convert should be called
 	mockConvert.AssertCalled(t, "Convert", mock.Anything)
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
@@ -272,8 +281,12 @@ func TestScheduler_Convert_FatalError_AbortsCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal convert error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal convert error")
@@ -354,8 +367,12 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should not return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should not return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable convert error should not abort crawl")
@@ -466,8 +483,13 @@ func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, execErr, "Failed to execute")
 
 	// Verify convert was called
 	mockConvert.AssertCalled(t, "Convert", mock.Anything)
@@ -578,8 +600,13 @@ func TestScheduler_Convert_CalledExactlyOncePerPage(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, execErr, "Failed to execute")
 
 	// Verify convert was called exactly once
 	mockConvert.AssertNumberOfCalls(t, "Convert", 1)
@@ -667,8 +694,12 @@ func TestScheduler_Convert_ErrorPreventsSubsequentCalls(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal convert error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal convert error")

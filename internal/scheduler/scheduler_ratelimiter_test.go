@@ -69,7 +69,14 @@ func TestRateLimiter_SetBaseDelay_Called(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -196,7 +203,14 @@ func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -262,7 +276,14 @@ func TestRateLimiter_SetRandomSeed_CalledWithConfigValue(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -529,18 +550,18 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// WHEN: executing the crawl (which will hit 429 on robots.txt)
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize - this should return an error due to 429
+	_, initErr := s.InitializeCrawling(configPath)
 
-	// THEN: an error should be returned
-	if execErr == nil {
-		t.Fatal("Expected error from ExecuteCrawling for 429 response, got nil")
+	// THEN: an error should be returned from initialization
+	if initErr == nil {
+		t.Fatal("Expected error from InitializeCrawling for 429 response, got nil")
 	}
 
 	// AND: Backoff should have been called
 	mockLimiter.AssertCalled(t, "Backoff", host)
 
-	// AND: Error should have been recorded (2 errors: 1 from robots, 1 from scheduler)
+	// AND: Error should have been recorded (1 error from scheduler)
 	if errorSink.errorCount != 1 {
 		t.Errorf("Expected 1 error to be recorded, got %d", errorSink.errorCount)
 	}
@@ -738,12 +759,12 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// WHEN: executing the crawl (which will hit 503 on robots.txt)
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize - this should return an error due to 503
+	_, initErr := s.InitializeCrawling(configPath)
 
-	// THEN: an error should be returned
-	if execErr == nil {
-		t.Fatal("Expected error from ExecuteCrawling for 503 response, got nil")
+	// THEN: an error should be returned from initialization
+	if initErr == nil {
+		t.Fatal("Expected error from InitializeCrawling for 503 response, got nil")
 	}
 
 	// AND: Backoff should have been called
@@ -816,7 +837,14 @@ func TestSleeper_ResolveDelayAndSleepCalled(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

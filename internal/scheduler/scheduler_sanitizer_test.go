@@ -98,8 +98,13 @@ func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify sanitizer was called with the content node from extractor
 	assert.Equal(t, contentNode, receivedNode, "Sanitizer should be called with the ContentNode from extraction")
@@ -180,11 +185,15 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	exec, err := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	exec, err := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without error
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Failed to execute")
 	// Sanitizer should be called
 	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
@@ -266,8 +275,12 @@ func TestScheduler_Sanitizer_FatalError_AbortsCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal sanitizer error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal sanitizer error")
@@ -354,8 +367,12 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal sanitizer error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal sanitizer error")
@@ -443,8 +460,12 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should not return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should not return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable sanitizer error should not abort crawl")
@@ -531,8 +552,12 @@ func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
 
 	t.Logf("Discovered URL test: %v", discoveredURL)
 
-	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error
 	assert.NoError(t, execErr)
@@ -635,8 +660,13 @@ func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify sanitizer was called
 	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
@@ -739,8 +769,13 @@ func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify sanitizer was called exactly once
 	mockSanitizer.AssertNumberOfCalls(t, "Sanitize", 1)
@@ -825,8 +860,12 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal sanitizer error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal sanitizer error")

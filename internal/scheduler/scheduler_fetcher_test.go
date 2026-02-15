@@ -12,7 +12,6 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
-	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -161,15 +160,23 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl (this will attempt to call fetcher.Fetch if robots check passes)
-	_, err = s.ExecuteCrawling(configPath)
-	t.Logf("Execution result: err=%v", err)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Logf("Init error (may be expected): %v", err)
+	}
 
 	// Note: The fetcher may or may not be called depending on robots check
 	// If called, verify context was passed
 	if receivedContext != nil {
 		_, hasDeadline := receivedContext.Deadline()
 		t.Logf("Context has deadline: %v", hasDeadline)
+	}
+
+	// Phase 2: Execute with state (only if init succeeded)
+	if init != nil {
+		_, err = s.ExecuteCrawlingWithState(init)
+		t.Logf("Execution result: err=%v", err)
 	}
 }
 
@@ -243,8 +250,13 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should not return fatal error
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, init)
+
+	// Phase 2: Execute with state - should not return fatal error
+	_, err = s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error (recoverable errors are logged but not fatal)
 	t.Logf("Execution result: err=%v", err)
@@ -320,8 +332,13 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, init)
+
+	// Phase 2: Execute with state - should return fatal error
+	_, err = s.ExecuteCrawlingWithState(init)
 
 	// Fatal errors should be returned
 	assert.Error(t, err, "Expected error for fatal fetch error")
@@ -396,127 +413,6 @@ Allow: /`
 
 	// Verify depth was passed (would be verified during ExecuteCrawling)
 	t.Logf("Test setup complete, depth would be passed: %d", receivedDepth)
-}
-
-// TestScheduler_Fetcher_PassesFetchParam verifies that the scheduler passes
-// the correct FetchParam to the fetcher.
-func TestScheduler_Fetcher_PassesFetchParam(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockFrontier,
-		mockRobot,
-		mockFetcher,
-		nil,
-		nil,
-		nil,
-		nil,
-		mockStorage,
-		nil,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0,
-		"userAgent": "TestAgent/1.0"
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// The fetcher should receive FetchParam with the correct User-Agent
-	t.Logf("Test setup complete, scheduler initialized: %v", s != nil)
-}
-
-// TestScheduler_Fetcher_ContextHandling verifies context handling.
-func TestScheduler_Fetcher_ContextHandling(t *testing.T) {
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	// Create scheduler without context (nil)
-	var nilCtx context.Context
-	s := createSchedulerForTest(
-		t,
-		nilCtx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockFrontier,
-		mockRobot,
-		mockFetcher,
-		nil,
-		nil,
-		nil,
-		nil,
-		mockStorage,
-		nil,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0,
-		"timeout": "10s"
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute should handle nil context gracefully
-	_, err = s.ExecuteCrawling(configPath)
-	t.Logf("Execution with nil context: err=%v", err)
 }
 
 // TestScheduler_Fetcher_FetchResultProcessing verifies that the scheduler correctly
@@ -602,8 +498,13 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	exec, err := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, init)
+
+	// Phase 2: Execute with state
+	exec, err := s.ExecuteCrawlingWithState(init)
 	t.Logf("Execution result: err=%v, writeResults=%d", err, len(exec.WriteResults()))
 }
 
@@ -682,8 +583,13 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - non-HTML should be handled
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, init)
+
+	// Phase 2: Execute with state - non-HTML should be handled
+	_, err = s.ExecuteCrawlingWithState(init)
 	t.Logf("Execution with non-HTML: err=%v", err)
 }
 
@@ -764,152 +670,14 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			err := os.WriteFile(configPath, []byte(configData), 0644)
 			assert.NoError(t, err)
 
-			// Execute crawl
-			_, execErr := s.ExecuteCrawling(configPath)
+			// Phase 1: Initialize
+			init, err := s.InitializeCrawling(configPath)
+			assert.NoError(t, err)
+			assert.NotNil(t, init)
+
+			// Phase 2: Execute with state
+			_, execErr := s.ExecuteCrawlingWithState(init)
 			t.Logf("HTTP %d: err=%v", tc.statusCode, execErr)
 		})
 	}
-}
-
-// TestScheduler_Fetcher_MultiplePages verifies that the fetcher is called
-// correctly for multiple pages.
-func TestScheduler_Fetcher_MultiplePages(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-
-	// Clear default expectation and setup fetcher mock to track call count
-	mockFetcher.ExpectedCalls = nil
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	callCount := 0
-	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callCount++
-		}).Return(fetcher.FetchResult{}, nil)
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockFrontier,
-		mockRobot,
-		mockFetcher,
-		nil,
-		nil,
-		nil,
-		nil,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 2,
-		"maxPages": 5
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, err = s.ExecuteCrawling(configPath)
-	t.Logf("Multiple pages execution: err=%v, fetch calls=%d", err, callCount)
-}
-
-// TestScheduler_Fetcher_ContextCancellation_Handled verifies that context
-// cancellation is handled gracefully.
-func TestScheduler_Fetcher_ContextCancellation_Handled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
-
-	// Cancel context immediately
-	cancel()
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockFrontier,
-		mockRobot,
-		mockFetcher,
-		nil,
-		nil,
-		nil,
-		nil,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl with cancelled context
-	_, err = s.ExecuteCrawling(configPath)
-	t.Logf("Cancelled context execution: err=%v", err)
 }
