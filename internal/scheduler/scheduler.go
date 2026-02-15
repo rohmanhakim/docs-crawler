@@ -203,28 +203,32 @@ func (s *Scheduler) SubmitUrlForAdmission(
 	return nil
 }
 
-// Current implementation uses a single recorder and single execution path.
-// This does not imply a global ordering guarantee.
-// TODO: In the future consider implementing global ordering guarantee
-// TODO: split execute crwaling into two phases: Init() and Execute(). Init() is up to just before the crawl loop
-func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error) {
-	// Track crawl start time for duration calculation
-	crawlStartTime := time.Now()
+// InitializeCrawling performs all initialization steps up to just before the crawl loop.
+// This includes:
+// - Loading and validating configuration
+// - Initializing HTTP client, rate limiter, robots, frontier
+// - Configuring extractor, fetcher, asset resolver
+// - Submitting seed URL to frontier
+// - Applying initial rate limiting delay
+//
+// This method can be tested independently without waiting for the execution phase.
+func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitialization, err error) {
+	// Track initialization start time for stats recording
+	initStartTime := time.Now()
 
-	// Statistics tracking
-	var totalErrors int
-	var totalAssets int
-
-	// Ensure final stats are recorded even if errors occur
+	// Ensure stats are recorded only if initialization fails.
+	// On success, ExecuteCrawlingWithState will handle final stats recording.
 	defer func() {
-		crawlDuration := time.Since(crawlStartTime)
-		totalPages := s.frontier.VisitedCount()
-		s.crawlFinalizer.RecordFinalCrawlStats(
-			totalPages,
-			totalErrors,
-			totalAssets,
-			crawlDuration,
-		)
+		if err != nil && s.crawlFinalizer != nil {
+			// Only record stats on failure - this captures init duration
+			// when initialization fails before execution begins
+			s.crawlFinalizer.RecordFinalCrawlStats(
+				0, // No pages processed during init
+				0, // No errors during init (would need to count specific init errors)
+				0, // No assets during init
+				time.Since(initStartTime),
+			)
+		}
 	}()
 
 	// 1. Prepare config File
@@ -240,7 +244,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 				metadata.NewAttr(metadata.AttrField, fmt.Sprintf("field: %v", "theFieldError")),
 			},
 		)
-		return CrawlingExecution{}, err
+		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout())
@@ -251,7 +255,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 
 	// Validate that at least one seed URL exists
 	if len(cfg.SeedURLs()) == 0 {
-		err := fmt.Errorf("no seed URLs configured")
+		err = fmt.Errorf("no seed URLs configured")
 		s.metadataSink.RecordError(
 			time.Now(),
 			"config",
@@ -260,7 +264,7 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 			err.Error(),
 			[]metadata.Attribute{},
 		)
-		return CrawlingExecution{}, err
+		return nil, err
 	}
 
 	// 1.1 Initialize HTTP Client
@@ -315,12 +319,49 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 		if robotsErr, ok := err.(*robots.RobotsError); ok {
 			s.recordRobotsErrorAndBackoff(robotsErr, cfg.SeedURLs()[0])
 		}
-		return CrawlingExecution{}, err
+		return nil, err
 	}
 
 	// Apply rate limiting delay after successful robots check
 	delay := s.rateLimiter.ResolveDelay(s.currentHost)
 	s.sleeper.Sleep(delay)
+
+	// Return the initialization state
+	return &CrawlInitialization{
+		config:              cfg,
+		httpClient:          s.httpClient,
+		currentHost:         s.currentHost,
+		seedScheme:          seedScheme,
+		initialDelayApplied: true,
+	}, nil
+}
+
+// ExecuteCrawlingWithState runs the crawl execution loop using the provided initialization state.
+// This method handles the actual page fetching, extraction, and processing.
+// It manages its own deferred stat recording to ensure accurate execution timing.
+func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (CrawlingExecution, error) {
+	// Track execution start time for duration calculation
+	execStartTime := time.Now()
+
+	// Statistics tracking
+	var totalErrors int
+	var totalAssets int
+
+	// Ensure final stats are recorded even if errors occur
+	// This defer captures the execution phase duration only
+	defer func() {
+		execDuration := time.Since(execStartTime)
+		totalPages := s.frontier.VisitedCount()
+		s.crawlFinalizer.RecordFinalCrawlStats(
+			totalPages,
+			totalErrors,
+			totalAssets,
+			execDuration,
+		)
+	}()
+
+	cfg := init.config
+	seedScheme := init.seedScheme
 
 	// If frontier still has URL to be crawl...
 	for {
@@ -460,6 +501,17 @@ func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error
 
 	// Stats are recorded by defer - return successful execution result
 	return NewCrawlingExecution(s.writeResults, totalAssets), nil
+}
+
+// ExecuteCrawling is the main entry point for running a crawl.
+// It orchestrates the full crawl lifecycle by calling InitializeCrawling and ExecuteCrawlingWithState.
+// This method is kept for backward compatibility.
+func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error) {
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		return CrawlingExecution{}, err
+	}
+	return s.ExecuteCrawlingWithState(init)
 }
 
 func createHttpClient(
