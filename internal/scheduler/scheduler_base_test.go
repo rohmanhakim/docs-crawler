@@ -84,8 +84,14 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Execute crawl
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,10 +169,16 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 	}
 
 	// Should handle gracefully (either succeed or return error, not panic)
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize - may fail due to malformed URL
+	init, initErr := s.InitializeCrawling(configPath)
+
+	// Phase 2: If init succeeded, execute
+	if initErr == nil {
+		_, _ = s.ExecuteCrawlingWithState(init)
+	}
 
 	// Either outcome is acceptable as long as no panic occurs
-	t.Logf("Result: err=%v", err)
+	t.Logf("Result: initErr=%v", initErr)
 
 	// If stats were recorded, verify they're valid
 	if mockFinalizer.recordedStats != nil {
@@ -234,7 +246,14 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	_, err = s.ExecuteCrawling(config1)
+	// Phase 1: Initialize
+	init1, err := s.InitializeCrawling(config1)
+	if err != nil {
+		t.Fatalf("first initialization failed: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init1)
 	if err != nil {
 		t.Fatalf("first execution failed: %v", err)
 	}
@@ -254,7 +273,14 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	_, err = s.ExecuteCrawling(config2)
+	// Phase 1: Initialize second execution
+	init2, err := s.InitializeCrawling(config2)
+	if err != nil {
+		t.Fatalf("second initialization failed: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init2)
 	if err != nil {
 		t.Fatalf("second execution failed: %v", err)
 	}
@@ -391,8 +417,14 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Execute crawl
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -487,8 +519,14 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Execute crawl
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -588,8 +626,14 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Execute crawl
-	_, err = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

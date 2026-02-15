@@ -503,17 +503,6 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	return NewCrawlingExecution(s.writeResults, totalAssets), nil
 }
 
-// ExecuteCrawling is the main entry point for running a crawl.
-// It orchestrates the full crawl lifecycle by calling InitializeCrawling and ExecuteCrawlingWithState.
-// This method is kept for backward compatibility.
-func (s *Scheduler) ExecuteCrawling(configPath string) (CrawlingExecution, error) {
-	init, err := s.InitializeCrawling(configPath)
-	if err != nil {
-		return CrawlingExecution{}, err
-	}
-	return s.ExecuteCrawlingWithState(init)
-}
-
 func createHttpClient(
 	maxIdleConns int,
 	maxIdleConnsPerHost int,

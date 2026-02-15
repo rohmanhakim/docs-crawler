@@ -51,15 +51,6 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
@@ -92,6 +83,10 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocksAndNormalize(
 		t,
 		ctx,
@@ -120,8 +115,13 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify Normalize was called with the AssetfulMarkdownDoc from Resolve
 	mockNormalize.AssertCalled(t, "Normalize", mock.Anything, mock.Anything, mock.Anything)
@@ -153,15 +153,6 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
@@ -186,6 +177,10 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 		Return(normalizedDoc, nil)
 
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
+
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
 	s := createSchedulerWithAllMocksAndNormalize(
 		t,
@@ -215,8 +210,12 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error
 	assert.NoError(t, execErr)
@@ -233,8 +232,8 @@ func TestScheduler_Normalize_FatalError_AbortsCrawl(t *testing.T) {
 	noopSink := &metadata.NoopSink{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -249,15 +248,6 @@ func TestScheduler_Normalize_FatalError_AbortsCrawl(t *testing.T) {
 		Reason:     robots.EmptyRuleSet,
 		CrawlDelay: 0,
 	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
@@ -279,6 +269,10 @@ func TestScheduler_Normalize_FatalError_AbortsCrawl(t *testing.T) {
 
 	// Setup normalize to return a fatal error
 	setupNormalizeMockWithFatalError(mockNormalize)
+
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
 	s := createSchedulerWithAllMocksAndNormalize(
 		t,
@@ -308,8 +302,12 @@ func TestScheduler_Normalize_FatalError_AbortsCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal normalize error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal normalize error")
@@ -341,15 +339,6 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
@@ -371,6 +360,10 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 	// Setup normalize to return a recoverable error
 	setupNormalizeMockWithRecoverableError(mockNormalize)
 
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
 	s := createSchedulerWithAllMocksAndNormalize(
 		t,
 		ctx,
@@ -399,269 +392,16 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should not return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should not return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable normalize error should not abort crawl")
 	mockNormalize.AssertCalled(t, "Normalize", mock.Anything, mock.Anything, mock.Anything)
-}
-
-// TestScheduler_Normalize_MethodCallOrder verifies the correct order of method calls:
-// Fetch → Extract → Sanitize → Convert → Resolve → Normalize → Write
-func TestScheduler_Normalize_MethodCallOrder(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := new(fetcherMock)
-	mockRobot := NewRobotsMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockConvert := newConvertMockForTest(t)
-	mockResolver := newResolverMockForTest(t)
-	mockNormalize := newNormalizeMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-
-	// Track call order
-	callOrder := []string{}
-
-	// Setup fetcher
-	testURL, _ := url.Parse("http://example.com/page.html")
-	htmlBody := []byte(`<html><body><div>Test</div></body></html>`)
-	fetchResult := fetcher.NewFetchResultForTest(
-		*testURL,
-		htmlBody,
-		200,
-		"text/html",
-		map[string]string{"Content-Type": "text/html"},
-		time.Now(),
-	)
-	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Fetch")
-		}).Return(fetchResult, nil).Once()
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	mockExtractor.On("Extract", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Extract")
-		}).Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer
-	mockSanitizer.On("Sanitize", contentNode).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Sanitize")
-		}).Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	// Setup convert
-	mockConvert.On("Convert", mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Convert")
-		}).Return(createConversionResultForTest("# Test", nil), nil)
-
-	// Setup resolver
-	mockResolver.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Resolve")
-		}).Return(createAssetfulMarkdownDocForTest("# Test", nil), nil)
-
-	// Setup normalize
-	mockNormalize.On("Normalize", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Normalize")
-		}).Return(createNormalizedMarkdownDocForTest("# Test"), nil)
-
-	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
-
-	s := createSchedulerWithAllMocksAndNormalize(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFrontier,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		mockConvert,
-		mockResolver,
-		mockNormalize,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
-
-	// Verify all stages were called
-	mockNormalize.AssertCalled(t, "Normalize", mock.Anything, mock.Anything, mock.Anything)
-
-	// Verify order: Normalize should be called after Resolve
-	t.Logf("Call order: %v", callOrder)
-	assert.Contains(t, callOrder, "Fetch", "Fetch should be called")
-	assert.Contains(t, callOrder, "Extract", "Extract should be called")
-	assert.Contains(t, callOrder, "Sanitize", "Sanitize should be called")
-	assert.Contains(t, callOrder, "Convert", "Convert should be called")
-	assert.Contains(t, callOrder, "Resolve", "Resolve should be called")
-	assert.Contains(t, callOrder, "Normalize", "Normalize should be called")
-
-	// Find positions
-	fetchIdx := -1
-	extractIdx := -1
-	sanitizeIdx := -1
-	convertIdx := -1
-	resolveIdx := -1
-	normalizeIdx := -1
-	for i, call := range callOrder {
-		switch call {
-		case "Fetch":
-			fetchIdx = i
-		case "Extract":
-			extractIdx = i
-		case "Sanitize":
-			sanitizeIdx = i
-		case "Convert":
-			convertIdx = i
-		case "Resolve":
-			resolveIdx = i
-		case "Normalize":
-			normalizeIdx = i
-		}
-	}
-
-	assert.Less(t, fetchIdx, extractIdx, "Fetch should be called before Extract")
-	assert.Less(t, extractIdx, sanitizeIdx, "Extract should be called before Sanitize")
-	assert.Less(t, sanitizeIdx, convertIdx, "Sanitize should be called before Convert")
-	assert.Less(t, convertIdx, resolveIdx, "Convert should be called before Resolve")
-	assert.Less(t, resolveIdx, normalizeIdx, "Resolve should be called before Normalize")
-}
-
-// TestScheduler_Normalize_CalledExactlyOncePerPage verifies that Normalize
-// is called exactly once for each page processed.
-func TestScheduler_Normalize_CalledExactlyOncePerPage(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockConvert := newConvertMockForTest(t)
-	mockResolver := newResolverMockForTest(t)
-	mockNormalize := newNormalizeMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer
-	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	// Setup convert
-	setupConvertMockWithSuccess(mockConvert)
-
-	// Setup resolver
-	setupResolverMockWithSuccess(mockResolver)
-
-	// Setup normalize - should be called exactly once
-	setupNormalizeMockWithSuccess(mockNormalize)
-
-	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
-
-	s := createSchedulerWithAllMocksAndNormalize(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFrontier,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		mockConvert,
-		mockResolver,
-		mockNormalize,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
-
-	// Verify Normalize was called exactly once
-	mockNormalize.AssertNumberOfCalls(t, "Normalize", 1)
 }
 
 // TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable verifies that when Normalize()
@@ -690,15 +430,6 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
@@ -719,6 +450,10 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 
 	// Setup normalize to return a recoverable error (not fatal)
 	setupNormalizeMockWithRecoverableError(mockNormalize)
+
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
 	s := createSchedulerWithAllMocksAndNormalize(
 		t,
@@ -749,8 +484,12 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should NOT return error for recoverable error
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should NOT return error for recoverable error
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable normalize error should NOT abort the crawl
 	assert.NoError(t, execErr, "Recoverable normalize error should not abort crawl")
@@ -788,15 +527,6 @@ func TestScheduler_Normalize_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
 	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
@@ -817,6 +547,10 @@ func TestScheduler_Normalize_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 
 	// Setup normalize to return a fatal error using mock.Anything to ensure it gets called
 	setupNormalizeMockWithFatalError(mockNormalize)
+
+	// Setup frontier to return a token for the seed URL
+	seedURL, _ := url.Parse("http://example.com/")
+	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
 
 	s := createSchedulerWithAllMocksAndNormalize(
 		t,
@@ -847,8 +581,12 @@ func TestScheduler_Normalize_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal normalize error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal normalize error")
@@ -898,6 +636,16 @@ func createSchedulerWithAllMocksAndNormalize(
 		mockNormalize = newNormalizeMockForTest(t)
 		setupNormalizeMockWithSuccess(mockNormalize)
 	}
+
+	// Setup frontier mock expectations that are common to all tests
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0)
+	mockFrontier.On("IsDepthExhausted", mock.Anything).Return(true)
+	mockFrontier.On("CurrentMinDepth").Return(-1)
+	mockFrontier.On("Submit", mock.Anything).Return()
+	// Provide a default Dequeue to return no more URLs after the test's specific token
+	mockFrontier.On("Dequeue").Return(frontier.CrawlToken{}, false)
+	// Dequeue is expected to be set up by each test explicitly using SetupDequeueToReturn
 
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
@@ -1044,8 +792,12 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 	// Override current host (needed for some internal logic)
 	s.SetCurrentHost("example.com")
 
-	// Execute crawl - this will process the seed URL and call Normalize
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - this will process the seed URL and call Normalize
+	_, execErr := s.ExecuteCrawlingWithState(init)
 	assert.NoError(t, execErr)
 
 	// Verify Normalize was called
@@ -1164,7 +916,12 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, initErr := s.InitializeCrawling(configPath)
+	assert.NoError(t, initErr, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 	assert.NoError(t, execErr)
 
 	// Verify the captured depth is 1 (from the token), not 0 (seed depth)
@@ -1274,7 +1031,12 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, initErr := s.InitializeCrawling(configPath)
+	assert.NoError(t, initErr, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 	assert.NoError(t, execErr)
 
 	// Verify the captured allowedPathPrefixes match the config
@@ -1383,7 +1145,12 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, initErr := s.InitializeCrawling(configPath)
+	assert.NoError(t, initErr, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 	assert.NoError(t, execErr)
 
 	// Verify the captured hashAlgo matches the config

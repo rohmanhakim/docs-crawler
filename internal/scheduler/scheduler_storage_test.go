@@ -114,7 +114,14 @@ func TestScheduler_Write_CalledWithNormalizedDoc(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, _ = s.ExecuteCrawlingWithState(init)
 
 	// Verify Write was called with the NormalizedMarkdownDoc from Normalize
 	mockStorage.AssertCalled(t, "Write", mock.Anything, mock.Anything, mock.Anything)
@@ -209,7 +216,14 @@ func TestScheduler_Write_SuccessfulWrite_ReturnsWriteResult(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error
 	assert.NoError(t, execErr)
@@ -316,7 +330,14 @@ func TestScheduler_Write_FatalError_AbortsCrawl(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal storage error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal storage error")
@@ -416,7 +437,14 @@ func TestScheduler_Write_RecoverableError_ContinuesCrawl(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl - should not return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable storage error should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable storage error should not abort crawl")
@@ -546,7 +574,14 @@ func TestScheduler_Write_MethodCallOrder(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, _ = s.ExecuteCrawlingWithState(init)
 
 	// Verify all stages were called
 	mockStorage.AssertCalled(t, "Write", mock.Anything, mock.Anything, mock.Anything)
@@ -683,7 +718,14 @@ func TestScheduler_Write_CalledExactlyOncePerPage(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, _ = s.ExecuteCrawlingWithState(init)
 
 	// Verify Write was called exactly once
 	mockStorage.AssertNumberOfCalls(t, "Write", 1)
@@ -783,7 +825,14 @@ func TestScheduler_Write_CalledWithCorrectOutputDir(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, _ = s.ExecuteCrawlingWithState(init)
 
 	// Verify Write was called with the correct outputDir
 	mockStorage.AssertCalled(t, "Write", mock.Anything, mock.Anything, mock.Anything)
@@ -883,7 +932,14 @@ func TestScheduler_Write_CalledWithCorrectHashAlgo(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, _ = s.ExecuteCrawlingWithState(init)
 
 	// Verify Write was called with the correct hashAlgo
 	mockStorage.AssertCalled(t, "Write", mock.Anything, mock.Anything, mock.Anything)
@@ -990,7 +1046,14 @@ func TestScheduler_Write_MultiplePages_MultipleWriteResults(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error
 	assert.NoError(t, execErr)

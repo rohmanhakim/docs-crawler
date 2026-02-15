@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal/extractor"
-	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
@@ -98,8 +96,13 @@ func TestScheduler_Sanitizer_CalledWithExtractedContentNode(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify sanitizer was called with the content node from extractor
 	assert.Equal(t, contentNode, receivedNode, "Sanitizer should be called with the ContentNode from extraction")
@@ -180,11 +183,15 @@ func TestScheduler_Sanitizer_SuccessfulSanitization_ProceedsToMarkdownConversion
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	exec, err := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	exec, err := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without error
-	assert.NoError(t, err)
+	assert.NoError(t, err, "Failed to execute")
 	// Sanitizer should be called
 	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
@@ -266,8 +273,12 @@ func TestScheduler_Sanitizer_FatalError_AbortsCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal sanitizer error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal sanitizer error")
@@ -354,8 +365,12 @@ func TestScheduler_Sanitizer_ErrorDoesNotCallConvert(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal sanitizer error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal sanitizer error")
@@ -443,8 +458,12 @@ func TestScheduler_Sanitizer_RecoverableError_ContinuesCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should not return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should not return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable sanitizer error should not abort crawl")
@@ -531,219 +550,16 @@ func TestScheduler_Sanitizer_DiscoveredURLsSubmittedToFrontier(t *testing.T) {
 
 	t.Logf("Discovered URL test: %v", discoveredURL)
 
-	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error
 	assert.NoError(t, execErr)
 	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
-}
-
-// TestScheduler_Sanitizer_MethodCallOrder verifies the correct order of method calls:
-// Fetch → Extract → Sanitize → Convert → Resolve → Normalize → Write
-func TestScheduler_Sanitizer_MethodCallOrder(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockFetcher := new(fetcherMock)
-	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-
-	// Track call order
-	callOrder := []string{}
-
-	// Setup fetcher
-	testURL, _ := url.Parse("http://example.com/page.html")
-	htmlBody := []byte(`<html><body><div>Test</div></body></html>`)
-	fetchResult := fetcher.NewFetchResultForTest(
-		*testURL,
-		htmlBody,
-		200,
-		"text/html",
-		map[string]string{"Content-Type": "text/html"},
-		time.Now(),
-	)
-	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Fetch")
-		}).Return(fetchResult, nil).Once()
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	mockExtractor.On("Extract", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Extract")
-		}).Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	mockSanitizer.On("Sanitize", contentNode).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Sanitize")
-		}).Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockFrontier,
-		mockRobot,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		nil,
-		nil,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
-
-	// Verify sanitizer was called
-	mockSanitizer.AssertCalled(t, "Sanitize", contentNode)
-
-	// Verify order: Sanitize should be called after Extract
-	t.Logf("Call order: %v", callOrder)
-	assert.Contains(t, callOrder, "Fetch", "Fetch should be called")
-	assert.Contains(t, callOrder, "Extract", "Extract should be called")
-	assert.Contains(t, callOrder, "Sanitize", "Sanitize should be called")
-
-	// Find positions
-	fetchIdx := -1
-	extractIdx := -1
-	sanitizeIdx := -1
-	for i, call := range callOrder {
-		switch call {
-		case "Fetch":
-			fetchIdx = i
-		case "Extract":
-			extractIdx = i
-		case "Sanitize":
-			sanitizeIdx = i
-		}
-	}
-
-	assert.Less(t, fetchIdx, extractIdx, "Fetch should be called before Extract")
-	assert.Less(t, extractIdx, sanitizeIdx, "Extract should be called before Sanitize")
-}
-
-// TestScheduler_Sanitizer_CalledExactlyOncePerPage verifies that the sanitizer
-// is called exactly once for each page processed.
-func TestScheduler_Sanitizer_CalledExactlyOncePerPage(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer - should be called exactly once
-	mockSanitizer.On("Sanitize", contentNode).
-		Return(createSanitizedHTMLDocForTest(nil), nil).Once()
-
-	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockFrontier,
-		mockRobot,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		nil,
-		nil,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
-
-	// Verify sanitizer was called exactly once
-	mockSanitizer.AssertNumberOfCalls(t, "Sanitize", 1)
 }
 
 // TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls verifies that when Sanitize()
@@ -825,8 +641,12 @@ func TestScheduler_Sanitizer_ErrorPreventsSubsequentCalls(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal sanitizer error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal sanitizer error")

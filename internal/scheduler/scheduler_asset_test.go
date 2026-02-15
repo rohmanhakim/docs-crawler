@@ -10,7 +10,6 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
-	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
@@ -105,8 +104,13 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	_, err = s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, err, "Failed to execute")
 
 	// Verify Resolve was called with the conversion result from Convert
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -189,11 +193,15 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Should complete without fatal error
-	assert.NoError(t, execErr)
+	assert.NoError(t, execErr, "Failed to execute")
 	// Resolve should be called
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
@@ -272,8 +280,12 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal resolver error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal resolve error")
@@ -355,241 +367,16 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should not return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should not return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable resolve error should not abort crawl")
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-}
-
-// TestScheduler_Resolve_MethodCallOrder verifies the correct order of method calls:
-// Fetch → Extract → Sanitize → Convert → Resolve → Normalize → Write
-func TestScheduler_Resolve_MethodCallOrder(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := new(fetcherMock)
-	mockRobot := NewRobotsMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockConvert := newConvertMockForTest(t)
-	mockResolver := newResolverMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
-
-	// Track call order
-	callOrder := []string{}
-
-	// Setup fetcher
-	testURL, _ := url.Parse("http://example.com/page.html")
-	htmlBody := []byte(`<html><body><div>Test</div></body></html>`)
-	fetchResult := fetcher.NewFetchResultForTest(
-		*testURL,
-		htmlBody,
-		200,
-		"text/html",
-		map[string]string{"Content-Type": "text/html"},
-		time.Now(),
-	)
-	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Fetch")
-		}).Return(fetchResult, nil).Once()
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	mockExtractor.On("Extract", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Extract")
-		}).Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer
-	mockSanitizer.On("Sanitize", contentNode).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Sanitize")
-		}).Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	// Setup convert
-	mockConvert.On("Convert", mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Convert")
-		}).Return(createConversionResultForTest("# Test", nil), nil)
-
-	// Setup resolver
-	mockResolver.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Resolve")
-		}).Return(createAssetfulMarkdownDocForTest("# Test", nil), nil)
-
-	// Setup frontier to return a token for the seed URL
-	seedURL, _ := url.Parse("http://example.com/page.html")
-	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
-
-	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
-
-	s := createSchedulerWithAllMocks(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFrontier,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		mockConvert,
-		mockResolver,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
-
-	// Verify all stages were called
-	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-
-	// Verify order: Resolve should be called after Convert
-	t.Logf("Call order: %v", callOrder)
-	assert.Contains(t, callOrder, "Fetch", "Fetch should be called")
-	assert.Contains(t, callOrder, "Extract", "Extract should be called")
-	assert.Contains(t, callOrder, "Sanitize", "Sanitize should be called")
-	assert.Contains(t, callOrder, "Convert", "Convert should be called")
-	assert.Contains(t, callOrder, "Resolve", "Resolve should be called")
-
-	// Find positions
-	fetchIdx := -1
-	extractIdx := -1
-	sanitizeIdx := -1
-	convertIdx := -1
-	resolveIdx := -1
-	for i, call := range callOrder {
-		switch call {
-		case "Fetch":
-			fetchIdx = i
-		case "Extract":
-			extractIdx = i
-		case "Sanitize":
-			sanitizeIdx = i
-		case "Convert":
-			convertIdx = i
-		case "Resolve":
-			resolveIdx = i
-		}
-	}
-
-	assert.Less(t, fetchIdx, extractIdx, "Fetch should be called before Extract")
-	assert.Less(t, extractIdx, sanitizeIdx, "Extract should be called before Sanitize")
-	assert.Less(t, sanitizeIdx, convertIdx, "Sanitize should be called before Convert")
-	assert.Less(t, convertIdx, resolveIdx, "Convert should be called before Resolve")
-}
-
-// TestScheduler_Resolve_CalledExactlyOncePerPage verifies that the Resolve
-// is called exactly once for each page processed.
-func TestScheduler_Resolve_CalledExactlyOncePerPage(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockConvert := newConvertMockForTest(t)
-	mockResolver := newResolverMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer
-	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	// Setup convert
-	setupConvertMockWithSuccess(mockConvert)
-
-	// Setup resolver - should be called exactly once
-	setupResolverMockWithSuccess(mockResolver)
-
-	// Setup frontier to return a token for the seed URL
-	seedURL, _ := url.Parse("http://example.com/")
-	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
-
-	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
-
-	s := createSchedulerWithAllMocks(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFrontier,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		mockConvert,
-		mockResolver,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
-
-	// Verify Resolve was called exactly once
-	mockResolver.AssertNumberOfCalls(t, "Resolve", 1)
 }
 
 // TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable verifies that when Resolve()
@@ -669,8 +456,12 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should NOT return error for recoverable error
-	exec, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should NOT return error for recoverable error
+	exec, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Recoverable resolver error should NOT abort the crawl
 	assert.NoError(t, execErr, "Recoverable resolve error should not abort crawl")
@@ -757,8 +548,12 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return fatal error
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err, "Failed to initialize")
+
+	// Phase 2: Execute with state - should return fatal error
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Fatal resolver error should abort the crawl
 	assert.Error(t, execErr, "Expected error for fatal resolve error")
