@@ -16,11 +16,47 @@ const (
 	ErrCausePathError             StorageErrorCause = "path error"
 )
 
+// storageErrorClassifications provides explicit retry policy and crawl impact
+// for each StorageErrorCause. This replaces the old Retryable boolean field
+// with explicit two-dimensional classification.
+//
+// Classification Rationale:
+// - DiskFull: Manual retry - user can clean disk and retry later
+// - WriteFailure: Never retry - permissions or I/O issue, permanent
+// - HashComputationFailed: Never retry - algorithm issue, permanent
+// - PathError: Never retry - path configuration issue, permanent
+var storageErrorClassifications = map[StorageErrorCause]struct {
+	Policy failure.RetryPolicy
+	Impact failure.CrawlImpact
+}{
+	ErrCauseDiskFull:              {failure.RetryPolicyManual, failure.ImpactContinue},
+	ErrCauseWriteFailure:          {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseHashComputationFailed: {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCausePathError:             {failure.RetryPolicyNever, failure.ImpactContinue},
+}
+
+// StorageError represents an error that occurred during storage operations.
+// It implements failure.ClassifiedError interface with explicit retry policy
+// and crawl impact based on the error cause.
 type StorageError struct {
-	Message   string
-	Retryable bool
-	Cause     StorageErrorCause
-	Path      string
+	Message string
+	Cause   StorageErrorCause
+	Path    string
+	policy  failure.RetryPolicy
+	impact  failure.CrawlImpact
+}
+
+// NewStorageError creates a new StorageError with explicit classification based on cause.
+// The retry policy and crawl impact are determined by the error cause classification map.
+func NewStorageError(cause StorageErrorCause, message string, path string) *StorageError {
+	classification := storageErrorClassifications[cause]
+	return &StorageError{
+		Message: message,
+		Cause:   cause,
+		Path:    path,
+		policy:  classification.Policy,
+		impact:  classification.Impact,
+	}
 }
 
 func (e *StorageError) Error() string {
@@ -28,28 +64,31 @@ func (e *StorageError) Error() string {
 }
 
 func (e *StorageError) Severity() failure.Severity {
-	if e.Retryable {
+	if e.impact == failure.ImpactAbort {
+		return failure.SeverityFatal
+	}
+	switch e.policy {
+	case failure.RetryPolicyAuto:
+		return failure.SeverityRecoverable
+	case failure.RetryPolicyManual:
+		return failure.SeverityRetryExhausted
+	case failure.RetryPolicyNever:
+		return failure.SeverityRecoverable
+	default:
 		return failure.SeverityRecoverable
 	}
-	return failure.SeverityFatal
 }
 
 // RetryPolicy returns the automatic retry behavior for this error.
-// During transition, this derives from the existing Retryable field:
-// - Retryable: true  -> RetryPolicyAuto
-// - Retryable: false -> RetryPolicyManual (conservative default)
+// This is now explicitly set based on the error cause, not derived from a boolean.
 func (e *StorageError) RetryPolicy() failure.RetryPolicy {
-	if e.Retryable {
-		return failure.RetryPolicyAuto
-	}
-	return failure.RetryPolicyManual
+	return e.policy
 }
 
 // CrawlImpact returns how the scheduler should respond to this error.
-// During transition, this always returns ImpactContinue (conservative default).
-// Only config/scheduler errors should abort the crawl.
+// Storage errors never abort the crawl - they are per-URL failures.
 func (e *StorageError) CrawlImpact() failure.CrawlImpact {
-	return failure.ImpactContinue
+	return e.impact
 }
 
 // mapStorageErrorToMetadataCause maps storage-local error semantics
