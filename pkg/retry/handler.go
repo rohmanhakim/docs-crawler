@@ -47,12 +47,9 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 
 		lastErr = err
 
-		// Check if the error is retryable
-		// We check if the error implements the retryable interface or has Retryable field
-		shouldRetry := isErrorRetryable(err)
-
-		// If not retryable, return immediately
-		if !shouldRetry {
+		// Check if the error should be auto-retried based on RetryPolicy
+		// Only RetryPolicyAuto errors trigger automatic retry with exponential backoff
+		if !shouldAutoRetry(err) {
 			return Result[T]{
 				value:    zero,
 				err:      err,
@@ -91,30 +88,9 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 	}
 }
 
-// isErrorRetryable checks if an error should be retried.
-// It uses type assertion to check for the Retryable property.
-func isErrorRetryable(err failure.ClassifiedError) bool {
-	// Type assert to check if the error has a Retryable field/method
-	type hasRetryable interface {
-		IsRetryable() bool
-	}
-
-	if r, ok := err.(hasRetryable); ok {
-		return r.IsRetryable()
-	}
-
-	// Check for struct with Retryable field via reflection-like interface
-	// This handles errors like RetryError that have a Retryable field
-	type hasRetryableField interface {
-		failure.ClassifiedError
-		IsRetryable() bool
-	}
-
-	if r, ok := err.(hasRetryableField); ok {
-		return r.IsRetryable()
-	}
-
-	// Default to retryable if we can't determine
-	// This maintains backward compatibility
-	return true
+// shouldAutoRetry determines whether an error should trigger automatic retry.
+// It checks the error's RetryPolicy: only RetryPolicyAuto triggers automatic retry.
+// This is the primary method for retry decision-making in the retry handler.
+func shouldAutoRetry(err failure.ClassifiedError) bool {
+	return err.RetryPolicy() == failure.RetryPolicyAuto
 }
