@@ -10,7 +10,6 @@ import (
 type RobotsErrorCause string
 
 const (
-	// ErrCauseRepeatedFetchFailure = "repeated fetch failure"
 	ErrCauseDisallowRoot         = "root disallowed to be crawled"
 	ErrCauseInvalidRobotsUrl     = "invalid robots.txt URL"
 	ErrCausePreFetchFailure      = "failed before making fetch"
@@ -22,10 +21,55 @@ const (
 	ErrCauseParseError           = "failed to parse robots.txt"
 )
 
+// robotsErrorClassifications provides explicit retry policy and crawl impact
+// for each RobotsErrorCause. This replaces the old Retryable boolean field
+// with explicit two-dimensional classification.
+//
+// Classification Rationale:
+// - HttpTooManyRequests (429): Auto-retry with backoff, transient rate limiting
+// - HttpServerError (5xx): Auto-retry, transient server issues
+// - HttpFetchFailure: Auto-retry, network issues are usually transient
+// - DisallowRoot: Never retry, policy decision, not an error
+// - ParseError: Never retry, malformed robots.txt won't become valid
+// - InvalidRobotsUrl: Never retry, URL configuration issue
+// - PreFetchFailure: Never retry, configuration/internal error
+// - HttpTooManyRedirects: Never retry, redirect loop won't resolve
+// - HttpUnexpectedStatus: Never retry, unknown status, likely permanent
+var robotsErrorClassifications = map[RobotsErrorCause]struct {
+	Policy failure.RetryPolicy
+	Impact failure.CrawlImpact
+}{
+	ErrCauseHttpTooManyRequests:  {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseHttpServerError:      {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseHttpFetchFailure:     {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseDisallowRoot:         {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseParseError:           {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseInvalidRobotsUrl:     {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCausePreFetchFailure:      {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseHttpTooManyRedirects: {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseHttpUnexpectedStatus: {failure.RetryPolicyNever, failure.ImpactContinue},
+}
+
+// RobotsError represents an error that occurred during robots.txt processing.
+// It implements failure.ClassifiedError interface with explicit retry policy
+// and crawl impact based on the error cause.
 type RobotsError struct {
-	Message   string
-	Retryable bool
-	Cause     RobotsErrorCause
+	Message string
+	Cause   RobotsErrorCause
+	policy  failure.RetryPolicy
+	impact  failure.CrawlImpact
+}
+
+// NewRobotsError creates a new RobotsError with explicit classification based on cause.
+// The retry policy and crawl impact are determined by the error cause classification map.
+func NewRobotsError(cause RobotsErrorCause, message string) *RobotsError {
+	classification := robotsErrorClassifications[cause]
+	return &RobotsError{
+		Message: message,
+		Cause:   cause,
+		policy:  classification.Policy,
+		impact:  classification.Impact,
+	}
 }
 
 func (e *RobotsError) Error() string {
@@ -33,28 +77,31 @@ func (e *RobotsError) Error() string {
 }
 
 func (e *RobotsError) Severity() failure.Severity {
-	if e.Retryable {
+	if e.impact == failure.ImpactAbort {
+		return failure.SeverityFatal
+	}
+	switch e.policy {
+	case failure.RetryPolicyAuto:
+		return failure.SeverityRecoverable
+	case failure.RetryPolicyManual:
+		return failure.SeverityRetryExhausted
+	case failure.RetryPolicyNever:
+		return failure.SeverityRecoverable
+	default:
 		return failure.SeverityRecoverable
 	}
-	return failure.SeverityFatal
 }
 
 // RetryPolicy returns the automatic retry behavior for this error.
-// During transition, this derives from the existing Retryable field:
-// - Retryable: true  -> RetryPolicyAuto
-// - Retryable: false -> RetryPolicyManual (conservative default)
+// This is now explicitly set based on the error cause, not derived from a boolean.
 func (e *RobotsError) RetryPolicy() failure.RetryPolicy {
-	if e.Retryable {
-		return failure.RetryPolicyAuto
-	}
-	return failure.RetryPolicyManual
+	return e.policy
 }
 
 // CrawlImpact returns how the scheduler should respond to this error.
-// During transition, this always returns ImpactContinue (conservative default).
-// Only config/scheduler errors should abort the crawl.
+// Robots errors never abort the crawl - they are per-URL failures.
 func (e *RobotsError) CrawlImpact() failure.CrawlImpact {
-	return failure.ImpactContinue
+	return e.impact
 }
 
 // mapRobotsErrorToMetadataCause maps robots-local error semantics

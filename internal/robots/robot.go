@@ -114,11 +114,10 @@ func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 			return Decision{}, robotsError
 		}
 		// Unexpected error type
-		return Decision{}, &RobotsError{
-			Message:   fmt.Sprintf("unexpected error during decision: %v", decideErr),
-			Retryable: false,
-			Cause:     ErrCauseParseError,
-		}
+		return Decision{}, NewRobotsError(
+			ErrCauseParseError,
+			fmt.Sprintf("unexpected error during decision: %v", decideErr),
+		)
 	}
 
 	return decision, nil

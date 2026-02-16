@@ -12,6 +12,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
@@ -218,8 +219,8 @@ func TestRobotsFetcher_Fetch_ServerError(t *testing.T) {
 		t.Fatal("expected error for 500 response, got nil")
 	}
 
-	if !err.Retryable {
-		t.Error("expected 500 error to be retryable")
+	if err.RetryPolicy() != failure.RetryPolicyAuto {
+		t.Error("expected 500 error to be auto-retryable")
 	}
 
 	if err.Cause != robots.ErrCauseHttpServerError {
@@ -249,8 +250,8 @@ func TestRobotsFetcher_Fetch_TooManyRequests(t *testing.T) {
 		t.Fatal("expected error for 429 response, got nil")
 	}
 
-	if !err.Retryable {
-		t.Error("expected 429 error to be retryable")
+	if err.RetryPolicy() != failure.RetryPolicyAuto {
+		t.Error("expected 429 error to be auto-retryable")
 	}
 }
 

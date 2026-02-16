@@ -145,11 +145,8 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 // encounters an infrastructure error, it returns the error and does not submit to frontier.
 func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 	// GIVEN: robots encounters an infrastructure error (e.g., 500)
-	robotsErr := &robots.RobotsError{
-		Message:   "http error: 500",
-		Retryable: false,
-		Cause:     robots.ErrCauseHttpServerError,
-	}
+	robotsErr := robots.NewRobotsError(robots.ErrCauseHttpServerError, "http error: 500")
+
 	mockRobot := NewRobotsMockForTest(t)
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
