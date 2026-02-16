@@ -111,3 +111,11 @@ func (d DiscoveryMetadata) Depth() int {
 func (d DiscoveryMetadata) DelayOverride() *time.Duration {
 	return d.delayOverride
 }
+
+// RetryEntry represents a URL that is queued for manual retry.
+// This is used when auto-retry is exhausted but the user may want to retry later.
+type RetryEntry struct {
+	URL       url.URL
+	Reason    string
+	Timestamp time.Time
+}

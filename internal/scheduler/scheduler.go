@@ -380,8 +380,12 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// 3. Fetch Page URL
 		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryParam(cfg))
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.CrawlImpact() == failure.ImpactAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
 			}
 			// recoverable → log already done → count error
 			totalErrors++
@@ -391,8 +395,12 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// 4. Extract HTML DOM
 		extractionResult, err := s.domExtractor.Extract(fetchResult.URL(), fetchResult.Body())
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.CrawlImpact() == failure.ImpactAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
 			}
 			totalErrors++
 			continue
@@ -401,8 +409,12 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// 5. Sanitize extracted HTML
 		sanitizedHtml, err := s.htmlSanitizer.Sanitize(extractionResult.ContentNode)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.CrawlImpact() == failure.ImpactAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
 			}
 			totalErrors++
 			continue
@@ -438,8 +450,12 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// 6. HTML → Markdown Conversion
 		markdownDoc, err := s.markdownConversionRule.Convert(sanitizedHtml)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.CrawlImpact() == failure.ImpactAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
 			}
 			totalErrors++
 			continue
@@ -455,8 +471,12 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			RetryParam(cfg),
 		)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.CrawlImpact() == failure.ImpactAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
 			}
 			totalErrors++
 			// Continue to process the markdown even if asset resolution had errors
@@ -478,8 +498,12 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			normalizeParam,
 		)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.CrawlImpact() == failure.ImpactAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
 			}
 			totalErrors++
 			continue
@@ -492,8 +516,12 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			cfg.HashAlgo(),
 		)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.CrawlImpact() == failure.ImpactAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
 			}
 			// recoverable → log already done → count error
 			totalErrors++

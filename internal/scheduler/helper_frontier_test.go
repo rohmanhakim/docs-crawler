@@ -1,6 +1,7 @@
 package scheduler_test
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/rohmanhakim/docs-crawler/internal/config"
@@ -105,6 +106,27 @@ func (f *frontierMock) OnDequeue(token frontier.CrawlToken, ok bool) *mock.Call 
 // This is a convenience wrapper around OnDequeue().Once().
 func (f *frontierMock) SetupDequeueToReturn(token frontier.CrawlToken, ok bool) {
 	f.OnDequeue(token, ok).Once()
+}
+
+// BookKeepForRetry tracks a URL for manual retry (new interface method)
+func (f *frontierMock) BookKeepForRetry(url url.URL, reason error) {
+	// No-op for tests that don't need to verify this
+}
+
+// GetRetryCandidates returns URLs eligible for manual retry (new interface method)
+func (f *frontierMock) GetRetryCandidates() []url.URL {
+	// Return nil by default - tests can override if needed
+	return nil
+}
+
+// RetryQueueSize returns the number of URLs in retry queue (new interface method)
+func (f *frontierMock) RetryQueueSize() int {
+	return 0
+}
+
+// ClearRetryQueue clears URLs from retry queue (new interface method)
+func (f *frontierMock) ClearRetryQueue(processed []url.URL) {
+	// No-op for tests that don't need to verify this
 }
 
 func newFrontierMockForTest(t *testing.T) *frontierMock {

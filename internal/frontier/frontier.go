@@ -3,6 +3,7 @@ package frontier
 import (
 	"net/url"
 	"sync"
+	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/config"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
@@ -48,6 +49,10 @@ type Frontier interface {
 	CurrentMinDepth() int
 	VisitedCount() int
 	Dequeue() (CrawlToken, bool)
+	BookKeepForRetry(url url.URL, reason error)
+	GetRetryCandidates() []url.URL
+	RetryQueueSize() int
+	ClearRetryQueue(processed []url.URL)
 }
 
 type CrawlFrontier struct {
@@ -57,6 +62,10 @@ type CrawlFrontier struct {
 	maxDepth      int
 	currentDepth  int
 	maxPages      int
+
+	// Retry queue for manual retry - URLs that exhausted auto-retry
+	retryQueue FIFOQueue[RetryEntry]
+	retrySet   Set[string]
 }
 
 func NewCrawlFrontier() CrawlFrontier {
@@ -182,4 +191,94 @@ func (f *CrawlFrontier) deduplicate(canonicalizedUrl url.URL, depth int) {
 		depth: depth,
 	}
 	f.Enqueue(token)
+}
+
+// BookKeepForRetry adds a URL to the manual retry queue.
+// It deduplicates URLs - if a URL is already in the queue, it won't be added again.
+// The error is stored as the reason for debugging/display purposes.
+func (f *CrawlFrontier) BookKeepForRetry(url url.URL, reason error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Initialize retry set if needed
+	if f.retrySet == nil {
+		f.retrySet = NewSet[string]()
+	}
+	// Initialize retry queue if needed
+	if f.retryQueue == nil {
+		f.retryQueue = *NewFIFOQueue[RetryEntry]()
+	}
+
+	key := url.String()
+	if f.retrySet.Contains(key) {
+		return // Already tracked
+	}
+
+	f.retrySet.Add(key)
+	f.retryQueue.Enqueue(RetryEntry{
+		URL:       url,
+		Reason:    reason.Error(),
+		Timestamp: time.Now(),
+	})
+}
+
+// GetRetryCandidates returns all URLs that are eligible for manual retry.
+// This should be called after a crawl completes to get URLs that can be retried.
+func (f *CrawlFrontier) GetRetryCandidates() []url.URL {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	if f.retryQueue == nil {
+		return nil
+	}
+
+	candidates := make([]url.URL, 0, f.retryQueue.Size())
+	for _, entry := range f.retryQueue {
+		candidates = append(candidates, entry.URL)
+	}
+	return candidates
+}
+
+// RetryQueueSize returns the number of URLs in the retry queue.
+func (f *CrawlFrontier) RetryQueueSize() int {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	if f.retryQueue == nil {
+		return 0
+	}
+	return f.retryQueue.Size()
+}
+
+// ClearRetryQueue removes URLs from the retry queue that have been successfully processed.
+// The processed parameter is a list of URLs that should be removed.
+func (f *CrawlFrontier) ClearRetryQueue(processed []url.URL) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if f.retryQueue == nil || f.retrySet == nil {
+		return
+	}
+
+	// Build a set of processed URLs for efficient lookup
+	processedSet := make(map[string]bool)
+	for _, url := range processed {
+		processedSet[url.String()] = true
+	}
+
+	// Rebuild retry queue and set, excluding processed URLs
+	newQueue := *NewFIFOQueue[RetryEntry]()
+	newSet := NewSet[string]()
+
+	for _, entry := range f.retryQueue {
+		key := entry.URL.String()
+		if !processedSet[key] {
+			newQueue.Enqueue(entry)
+			newSet.Add(key)
+		}
+		// If processed, don't add to new queue (effectively removing it)
+	}
+
+	f.retryQueue = newQueue
+	f.retrySet = newSet
 }
