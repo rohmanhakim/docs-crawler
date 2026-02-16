@@ -26,10 +26,49 @@ const (
 	ErrCauseHashError             = "hash error"
 )
 
+// assetsErrorClassifications provides explicit retry policy and crawl impact
+// for each AssetsErrorCause. This replaces the old Retryable boolean field
+// with explicit two-dimensional classification.
+var assetsErrorClassifications = map[AssetsErrorCause]struct {
+	Policy failure.RetryPolicy
+	Impact failure.CrawlImpact
+}{
+	ErrCauseTimeout:               {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseNetworkFailure:        {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseReadResponseBodyError: {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseRequest5xx:            {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseRequestTooMany:        {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseRequestPageForbidden:  {failure.RetryPolicyManual, failure.ImpactContinue},
+	ErrCauseDiskFull:              {failure.RetryPolicyManual, failure.ImpactContinue},
+	ErrCauseRepeated403:           {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseAssetTooLarge:         {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseRedirectLimitExceeded: {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseContentTypeInvalid:    {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseWriteFailure:          {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCausePathError:             {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseHashError:             {failure.RetryPolicyNever, failure.ImpactContinue},
+}
+
+// AssetsError represents an error that occurred during asset resolution.
+// It implements failure.ClassifiedError interface with explicit retry policy
+// and crawl impact based on the error cause.
 type AssetsError struct {
-	Message   string
-	Retryable bool
-	Cause     AssetsErrorCause
+	Message string
+	Cause   AssetsErrorCause
+	policy  failure.RetryPolicy
+	impact  failure.CrawlImpact
+}
+
+// NewAssetsError creates a new AssetsError with explicit classification based on cause.
+// The retry policy and crawl impact are determined by the error cause classification map.
+func NewAssetsError(cause AssetsErrorCause, message string) *AssetsError {
+	classification := assetsErrorClassifications[cause]
+	return &AssetsError{
+		Message: message,
+		Cause:   cause,
+		policy:  classification.Policy,
+		impact:  classification.Impact,
+	}
 }
 
 func (e *AssetsError) Error() string {
@@ -37,28 +76,31 @@ func (e *AssetsError) Error() string {
 }
 
 func (e *AssetsError) Severity() failure.Severity {
-	if e.Retryable {
+	if e.impact == failure.ImpactAbort {
+		return failure.SeverityFatal
+	}
+	switch e.policy {
+	case failure.RetryPolicyAuto:
+		return failure.SeverityRecoverable
+	case failure.RetryPolicyManual:
+		return failure.SeverityRetryExhausted
+	case failure.RetryPolicyNever:
+		return failure.SeverityRecoverable
+	default:
 		return failure.SeverityRecoverable
 	}
-	return failure.SeverityFatal
 }
 
 // RetryPolicy returns the automatic retry behavior for this error.
-// During transition, this derives from the existing Retryable field:
-// - Retryable: true  -> RetryPolicyAuto
-// - Retryable: false -> RetryPolicyManual (conservative default)
+// This is now explicitly set based on the error cause, not derived from a boolean.
 func (e *AssetsError) RetryPolicy() failure.RetryPolicy {
-	if e.Retryable {
-		return failure.RetryPolicyAuto
-	}
-	return failure.RetryPolicyManual
+	return e.policy
 }
 
 // CrawlImpact returns how the scheduler should respond to this error.
-// During transition, this always returns ImpactContinue (conservative default).
-// Only config/scheduler errors should abort the crawl.
+// Asset errors never abort the crawl - they are per-URL failures.
 func (e *AssetsError) CrawlImpact() failure.CrawlImpact {
-	return failure.ImpactContinue
+	return e.impact
 }
 
 // mapAssetsErrorToMetadataCause maps assets-local error semantics

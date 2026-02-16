@@ -63,22 +63,14 @@ func setupResolverMockWithError(m *resolverMock, err failure.ClassifiedError) {
 
 // setupResolverMockWithFatalError sets up the resolver mock to return a fatal error
 func setupResolverMockWithFatalError(m *resolverMock) {
-	resolverErr := &assets.AssetsError{
-		Message:   "fatal asset error: disk full",
-		Retryable: false,
-		Cause:     assets.ErrCauseDiskFull,
-	}
+	resolverErr := assets.NewAssetsError(assets.ErrCauseDiskFull, "fatal asset error: disk full")
 	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(assets.AssetfulMarkdownDoc{}, resolverErr)
 }
 
 // setupResolverMockWithRecoverableError sets up the resolver mock to return a recoverable error
 func setupResolverMockWithRecoverableError(m *resolverMock) {
-	resolverErr := &assets.AssetsError{
-		Message:   "recoverable asset error: network timeout",
-		Retryable: true,
-		Cause:     assets.ErrCauseNetworkFailure,
-	}
+	resolverErr := assets.NewAssetsError(assets.ErrCauseNetworkFailure, "recoverable asset error: network timeout")
 	m.On("Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(assets.AssetfulMarkdownDoc{}, resolverErr)
 }
