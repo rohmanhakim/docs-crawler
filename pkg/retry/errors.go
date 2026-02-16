@@ -13,41 +13,114 @@ const (
 	ErrExhaustedAttempts = "exhausted attempt"
 )
 
+// RetryError represents an error that occurred during retry attempts.
+// It stores the original error for debugging and implements the ClassifiedError interface.
 type RetryError struct {
-	Message   string
-	Retryable bool
-	Cause     RetryErrorCause
+	Message string
+	Cause   RetryErrorCause
+	wrapped error       // Original error that caused the retry failure
+	policy  RetryPolicy // Cached policy for interface method
+	impact  CrawlImpact // Cached impact for interface method
 }
 
+// RetryPolicy is the retry policy for RetryError
+type RetryPolicy int
+
+const (
+	RetryPolicyAuto RetryPolicy = iota
+	RetryPolicyManual
+	RetryPolicyNever
+)
+
+// CrawlImpact is the crawl impact for RetryError
+type CrawlImpact int
+
+const (
+	ImpactContinue CrawlImpact = iota
+	ImpactAbort
+)
+
+// NewRetryError creates a new RetryError with explicit classification.
+// Parameters:
+//   - cause: The error cause (ErrZeroAttempt or ErrExhaustedAttempts)
+//   - message: Human-readable error message
+//   - policy: RetryPolicyAuto, RetryPolicyManual, or RetryPolicyNever
+//   - impact: ImpactContinue or ImpactAbort
+//   - wrapped: The original error that caused the retry failure (may be nil)
+func NewRetryError(cause RetryErrorCause, message string, policy RetryPolicy, impact CrawlImpact, wrapped error) *RetryError {
+	return &RetryError{
+		Message: message,
+		Cause:   cause,
+		wrapped: wrapped,
+		policy:  policy,
+		impact:  impact,
+	}
+}
+
+// Error returns the error message implementing the error interface.
 func (e *RetryError) Error() string {
+	if e.wrapped != nil {
+		return fmt.Sprintf("retry error: %s, %s: %v", e.Cause, e.Message, e.wrapped)
+	}
 	return fmt.Sprintf("retry error: %s, %s", e.Cause, e.Message)
 }
 
-func (e *RetryError) Severity() failure.Severity {
-	if e.Retryable {
-		return failure.SeverityRecoverable
-	}
-	return failure.SeverityFatal
+// Unwrap returns the wrapped error for error chain support.
+func (e *RetryError) Unwrap() error {
+	return e.wrapped
 }
 
+// Severity returns the severity for observability.
+// Derives from policy and impact for backward compatibility.
+func (e *RetryError) Severity() failure.Severity {
+	if e.impact == ImpactAbort {
+		return failure.SeverityFatal
+	}
+	switch e.policy {
+	case RetryPolicyAuto:
+		return failure.SeverityRecoverable
+	case RetryPolicyManual:
+		return failure.SeverityRetryExhausted
+	case RetryPolicyNever:
+		return failure.SeverityFatal
+	default:
+		return failure.SeverityRecoverable
+	}
+}
+
+// IsRetryable returns whether this error is retryable.
+// Deprecated: Use RetryPolicy() instead.
 func (e *RetryError) IsRetryable() bool {
-	return e.Retryable
+	return e.policy == RetryPolicyAuto
 }
 
 // RetryPolicy returns the automatic retry behavior for this error.
-// When RetryError is returned (exhausted attempts), it should be RetryPolicyManual
-// since auto-retry is exhausted but manual retry may be possible.
+// When RetryError is returned (exhausted attempts), it returns the cached policy.
 func (e *RetryError) RetryPolicy() failure.RetryPolicy {
-	if e.Retryable {
+	switch e.policy {
+	case RetryPolicyAuto:
+		return failure.RetryPolicyAuto
+	case RetryPolicyManual:
+		return failure.RetryPolicyManual
+	case RetryPolicyNever:
+		return failure.RetryPolicyNever
+	default:
+		// Default to Manual (eligible for manual retry) when exhausted
 		return failure.RetryPolicyManual
 	}
-	return failure.RetryPolicyNever
 }
 
 // CrawlImpact returns how the scheduler should respond to this error.
-// RetryError should never abort the crawl. It's a per-URL failure.
+// RetryError should never abort the crawl. It returns the cached impact.
 func (e *RetryError) CrawlImpact() failure.CrawlImpact {
-	return failure.ImpactContinue
+	switch e.impact {
+	case ImpactContinue:
+		return failure.ImpactContinue
+	case ImpactAbort:
+		return failure.ImpactAbort
+	default:
+		return failure.ImpactContinue
+	}
 }
 
 // Is allows errors.Is to match RetryError types

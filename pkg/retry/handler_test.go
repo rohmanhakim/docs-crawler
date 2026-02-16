@@ -230,8 +230,9 @@ func TestRetry_ExhaustedAttempts(t *testing.T) {
 	if callCount != maxAttempts {
 		t.Fatalf("expected %d calls, got: %d", maxAttempts, callCount)
 	}
-	if result.Err().Severity() != failure.SeverityRecoverable {
-		t.Fatalf("expected error severity to be 'SeverityRecoverable', got: '%s'", result.Err().Severity())
+	// New behavior: exhausted attempts should return SeverityRetryExhausted
+	if result.Err().Severity() != failure.SeverityRetryExhausted {
+		t.Fatalf("expected error severity to be 'SeverityRetryExhausted', got: '%s'", result.Err().Severity())
 	}
 	var retryErr *retry.RetryError
 	errors.As(result.Err(), &retryErr)
@@ -260,8 +261,9 @@ func TestRetry_MaxAttemptsLessThanOne(t *testing.T) {
 	if result.IsSuccess() {
 		t.Fatal("expected error for MaxAttempts < 1, got nil")
 	}
-	if result.Err().Severity() != failure.SeverityRecoverable {
-		t.Fatalf("expected error severity to be 'SeverityRecoverable', got: '%s'", result.Err().Severity())
+	// New behavior: zero attempt is a config error -> SeverityFatal
+	if result.Err().Severity() != failure.SeverityFatal {
+		t.Fatalf("expected error severity to be 'SeverityFatal', got: '%s'", result.Err().Severity())
 	}
 	errors.As(result.Err(), &retryErr)
 	if retryErr.Cause != retry.ErrZeroAttempt {
@@ -412,10 +414,6 @@ func TestRetry_MixedRetryableAndNonRetryable(t *testing.T) {
 
 // TestRetry_DeterministicWithSameSeed verifies deterministic behavior with same seed
 func TestRetry_DeterministicWithSameSeed(t *testing.T) {
-	// This test verifies that using the same random seed produces consistent timing
-	// We can't easily test the exact timing, but we can verify the function works
-	// with a fixed seed
-
 	callCount := 0
 	fn := func() (int, failure.ClassifiedError) {
 		callCount++
@@ -432,7 +430,7 @@ func TestRetry_DeterministicWithSameSeed(t *testing.T) {
 	params := retry.NewRetryParam(
 		10*time.Millisecond,
 		5*time.Millisecond,
-		12345, // fixed seed
+		12345,
 		3,
 		defaultBackoffParam(),
 	)
@@ -490,7 +488,7 @@ func TestRetry_SuccessAfterManyFailures(t *testing.T) {
 	}
 }
 
-// TestRetry_ExhaustedErrorIsRetryable verifies that exhausted attempt error is marked as retryable
+// TestRetry_ExhaustedErrorIsRetryable verifies that exhausted attempt error has RetryPolicyManual
 func TestRetry_ExhaustedErrorIsRetryable(t *testing.T) {
 	fn := func() (string, failure.ClassifiedError) {
 		return "", &mockError{
@@ -514,17 +512,10 @@ func TestRetry_ExhaustedErrorIsRetryable(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	// The error should be retryable at scheduler level
-	type retryableChecker interface {
-		IsRetryable() bool
-	}
-
-	if r, ok := result.Err().(retryableChecker); ok {
-		if !r.IsRetryable() {
-			t.Error("expected exhausted attempt error to be retryable at scheduler level")
-		}
-	} else {
-		t.Error("error should implement IsRetryable method")
+	// New behavior: exhausted error should have RetryPolicyManual (eligible for manual retry)
+	// Check using RetryPolicy() method
+	if result.Err().RetryPolicy() != failure.RetryPolicyManual {
+		t.Errorf("expected exhausted error to have RetryPolicyManual, got: %v", result.Err().RetryPolicy())
 	}
 }
 
@@ -541,24 +532,20 @@ func (e *errorWithoutIsRetryable) Severity() failure.Severity {
 	return failure.SeverityRecoverable
 }
 
-// RetryPolicy returns RetryPolicyAuto as default (for backward compatibility test)
 func (e *errorWithoutIsRetryable) RetryPolicy() failure.RetryPolicy {
 	return failure.RetryPolicyAuto
 }
 
-// CrawlImpact returns ImpactContinue (for backward compatibility test)
 func (e *errorWithoutIsRetryable) CrawlImpact() failure.CrawlImpact {
 	return failure.ImpactContinue
 }
 
-// TestRetry_DefaultRetryableWhenNoIsRetryable verifies that errors without IsRetryable
-// default to being retryable (backward compatibility)
+// TestRetry_DefaultRetryableWhenNoIsRetryable verifies backward compatibility
 func TestRetry_DefaultRetryableWhenNoIsRetryable(t *testing.T) {
 	callCount := 0
 	fn := func() (string, failure.ClassifiedError) {
 		callCount++
 		if callCount < 2 {
-			// Return an error without IsRetryable method
 			return "", &errorWithoutIsRetryable{msg: "error without retryable flag"}
 		}
 		return "success", nil
@@ -588,7 +575,7 @@ func TestRetry_DefaultRetryableWhenNoIsRetryable(t *testing.T) {
 	}
 }
 
-// TestRetry_ErrorWrapping verifies that the original error is included in exhausted message
+// TestRetry_ErrorWrapping verifies that the original error is included
 func TestRetry_ErrorWrapping(t *testing.T) {
 	originalErr := &mockError{
 		msg:       "original error message",
@@ -614,9 +601,18 @@ func TestRetry_ErrorWrapping(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	// The error message should contain information about exhausted attempts
 	if result.Err().Error() == "" {
 		t.Error("expected non-empty error message")
+	}
+
+	// Verify the wrapped error can be accessed via Unwrap
+	var retryErr *retry.RetryError
+	if errors.As(result.Err(), &retryErr) {
+		// Unwrap should return the original error (the mockError wrapped in RetryError)
+		unwrapped := retryErr.Unwrap()
+		if unwrapped == nil {
+			t.Error("expected wrapped error to be accessible via Unwrap")
+		}
 	}
 }
 
@@ -629,8 +625,6 @@ func TestNewRetryParam(t *testing.T) {
 
 	params := retry.NewRetryParam(baseDelay, jitter, seed, maxAttempts, defaultBackoffParam())
 
-	// We can't directly access fields since this is black box testing,
-	// but we can verify the behavior through Retry function
 	callCount := 0
 	fn := func() (string, failure.ClassifiedError) {
 		callCount++
@@ -673,10 +667,7 @@ func BenchmarkRetry(b *testing.B) {
 	}
 }
 
-// errorIsNil verifies that the function handles nil errors correctly at type level
-// This is more of a compile-time check through usage
 func TestRetry_NilErrorTypeSafety(t *testing.T) {
-	// Ensure the function signature accepts functions that can return nil error
 	fn := func() (string, failure.ClassifiedError) {
 		return "success", nil
 	}
@@ -702,13 +693,8 @@ func TestRetry_NilErrorTypeSafety(t *testing.T) {
 	}
 }
 
-// Verify that RetryError type is accessible and has the expected shape
 func TestRetryErrorType(t *testing.T) {
-	// This test verifies we can create and use RetryError from the package
-	// In black box testing, we interact through the exported API
-
 	fn := func() (string, failure.ClassifiedError) {
-		// Return a proper ClassifiedError implementation
 		return "", &mockError{
 			msg:       "some error",
 			retryable: true,
@@ -716,16 +702,14 @@ func TestRetryErrorType(t *testing.T) {
 		}
 	}
 
-	// This would fail to compile if RetryError wasn't properly exported/accessible
 	params := retry.NewRetryParam(
 		10*time.Millisecond,
 		5*time.Millisecond,
 		42,
-		1, // Only 1 attempt to avoid type conversion issues
+		1,
 		defaultBackoffParam(),
 	)
 
-	// We expect an error here - it should be a RetryError after exhausting attempts
 	result := retry.Retry(params, fn)
 	if result.IsSuccess() {
 		t.Fatal("expected error after exhausting attempts")

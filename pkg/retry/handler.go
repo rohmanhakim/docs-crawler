@@ -23,11 +23,13 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 	if retryParam.MaxAttempts < 1 {
 		return Result[T]{
 			value: zero,
-			err: &RetryError{
-				Message:   "max attempt cannot be 0",
-				Cause:     ErrZeroAttempt,
-				Retryable: true,
-			},
+			err: NewRetryError(
+				ErrZeroAttempt,
+				"max attempt cannot be 0",
+				RetryPolicyNever, // Zero attempt is a configuration error
+				ImpactContinue,   // But it doesn't abort the crawl
+				nil,
+			),
 			attempts: 0,
 		}
 	}
@@ -78,11 +80,13 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 	// Return failure result when max attempts are exhausted
 	return Result[T]{
 		value: zero,
-		err: &RetryError{
-			Message:   fmt.Sprintf("exhausted %d attempts. Last error: %v", retryParam.MaxAttempts, lastErr),
-			Cause:     ErrExhaustedAttempts,
-			Retryable: true, // This is recoverable at scheduler level
-		},
+		err: NewRetryError(
+			ErrExhaustedAttempts,
+			fmt.Sprintf("exhausted %d attempts. Last error: %v", retryParam.MaxAttempts, lastErr),
+			RetryPolicyManual, // Exhausted auto-retry → manual retry eligible
+			ImpactContinue,    // Don't abort crawl
+			lastErr,           // Preserve original error
+		),
 		attempts: retryParam.MaxAttempts,
 	}
 }
