@@ -21,10 +21,44 @@ const (
 	ErrCauseRepeated403           = "repeated 403s"
 )
 
+// fetchErrorClassifications provides explicit retry policy and crawl impact
+// for each FetchErrorCause. This replaces the old Retryable boolean field
+// with explicit two-dimensional classification.
+var fetchErrorClassifications = map[FetchErrorCause]struct {
+	Policy failure.RetryPolicy
+	Impact failure.CrawlImpact
+}{
+	ErrCauseTimeout:               {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseNetworkFailure:        {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseReadResponseBodyError: {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseContentTypeInvalid:    {failure.RetryPolicyManual, failure.ImpactContinue},
+	ErrCauseRedirectLimitExceeded: {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseRequestPageForbidden:  {failure.RetryPolicyManual, failure.ImpactContinue},
+	ErrCauseRequestTooMany:        {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseRequest5xx:            {failure.RetryPolicyAuto, failure.ImpactContinue},
+	ErrCauseRepeated403:           {failure.RetryPolicyNever, failure.ImpactContinue},
+}
+
+// FetchError represents an error that occurred during HTTP fetch operations.
+// It implements failure.ClassifiedError interface with explicit retry policy
+// and crawl impact based on the error cause.
 type FetchError struct {
-	Message   string
-	Retryable bool
-	Cause     FetchErrorCause
+	Message string
+	Cause   FetchErrorCause
+	policy  failure.RetryPolicy
+	impact  failure.CrawlImpact
+}
+
+// NewFetchError creates a new FetchError with explicit classification based on cause.
+// The retry policy and crawl impact are determined by the error cause classification map.
+func NewFetchError(cause FetchErrorCause, message string) *FetchError {
+	classification := fetchErrorClassifications[cause]
+	return &FetchError{
+		Message: message,
+		Cause:   cause,
+		policy:  classification.Policy,
+		impact:  classification.Impact,
+	}
 }
 
 func (e *FetchError) Error() string {
@@ -32,28 +66,31 @@ func (e *FetchError) Error() string {
 }
 
 func (e *FetchError) Severity() failure.Severity {
-	if e.Retryable {
+	if e.impact == failure.ImpactAbort {
+		return failure.SeverityFatal
+	}
+	switch e.policy {
+	case failure.RetryPolicyAuto:
+		return failure.SeverityRecoverable
+	case failure.RetryPolicyManual:
+		return failure.SeverityRetryExhausted
+	case failure.RetryPolicyNever:
+		return failure.SeverityRecoverable
+	default:
 		return failure.SeverityRecoverable
 	}
-	return failure.SeverityFatal
 }
 
 // RetryPolicy returns the automatic retry behavior for this error.
-// During transition, this derives from the existing Retryable field:
-// - Retryable: true  -> RetryPolicyAuto
-// - Retryable: false -> RetryPolicyManual (conservative default)
+// This is now explicitly set based on the error cause, not derived from a boolean.
 func (e *FetchError) RetryPolicy() failure.RetryPolicy {
-	if e.Retryable {
-		return failure.RetryPolicyAuto
-	}
-	return failure.RetryPolicyManual
+	return e.policy
 }
 
 // CrawlImpact returns how the scheduler should respond to this error.
-// During transition, this always returns ImpactContinue (conservative default).
-// Only config/scheduler errors should abort the crawl.
+// Fetch errors never abort the crawl - they are per-URL failures.
 func (e *FetchError) CrawlImpact() failure.CrawlImpact {
-	return failure.ImpactContinue
+	return e.impact
 }
 
 // mapFetchErrorToMetadataCause maps fetcher-local error semantics

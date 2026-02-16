@@ -570,11 +570,11 @@ func TestHtmlFetcher_MetadataSinkInterface(t *testing.T) {
 
 func TestHtmlFetcher_FetchError_Severity(t *testing.T) {
 	// Test that FetchError implements ClassifiedError correctly
-	err := &fetcher.FetchError{
-		Message:   "test error",
-		Retryable: true,
-		Cause:     fetcher.ErrCauseNetworkFailure,
-	}
+	// Using constructor with RetryPolicyAuto
+	err := fetcher.NewFetchError(
+		fetcher.ErrCauseNetworkFailure,
+		"test error",
+	)
 
 	// Verify it implements failure.ClassifiedError
 	var classifiedErr failure.ClassifiedError = err
@@ -583,16 +583,15 @@ func TestHtmlFetcher_FetchError_Severity(t *testing.T) {
 		t.Errorf("expected SeverityRecoverable for retryable error, got %s", classifiedErr.Severity())
 	}
 
-	// Test non-retryable error
-	nonRetryableErr := &fetcher.FetchError{
-		Message:   "test error",
-		Retryable: false,
-		Cause:     fetcher.ErrCauseContentTypeInvalid,
-	}
+	// Test non-retryable error (RetryPolicyNever for redirect limit exceeded)
+	nonRetryableErr := fetcher.NewFetchError(
+		fetcher.ErrCauseRedirectLimitExceeded,
+		"test error",
+	)
 
 	classifiedErr = nonRetryableErr
-	if classifiedErr.Severity() != failure.SeverityFatal {
-		t.Errorf("expected SeverityFatal for non-retryable error, got %s", classifiedErr.Severity())
+	if classifiedErr.Severity() != failure.SeverityRecoverable {
+		t.Errorf("expected SeverityRecoverable for non-retryable error, got %s", classifiedErr.Severity())
 	}
 }
 
