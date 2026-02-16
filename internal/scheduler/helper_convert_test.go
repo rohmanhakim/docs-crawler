@@ -43,23 +43,13 @@ func setupConvertMockWithSuccess(m *convertMock) {
 	m.On("Convert", mock.Anything).Return(result, nil)
 }
 
-// setupConvertMockWithFatalError sets up the convert mock to return a fatal error
-func setupConvertMockWithFatalError(m *convertMock) {
-	convertErr := &mdconvert.ConversionError{
-		Message:   "fatal conversion error",
-		Retryable: false,
-		Cause:     mdconvert.ErrCauseConversionFailure,
-	}
-	m.On("Convert", mock.Anything).Return(mdconvert.ConversionResult{}, convertErr)
-}
-
 // setupConvertMockWithRecoverableError sets up the convert mock to return a recoverable error
+// Note: With the new classification design, all content processing errors return SeverityRecoverable.
 func setupConvertMockWithRecoverableError(m *convertMock) {
-	convertErr := &mdconvert.ConversionError{
-		Message:   "recoverable conversion error",
-		Retryable: true,
-		Cause:     mdconvert.ErrCauseConversionFailure,
-	}
+	convertErr := mdconvert.NewConversionError(
+		mdconvert.ErrCauseConversionFailure,
+		"recoverable conversion error",
+	)
 	m.On("Convert", mock.Anything).Return(mdconvert.ConversionResult{}, convertErr)
 }
 

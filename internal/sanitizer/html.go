@@ -92,22 +92,20 @@ func buildErrorAttributes(err *SanitizationError) []metadata.Attribute {
 func sanitize(doc *html.Node) (SanitizedHTMLDoc, *SanitizationError) {
 	// Step 1: Check if the document is parseable
 	if !isParseable(doc) {
-		return SanitizedHTMLDoc{}, &SanitizationError{
-			Message:   "input HTML cannot be parsed: nil node or no content",
-			Retryable: false,
-			Cause:     ErrCauseUnparseableHTML,
-		}
+		return SanitizedHTMLDoc{}, NewSanitizationError(
+			ErrCauseUnparseableHTML,
+			"input HTML cannot be parsed: nil node or no content",
+		)
 	}
 
 	// Step 2: Check if the document is repairable
 	result := isRepairable(doc)
 	if !result.Repairable {
 		cause := mapReasonToErrorCause(result.Reason)
-		return SanitizedHTMLDoc{}, &SanitizationError{
-			Message:   fmt.Sprintf("document is not repairable: %s", result.Reason),
-			Retryable: false,
-			Cause:     cause,
-		}
+		return SanitizedHTMLDoc{}, NewSanitizationError(
+			cause,
+			fmt.Sprintf("document is not repairable: %s", result.Reason),
+		)
 	}
 
 	// Step 3: Normalize heading levels (Invariant H1)

@@ -100,20 +100,18 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	// Parse HTML
 	doc, err := html.Parse(bytes.NewReader(htmlByte))
 	if err != nil {
-		return ExtractionResult{}, &ExtractionError{
-			Message:   fmt.Sprintf("failed to parse HTML: %v", err),
-			Retryable: false,
-			Cause:     ErrCauseNotHTML,
-		}
+		return ExtractionResult{}, NewExtractionError(
+			ErrCauseNotHTML,
+			fmt.Sprintf("failed to parse HTML: %v", err),
+		)
 	}
 
 	// Validate that this is actually HTML (has <html> element)
 	if !isValidHTML(doc) {
-		return ExtractionResult{}, &ExtractionError{
-			Message:   "input is not valid HTML document",
-			Retryable: false,
-			Cause:     ErrCauseNotHTML,
-		}
+		return ExtractionResult{}, NewExtractionError(
+			ErrCauseNotHTML,
+			"input is not valid HTML document",
+		)
 	}
 
 	// Layer 1: Extract semantic container (main, article, [role="main"])
@@ -144,11 +142,10 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	}
 
 	// All layers failed to find meaningful content
-	return ExtractionResult{}, &ExtractionError{
-		Message:   "no meaningful content container found",
-		Retryable: false,
-		Cause:     ErrCauseNoContent,
-	}
+	return ExtractionResult{}, NewExtractionError(
+		ErrCauseNoContent,
+		"no meaningful content container found",
+	)
 }
 
 // isValidHTML checks if the parsed document has a proper HTML structure

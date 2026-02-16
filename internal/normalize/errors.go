@@ -12,62 +12,87 @@ type NormalizationErrorCause string
 const (
 	// ErrCauseBrokenH1Invariant indicates that the document does not have exactly one H1 heading.
 	// The sanitizer should enforce this invariant, but normalization verifies it before title extraction.
-	// This is a non-recoverable error that indicates a pipeline invariant violation.
 	ErrCauseBrokenH1Invariant NormalizationErrorCause = "broken H1 invariant"
 
 	// ErrCauseEmptyContent indicates that the markdown content is empty after conversion.
 	// Per design doc Section 9.2, documents must have content to be RAG-ready.
-	// This is a non-recoverable error as empty documents provide no value for ingestion.
 	ErrCauseEmptyContent NormalizationErrorCause = "empty markdown content"
 
 	// ErrCauseSectionDerivationFailed indicates that the section field could not be derived
-	// from the URL path. Per frontmatter.md Section 4, section must be mechanically derivable
-	// from the first meaningful path segment after stripping allowedPathPrefix.
-	// This is a non-recoverable error indicating a URL structure invariant violation.
+	// from the URL path. Per frontmatter.md Section 4, section must be mechanically derivable.
 	ErrCauseSectionDerivationFailed NormalizationErrorCause = "section derivation failed"
 
 	// ErrCauseTitleExtractionFailed indicates that the title could not be extracted from
 	// the first H1 heading. Per frontmatter.md Section 5, title must come from content.
-	// This occurs when an H1 exists but contains no extractable text.
-	// This is a non-recoverable error as title is required for indexing and display.
 	ErrCauseTitleExtractionFailed NormalizationErrorCause = "title extraction failed"
 
 	// ErrCauseHashComputationFailed indicates that doc_id or content_hash computation failed.
 	// This can occur if the configured hash algorithm is unsupported or encounters an error.
-	// Both hashes are critical for change detection and deduplication.
-	// This is a non-recoverable error indicating a configuration or system issue.
 	ErrCauseHashComputationFailed NormalizationErrorCause = "hash computation failed"
 
 	// ErrCauseFrontmatterMarshalFailed indicates that YAML frontmatter serialization failed.
 	// This can occur due to invalid characters, encoding issues, or marshal errors.
-	// This is a non-recoverable error as the document cannot be written without valid frontmatter.
 	ErrCauseFrontmatterMarshalFailed NormalizationErrorCause = "frontmatter marshal failed"
 
 	// ErrCauseSkippedHeadingLevels indicates that heading levels were skipped
 	// (e.g., H1 -> H3 without H2). Per Invariant N3, levels must increase by at most +1.
-	// This is a non-recoverable error indicating a structural contract violation.
 	ErrCauseSkippedHeadingLevels NormalizationErrorCause = "skipped heading levels"
 
 	// ErrCauseOrphanContent indicates content exists before the first H1 heading.
 	// Per Invariant N4, all content must belong to the document rooted at H1.
-	// This is a non-recoverable error indicating a structural contract violation.
 	ErrCauseOrphanContent NormalizationErrorCause = "orphan content outside root hierarchy"
 
 	// ErrCauseEmptySection indicates a heading has no content before the next
 	// heading of same or higher level. Per Invariant N5, sections must have content.
-	// This is a non-recoverable error indicating a structural contract violation.
 	ErrCauseEmptySection NormalizationErrorCause = "empty section"
 
 	// ErrCauseBrokenAtomicBlock indicates a heading appears inside a fenced code block,
 	// table, or other atomic block. Per Invariant N6, atomic blocks must remain intact.
-	// This is a non-recoverable error indicating a structural contract violation.
 	ErrCauseBrokenAtomicBlock NormalizationErrorCause = "broken atomic block"
 )
 
+// normalizationErrorClassifications provides explicit retry policy and crawl impact
+// for each NormalizationErrorCause. Content processing errors are deterministic -
+// retrying the same content yields the same error.
+//
+// Classification Rationale:
+// - All causes: Never retry - content processing errors are deterministic and permanent
+var normalizationErrorClassifications = map[NormalizationErrorCause]struct {
+	Policy failure.RetryPolicy
+	Impact failure.CrawlImpact
+}{
+	ErrCauseBrokenH1Invariant:        {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseEmptyContent:             {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseSectionDerivationFailed:  {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseTitleExtractionFailed:    {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseHashComputationFailed:    {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseFrontmatterMarshalFailed: {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseSkippedHeadingLevels:     {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseOrphanContent:            {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseEmptySection:             {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseBrokenAtomicBlock:        {failure.RetryPolicyNever, failure.ImpactContinue},
+}
+
+// NormalizationError represents an error that occurred during markdown normalization.
+// It implements failure.ClassifiedError interface with explicit retry policy
+// and crawl impact based on the error cause.
 type NormalizationError struct {
-	Message   string
-	Retryable bool
-	Cause     NormalizationErrorCause
+	Message string
+	Cause   NormalizationErrorCause
+	policy  failure.RetryPolicy
+	impact  failure.CrawlImpact
+}
+
+// NewNormalizationError creates a new NormalizationError with explicit classification based on cause.
+// The retry policy and crawl impact are determined by the error cause classification map.
+func NewNormalizationError(cause NormalizationErrorCause, message string) *NormalizationError {
+	classification := normalizationErrorClassifications[cause]
+	return &NormalizationError{
+		Message: message,
+		Cause:   cause,
+		policy:  classification.Policy,
+		impact:  classification.Impact,
+	}
 }
 
 func (e *NormalizationError) Error() string {
@@ -75,28 +100,31 @@ func (e *NormalizationError) Error() string {
 }
 
 func (e *NormalizationError) Severity() failure.Severity {
-	if e.Retryable {
+	if e.impact == failure.ImpactAbort {
+		return failure.SeverityFatal
+	}
+	switch e.policy {
+	case failure.RetryPolicyAuto:
+		return failure.SeverityRecoverable
+	case failure.RetryPolicyManual:
+		return failure.SeverityRetryExhausted
+	case failure.RetryPolicyNever:
+		return failure.SeverityRecoverable
+	default:
 		return failure.SeverityRecoverable
 	}
-	return failure.SeverityFatal
 }
 
 // RetryPolicy returns the automatic retry behavior for this error.
-// During transition, this derives from the existing Retryable field:
-// - Retryable: true  -> RetryPolicyAuto
-// - Retryable: false -> RetryPolicyManual (conservative default)
+// Content processing errors are deterministic and never benefit from retry.
 func (e *NormalizationError) RetryPolicy() failure.RetryPolicy {
-	if e.Retryable {
-		return failure.RetryPolicyAuto
-	}
-	return failure.RetryPolicyManual
+	return e.policy
 }
 
 // CrawlImpact returns how the scheduler should respond to this error.
-// During transition, this always returns ImpactContinue (conservative default).
-// Only config/scheduler errors should abort the crawl.
+// Normalization errors never abort the crawl - they are per-URL failures.
 func (e *NormalizationError) CrawlImpact() failure.CrawlImpact {
-	return failure.ImpactContinue
+	return e.impact
 }
 
 // mapNormalizationErrorToMetadataCause maps normalize-local error semantics

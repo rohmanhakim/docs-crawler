@@ -79,11 +79,10 @@ func (s *StrictConversionRule) Convert(
 func convert(htmlDoc *html.Node) (ConversionResult, *ConversionError) {
 	// Handle nil node gracefully
 	if htmlDoc == nil {
-		return ConversionResult{}, &ConversionError{
-			Message:   "cannot convert nil HTML node",
-			Retryable: false,
-			Cause:     ErrCauseConversionFailure,
-		}
+		return ConversionResult{}, NewConversionError(
+			ErrCauseConversionFailure,
+			"cannot convert nil HTML node",
+		)
 	}
 
 	// Create a converter with plugins for commonmark, base, and table support
@@ -98,11 +97,10 @@ func convert(htmlDoc *html.Node) (ConversionResult, *ConversionError) {
 	// Convert the HTML node to markdown
 	markdown, err := conv.ConvertNode(htmlDoc)
 	if err != nil {
-		return ConversionResult{}, &ConversionError{
-			Message:   err.Error(),
-			Retryable: false,
-			Cause:     ErrCauseConversionFailure,
-		}
+		return ConversionResult{}, NewConversionError(
+			ErrCauseConversionFailure,
+			err.Error(),
+		)
 	}
 
 	// Extract link refs from the HTML document using goquery
