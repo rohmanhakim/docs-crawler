@@ -39,6 +39,17 @@ func (m *mockError) IsRetryable() bool {
 	return m.retryable
 }
 
+func (m *mockError) RetryPolicy() failure.RetryPolicy {
+	if m.retryable {
+		return failure.RetryPolicyAuto
+	}
+	return failure.RetryPolicyManual
+}
+
+func (m *mockError) CrawlImpact() failure.CrawlImpact {
+	return failure.ImpactContinue
+}
+
 // TestRetry_SuccessOnFirstAttempt verifies that a successful function returns immediately
 func TestRetry_SuccessOnFirstAttempt(t *testing.T) {
 	callCount := 0
@@ -528,6 +539,16 @@ func (e *errorWithoutIsRetryable) Error() string {
 
 func (e *errorWithoutIsRetryable) Severity() failure.Severity {
 	return failure.SeverityRecoverable
+}
+
+// RetryPolicy returns RetryPolicyAuto as default (for backward compatibility test)
+func (e *errorWithoutIsRetryable) RetryPolicy() failure.RetryPolicy {
+	return failure.RetryPolicyAuto
+}
+
+// CrawlImpact returns ImpactContinue (for backward compatibility test)
+func (e *errorWithoutIsRetryable) CrawlImpact() failure.CrawlImpact {
+	return failure.ImpactContinue
 }
 
 // TestRetry_DefaultRetryableWhenNoIsRetryable verifies that errors without IsRetryable

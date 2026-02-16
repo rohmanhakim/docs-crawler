@@ -39,6 +39,24 @@ func (e *RobotsError) Severity() failure.Severity {
 	return failure.SeverityFatal
 }
 
+// RetryPolicy returns the automatic retry behavior for this error.
+// During transition, this derives from the existing Retryable field:
+// - Retryable: true  -> RetryPolicyAuto
+// - Retryable: false -> RetryPolicyManual (conservative default)
+func (e *RobotsError) RetryPolicy() failure.RetryPolicy {
+	if e.Retryable {
+		return failure.RetryPolicyAuto
+	}
+	return failure.RetryPolicyManual
+}
+
+// CrawlImpact returns how the scheduler should respond to this error.
+// During transition, this always returns ImpactContinue (conservative default).
+// Only config/scheduler errors should abort the crawl.
+func (e *RobotsError) CrawlImpact() failure.CrawlImpact {
+	return failure.ImpactContinue
+}
+
 // mapRobotsErrorToMetadataCause maps robots-local error semantics
 // to the canonical metadata.ErrorCause table.
 //

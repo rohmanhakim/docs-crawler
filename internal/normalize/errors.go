@@ -44,7 +44,7 @@ const (
 	ErrCauseFrontmatterMarshalFailed NormalizationErrorCause = "frontmatter marshal failed"
 
 	// ErrCauseSkippedHeadingLevels indicates that heading levels were skipped
-	// (e.g., H1 → H3 without H2). Per Invariant N3, levels must increase by at most +1.
+	// (e.g., H1 -> H3 without H2). Per Invariant N3, levels must increase by at most +1.
 	// This is a non-recoverable error indicating a structural contract violation.
 	ErrCauseSkippedHeadingLevels NormalizationErrorCause = "skipped heading levels"
 
@@ -79,6 +79,24 @@ func (e *NormalizationError) Severity() failure.Severity {
 		return failure.SeverityRecoverable
 	}
 	return failure.SeverityFatal
+}
+
+// RetryPolicy returns the automatic retry behavior for this error.
+// During transition, this derives from the existing Retryable field:
+// - Retryable: true  -> RetryPolicyAuto
+// - Retryable: false -> RetryPolicyManual (conservative default)
+func (e *NormalizationError) RetryPolicy() failure.RetryPolicy {
+	if e.Retryable {
+		return failure.RetryPolicyAuto
+	}
+	return failure.RetryPolicyManual
+}
+
+// CrawlImpact returns how the scheduler should respond to this error.
+// During transition, this always returns ImpactContinue (conservative default).
+// Only config/scheduler errors should abort the crawl.
+func (e *NormalizationError) CrawlImpact() failure.CrawlImpact {
+	return failure.ImpactContinue
 }
 
 // mapNormalizationErrorToMetadataCause maps normalize-local error semantics
