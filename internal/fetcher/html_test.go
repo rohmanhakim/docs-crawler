@@ -195,8 +195,9 @@ func TestHtmlFetcher_Fetch_NonHTMLContent(t *testing.T) {
 		t.Fatalf("expected FetchError, got %T", err)
 	}
 
-	if fetchErr.IsRetryable() {
-		t.Error("expected non-retryable error for invalid content type")
+	// Use RetryPolicy() instead of IsRetryable()
+	if fetchErr.RetryPolicy() != failure.RetryPolicyManual {
+		t.Error("expected non-retryable error (RetryPolicyManual) for invalid content type")
 	}
 
 	// Verify fetch event was recorded with status 0 (error case)
@@ -241,8 +242,9 @@ func TestHtmlFetcher_Fetch_HTTP404(t *testing.T) {
 		t.Fatalf("expected FetchError, got %T", err)
 	}
 
-	if fetchErr.IsRetryable() {
-		t.Error("expected non-retryable error for 404")
+	// Use RetryPolicy() instead of IsRetryable()
+	if fetchErr.RetryPolicy() != failure.RetryPolicyManual {
+		t.Error("expected non-retryable error (RetryPolicyManual) for 404")
 	}
 }
 
@@ -272,8 +274,9 @@ func TestHtmlFetcher_Fetch_HTTP403(t *testing.T) {
 		t.Fatalf("expected FetchError, got %T", err)
 	}
 
-	if fetchErr.IsRetryable() {
-		t.Error("expected non-retryable error for 403")
+	// Use RetryPolicy() instead of IsRetryable()
+	if fetchErr.RetryPolicy() != failure.RetryPolicyManual {
+		t.Error("expected non-retryable error (RetryPolicyManual) for 403")
 	}
 }
 
@@ -468,58 +471,58 @@ func TestHtmlFetcher_FetchResult_Accessors(t *testing.T) {
 
 func TestFetchError_Classification(t *testing.T) {
 	tests := []struct {
-		name            string
-		statusCode      int
-		contentType     string
-		expectRetryable bool
+		name              string
+		statusCode        int
+		contentType       string
+		expectRetryPolicy failure.RetryPolicy
 	}{
 		{
-			name:            "200 OK HTML - no error",
-			statusCode:      http.StatusOK,
-			contentType:     "text/html",
-			expectRetryable: false,
+			name:              "200 OK HTML - no error",
+			statusCode:        http.StatusOK,
+			contentType:       "text/html",
+			expectRetryPolicy: failure.RetryPolicyAuto, // won't be checked, no error
 		},
 		{
-			name:            "500 Internal Server Error - retryable",
-			statusCode:      http.StatusInternalServerError,
-			contentType:     "text/html",
-			expectRetryable: true,
+			name:              "500 Internal Server Error - retryable",
+			statusCode:        http.StatusInternalServerError,
+			contentType:       "text/html",
+			expectRetryPolicy: failure.RetryPolicyAuto,
 		},
 		{
-			name:            "502 Bad Gateway - retryable",
-			statusCode:      http.StatusBadGateway,
-			contentType:     "text/html",
-			expectRetryable: true,
+			name:              "502 Bad Gateway - retryable",
+			statusCode:        http.StatusBadGateway,
+			contentType:       "text/html",
+			expectRetryPolicy: failure.RetryPolicyAuto,
 		},
 		{
-			name:            "503 Service Unavailable - retryable",
-			statusCode:      http.StatusServiceUnavailable,
-			contentType:     "text/html",
-			expectRetryable: true,
+			name:              "503 Service Unavailable - retryable",
+			statusCode:        http.StatusServiceUnavailable,
+			contentType:       "text/html",
+			expectRetryPolicy: failure.RetryPolicyAuto,
 		},
 		{
-			name:            "400 Bad Request - not retryable",
-			statusCode:      http.StatusBadRequest,
-			contentType:     "text/html",
-			expectRetryable: false,
+			name:              "400 Bad Request - not retryable",
+			statusCode:        http.StatusBadRequest,
+			contentType:       "text/html",
+			expectRetryPolicy: failure.RetryPolicyManual,
 		},
 		{
-			name:            "401 Unauthorized - not retryable",
-			statusCode:      http.StatusUnauthorized,
-			contentType:     "text/html",
-			expectRetryable: false,
+			name:              "401 Unauthorized - not retryable",
+			statusCode:        http.StatusUnauthorized,
+			contentType:       "text/html",
+			expectRetryPolicy: failure.RetryPolicyManual,
 		},
 		{
-			name:            "403 Forbidden - not retryable",
-			statusCode:      http.StatusForbidden,
-			contentType:     "text/html",
-			expectRetryable: false,
+			name:              "403 Forbidden - not retryable",
+			statusCode:        http.StatusForbidden,
+			contentType:       "text/html",
+			expectRetryPolicy: failure.RetryPolicyManual,
 		},
 		{
-			name:            "404 Not Found - not retryable",
-			statusCode:      http.StatusNotFound,
-			contentType:     "text/html",
-			expectRetryable: false,
+			name:              "404 Not Found - not retryable",
+			statusCode:        http.StatusNotFound,
+			contentType:       "text/html",
+			expectRetryPolicy: failure.RetryPolicyManual,
 		},
 	}
 
@@ -551,8 +554,9 @@ func TestFetchError_Classification(t *testing.T) {
 
 			var fetchErr *fetcher.FetchError
 			if errors.As(err, &fetchErr) {
-				if fetchErr.IsRetryable() != tt.expectRetryable {
-					t.Errorf("expected retryable=%v, got retryable=%v", tt.expectRetryable, fetchErr.IsRetryable())
+				// Use RetryPolicy() instead of IsRetryable()
+				if fetchErr.RetryPolicy() != tt.expectRetryPolicy {
+					t.Errorf("expected RetryPolicy=%v, got RetryPolicy=%v", tt.expectRetryPolicy, fetchErr.RetryPolicy())
 				}
 			}
 		})

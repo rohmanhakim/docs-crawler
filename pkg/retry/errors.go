@@ -71,12 +71,6 @@ func (e *RetryError) Severity() failure.Severity {
 	}
 }
 
-// IsRetryable returns whether this error is retryable.
-// Deprecated: Use RetryPolicy() instead.
-func (e *RetryError) IsRetryable() bool {
-	return e.policy == failure.RetryPolicyAuto
-}
-
 // RetryPolicy returns the automatic retry behavior for this error.
 // When RetryError is returned (exhausted attempts), it returns the cached policy.
 func (e *RetryError) RetryPolicy() failure.RetryPolicy {

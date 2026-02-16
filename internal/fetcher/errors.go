@@ -38,11 +38,6 @@ func (e *FetchError) Severity() failure.Severity {
 	return failure.SeverityFatal
 }
 
-// IsRetryable returns whether this error is retryable
-func (e *FetchError) IsRetryable() bool {
-	return e.Retryable
-}
-
 // RetryPolicy returns the automatic retry behavior for this error.
 // During transition, this derives from the existing Retryable field:
 // - Retryable: true  -> RetryPolicyAuto

@@ -43,12 +43,6 @@ func (e *AssetsError) Severity() failure.Severity {
 	return failure.SeverityFatal
 }
 
-// IsRetryable returns whether the error should be retried.
-// This implements the interface checked by the retry handler.
-func (e *AssetsError) IsRetryable() bool {
-	return e.Retryable
-}
-
 // RetryPolicy returns the automatic retry behavior for this error.
 // During transition, this derives from the existing Retryable field:
 // - Retryable: true  -> RetryPolicyAuto
