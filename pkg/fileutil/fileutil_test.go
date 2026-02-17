@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/fileutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -168,8 +169,9 @@ func TestEnsureDir_PermissionError(t *testing.T) {
 
 	var fileErr *fileutil.FileError
 	if assert.ErrorAs(t, err, &fileErr) {
-		assert.False(t, fileErr.Retryable)
 		assert.Equal(t, fileutil.ErrCausePathError, fileErr.Cause)
+		// Path errors should have RetryPolicyNever (not auto-retryable)
+		assert.Equal(t, fileErr.RetryPolicy(), failure.RetryPolicyNever)
 	}
 }
 
