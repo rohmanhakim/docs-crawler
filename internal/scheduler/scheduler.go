@@ -20,6 +20,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
+	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
@@ -65,6 +66,7 @@ type Scheduler struct {
 	crawlFinalizer         metadata.CrawlFinalizer
 	robot                  robots.Robot
 	frontier               frontier.Frontier
+	failureJournal         failurejournal.Journal
 	htmlFetcher            fetcher.Fetcher
 	domExtractor           extractor.Extractor
 	htmlSanitizer          sanitizer.Sanitizer
