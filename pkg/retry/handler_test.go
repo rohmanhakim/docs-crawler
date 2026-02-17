@@ -35,10 +35,6 @@ func (m *mockError) Severity() failure.Severity {
 	return m.severity
 }
 
-func (m *mockError) IsRetryable() bool {
-	return m.retryable
-}
-
 func (m *mockError) RetryPolicy() failure.RetryPolicy {
 	if m.retryable {
 		return failure.RetryPolicyAuto
