@@ -234,6 +234,7 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 				0, // No errors during init (would need to count specific init errors)
 				0, // No assets during init
 				time.Since(initStartTime),
+				0, // No retry queue during init (no failures yet)
 			)
 		}
 	}()
@@ -359,11 +360,13 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	defer func() {
 		execDuration := time.Since(execStartTime)
 		totalPages := s.frontier.VisitedCount()
+		retryQueueCount := s.frontier.RetryQueueSize()
 		s.crawlFinalizer.RecordFinalCrawlStats(
 			totalPages,
 			totalErrors,
 			totalAssets,
 			execDuration,
+			retryQueueCount,
 		)
 	}()
 
@@ -385,7 +388,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			}
 			// Track for manual retry if eligible
 			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err, frontier.StageFetch, 0)
 			}
 			// recoverable → log already done → count error
 			totalErrors++
@@ -400,7 +403,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			}
 			// Track for manual retry if eligible
 			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err, frontier.StageFetch, 0)
 			}
 			totalErrors++
 			continue
@@ -414,7 +417,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			}
 			// Track for manual retry if eligible
 			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err, frontier.StageFetch, 0)
 			}
 			totalErrors++
 			continue
@@ -455,7 +458,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			}
 			// Track for manual retry if eligible
 			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err, frontier.StageFetch, 0)
 			}
 			totalErrors++
 			continue
@@ -476,7 +479,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			}
 			// Track for manual retry if eligible
 			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err, frontier.StageAsset, 0)
 			}
 			totalErrors++
 			// Continue to process the markdown even if asset resolution had errors
@@ -503,7 +506,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			}
 			// Track for manual retry if eligible
 			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err, frontier.StageFetch, 0)
 			}
 			totalErrors++
 			continue
@@ -521,7 +524,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			}
 			// Track for manual retry if eligible
 			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err)
+				s.frontier.BookKeepForRetry(nextCrawlToken.URL(), err, frontier.StageStorage, 0)
 			}
 			// recoverable → log already done → count error
 			totalErrors++

@@ -109,7 +109,7 @@ func (f *frontierMock) SetupDequeueToReturn(token frontier.CrawlToken, ok bool) 
 }
 
 // BookKeepForRetry tracks a URL for manual retry (new interface method)
-func (f *frontierMock) BookKeepForRetry(url url.URL, reason error) {
+func (f *frontierMock) BookKeepForRetry(url url.URL, reason error, stage frontier.Stage, retryCount int) {
 	// No-op for tests that don't need to verify this
 }
 

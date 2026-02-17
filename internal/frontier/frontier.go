@@ -49,7 +49,7 @@ type Frontier interface {
 	CurrentMinDepth() int
 	VisitedCount() int
 	Dequeue() (CrawlToken, bool)
-	BookKeepForRetry(url url.URL, reason error)
+	BookKeepForRetry(url url.URL, reason error, stage Stage, retryCount int)
 	GetRetryCandidates() []url.URL
 	RetryQueueSize() int
 	ClearRetryQueue(processed []url.URL)
@@ -196,7 +196,8 @@ func (f *CrawlFrontier) deduplicate(canonicalizedUrl url.URL, depth int) {
 // BookKeepForRetry adds a URL to the manual retry queue.
 // It deduplicates URLs - if a URL is already in the queue, it won't be added again.
 // The error is stored as the reason for debugging/display purposes.
-func (f *CrawlFrontier) BookKeepForRetry(url url.URL, reason error) {
+// stage and retryCount are recorded for future Failure Journal persistence.
+func (f *CrawlFrontier) BookKeepForRetry(url url.URL, reason error, stage Stage, retryCount int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -216,9 +217,11 @@ func (f *CrawlFrontier) BookKeepForRetry(url url.URL, reason error) {
 
 	f.retrySet.Add(key)
 	f.retryQueue.Enqueue(RetryEntry{
-		URL:       url,
-		Reason:    reason.Error(),
-		Timestamp: time.Now(),
+		URL:        url,
+		Reason:     reason.Error(),
+		Timestamp:  time.Now(),
+		Stage:      stage,
+		RetryCount: retryCount,
 	})
 }
 

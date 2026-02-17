@@ -23,10 +23,11 @@ crawlStats
   - Must be constructed without reading metadata
 */
 type crawlStats struct {
-	totalPages  int
-	totalErrors int
-	totalAssets int
-	durationMs  int64
+	totalPages            int
+	totalErrors           int
+	totalAssets           int
+	durationMs            int64
+	manualRetryQueueCount int // URLs in manual retry queue at crawl completion
 }
 
 type ArtifactKind string
