@@ -14,7 +14,6 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
-	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -30,6 +29,7 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -67,6 +67,7 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// Create a temp config file
@@ -121,6 +122,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -175,7 +177,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 		normalizeMock,
 		mockStorage,
 		mockSleeper,
-		failurejournal.NewInMemoryJournal(),
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -229,6 +231,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -266,6 +269,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -319,6 +323,7 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -356,6 +361,7 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -402,6 +408,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -439,6 +446,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -498,6 +506,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -534,6 +543,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()

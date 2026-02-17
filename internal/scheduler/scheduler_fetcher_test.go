@@ -34,6 +34,7 @@ Allow: /`
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -82,6 +83,7 @@ Allow: /`
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost(testURL.Host)
 
@@ -106,6 +108,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -147,6 +150,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -191,6 +195,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -238,6 +243,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -273,6 +279,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -321,6 +328,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -362,6 +370,7 @@ Allow: /`
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -403,6 +412,7 @@ Allow: /`
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	testURL, _ := url.Parse(server.URL + "/page.html")
@@ -427,6 +437,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -486,6 +497,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -520,6 +532,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -572,6 +585,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -617,6 +631,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			mockFetcher := newFetcherMockForTest(t)
 			mockRobot := NewRobotsMockForTest(t)
 			mockStorage := newStorageMockForTest(t)
+			mockFailureJournal := newFailureJournalMockForTest(t)
 			mockSleeper := newSleeperMock(t)
 
 			mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -659,6 +674,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 				nil,
 				mockStorage,
 				mockSleeper,
+				mockFailureJournal,
 			)
 
 			tmpDir := t.TempDir()

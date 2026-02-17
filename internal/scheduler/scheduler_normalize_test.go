@@ -44,6 +44,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -104,6 +105,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -146,6 +148,7 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -199,6 +202,7 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -242,6 +246,7 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -291,6 +296,7 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -332,6 +338,7 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Only expect one Decide call for the seed URL
@@ -382,6 +389,7 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -429,7 +437,7 @@ func createSchedulerWithAllMocksAndNormalize(
 	mockNormalize *normalizeMock,
 	mockStorage *storageMock,
 	mockSleeper *sleeperMock,
-	mockFailureJournal ...failurejournal.Journal,
+	mockFailureJournal failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
 	// Create real components if mocks not provided
@@ -450,14 +458,6 @@ func createSchedulerWithAllMocksAndNormalize(
 		setupNormalizeMockWithSuccess(mockNormalize)
 	}
 
-	// Create a failure journal if none provided
-	var journal failurejournal.Journal
-	if len(mockFailureJournal) > 0 && mockFailureJournal[0] != nil {
-		journal = mockFailureJournal[0]
-	} else {
-		journal = failurejournal.NewInMemoryJournal()
-	}
-
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
 		mockFinalizer,
@@ -473,7 +473,7 @@ func createSchedulerWithAllMocksAndNormalize(
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
-		journal,
+		mockFailureJournal,
 	)
 	return &s
 }
@@ -529,6 +529,7 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Setup robots
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -599,6 +600,7 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// Override current host (needed for some internal logic)
@@ -644,6 +646,7 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -716,6 +719,7 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")
 
@@ -761,6 +765,7 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -829,6 +834,7 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")
 
@@ -875,6 +881,7 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -943,6 +950,7 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")
 

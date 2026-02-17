@@ -31,6 +31,7 @@ func TestInitializeCrawling_Success_ReturnsInitialization(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up expectations
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -62,6 +63,7 @@ func TestInitializeCrawling_Success_ReturnsInitialization(t *testing.T) {
 		nil, // nil = create normalize mock
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// Create a valid config file
@@ -100,6 +102,7 @@ func TestInitializeCrawling_ConfigFileNotFound_ReturnsError(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Use helper function
 	s := createSchedulerForTest(
@@ -117,6 +120,7 @@ func TestInitializeCrawling_ConfigFileNotFound_ReturnsError(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// Execute InitializeCrawling with non-existent file
@@ -145,6 +149,7 @@ func TestInitializeCrawling_InvalidConfigJSON_ReturnsError(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Use helper function
 	s := createSchedulerForTest(
@@ -162,6 +167,7 @@ func TestInitializeCrawling_InvalidConfigJSON_ReturnsError(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// Create invalid JSON config file
@@ -193,6 +199,7 @@ func TestInitializeCrawling_EmptySeedURLs_ReturnsError(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Use helper function
 	s := createSchedulerForTest(
@@ -210,6 +217,7 @@ func TestInitializeCrawling_EmptySeedURLs_ReturnsError(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// Create config with empty seed URLs
@@ -247,6 +255,7 @@ func TestExecuteCrawlingWithState_Success_ReturnsExecutionResult(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up frontier to have a URL to process
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -289,6 +298,7 @@ func TestExecuteCrawlingWithState_Success_ReturnsExecutionResult(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// First initialize
@@ -329,6 +339,7 @@ func TestExecuteCrawlingWithState_EmptyFrontier_Completes(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Disable auto-enqueue to control behavior precisely
 	mockFrontier.disableAutoEnqueue = true
@@ -369,6 +380,7 @@ func TestExecuteCrawlingWithState_EmptyFrontier_Completes(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// First initialize
@@ -415,6 +427,7 @@ func TestExecuteCrawlingWithState_RecordsStatsCorrectly(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up frontier to process one URL
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -456,6 +469,7 @@ func TestExecuteCrawlingWithState_RecordsStatsCorrectly(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -510,6 +524,7 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up frontier
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -551,6 +566,7 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -596,6 +612,7 @@ func TestSplit_InitFailure_RecordsStats(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Use helper function
 	s := createSchedulerForTest(
@@ -613,6 +630,7 @@ func TestSplit_InitFailure_RecordsStats(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// Initialize with non-existent config

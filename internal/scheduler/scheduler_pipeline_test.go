@@ -42,6 +42,7 @@ func TestPipeline_MethodCallOrder(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -135,6 +136,7 @@ func TestPipeline_MethodCallOrder(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -209,6 +211,7 @@ func TestPipeline_CalledExactlyOncePerPage(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -257,6 +260,7 @@ func TestPipeline_CalledExactlyOncePerPage(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -300,6 +304,7 @@ func TestPipeline_AllStagesCalled(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -347,6 +352,7 @@ func TestPipeline_AllStagesCalled(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()

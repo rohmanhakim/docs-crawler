@@ -97,7 +97,14 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Verify: crawl should NOT abort (no fatal error returned)
 	// The error should be handled gracefully
@@ -183,7 +190,14 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Verify: error is handled, not fatal
 	t.Logf("Execution result: err=%v", execErr)
@@ -267,8 +281,15 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
 
-	// Execute crawl - should return error due to abort
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Execute crawl
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Verify: error is returned (crawl aborted)
 	assert.Error(t, execErr, "Crawl should abort on ImpactAbort error")
@@ -354,7 +375,14 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Verify: crawl completed (storage error was handled gracefully)
 	t.Logf("Execution result: err=%v", execErr)
@@ -501,7 +529,14 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Verify: crawl completed (not aborted)
 	t.Logf("Execution result: err=%v", execErr)
@@ -586,7 +621,14 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Verify: error handled gracefully
 	t.Logf("Execution result: err=%v", execErr)
@@ -671,7 +713,14 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Execute crawl
-	_, execErr := s.ExecuteCrawling(configPath)
+	// Phase 1: Initialize
+	init, err := s.InitializeCrawling(configPath)
+	if err != nil {
+		t.Fatalf("Failed to initialize: %v", err)
+	}
+
+	// Phase 2: Execute with state
+	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Verify: error handled gracefully
 	t.Logf("Execution result: err=%v", execErr)

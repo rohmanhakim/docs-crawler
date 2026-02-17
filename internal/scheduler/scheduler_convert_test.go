@@ -2,14 +2,11 @@ package scheduler_test
 
 import (
 	"context"
-	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal/extractor"
-	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
@@ -35,6 +32,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -91,6 +89,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -131,6 +130,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -180,6 +180,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -221,6 +222,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -268,6 +270,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -290,144 +293,4 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable convert error should not abort crawl")
 	mockConvert.AssertCalled(t, "Convert", mock.Anything)
-}
-
-// TestScheduler_Convert_MethodCallOrder verifies the correct order of method calls:
-// Fetch → Extract → Sanitize → Convert → Resolve → Normalize → Write
-func TestScheduler_Convert_MethodCallOrder(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockFetcher := new(fetcherMock)
-	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockConvert := newConvertMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0).Maybe()
-	mockFrontier.On("Submit", mock.Anything).Return()
-	mockFrontier.On("Enqueue", mock.Anything).Return()
-	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
-	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
-	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-
-	// Track call order
-	callOrder := []string{}
-
-	// Setup fetcher
-	testURL, _ := url.Parse("http://example.com/page.html")
-	htmlBody := []byte(`<html><body><div>Test</div></body></html>`)
-	fetchResult := fetcher.NewFetchResultForTest(
-		*testURL,
-		htmlBody,
-		200,
-		"text/html",
-		map[string]string{"Content-Type": "text/html"},
-		time.Now(),
-	)
-	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Fetch")
-		}).Return(fetchResult, nil).Once()
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	mockExtractor.On("Extract", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Extract")
-		}).Return(extractor.ExtractionResult{ContentNode: contentNode}, nil)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer
-	mockSanitizer.On("Sanitize", contentNode).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Sanitize")
-		}).Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	// Setup convert
-	mockConvert.On("Convert", mock.Anything).
-		Run(func(args mock.Arguments) {
-			callOrder = append(callOrder, "Convert")
-		}).Return(createConversionResultForTest("# Test", nil), nil)
-
-	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
-
-	s := createSchedulerForTest(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockFrontier,
-		mockRobot,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		mockConvert,
-		nil,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 0
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Execute crawl
-	_, _ = s.ExecuteCrawling(configPath)
-
-	// Verify convert was called
-	mockConvert.AssertCalled(t, "Convert", mock.Anything)
-
-	// Verify order: Convert should be called after Sanitize
-	t.Logf("Call order: %v", callOrder)
-	assert.Contains(t, callOrder, "Fetch", "Fetch should be called")
-	assert.Contains(t, callOrder, "Extract", "Extract should be called")
-	assert.Contains(t, callOrder, "Sanitize", "Sanitize should be called")
-	assert.Contains(t, callOrder, "Convert", "Convert should be called")
-
-	// Find positions
-	fetchIdx := -1
-	extractIdx := -1
-	sanitizeIdx := -1
-	convertIdx := -1
-	for i, call := range callOrder {
-		switch call {
-		case "Fetch":
-			fetchIdx = i
-		case "Extract":
-			extractIdx = i
-		case "Sanitize":
-			sanitizeIdx = i
-		case "Convert":
-			convertIdx = i
-		}
-	}
-
-	assert.Less(t, fetchIdx, extractIdx, "Fetch should be called before Extract")
-	assert.Less(t, extractIdx, sanitizeIdx, "Extract should be called before Sanitize")
-	assert.Less(t, sanitizeIdx, convertIdx, "Sanitize should be called before Convert")
 }
