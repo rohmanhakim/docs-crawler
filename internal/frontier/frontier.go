@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/config"
+	"github.com/rohmanhakim/docs-crawler/pkg/collections"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
 )
 
@@ -57,21 +58,21 @@ type Frontier interface {
 
 type CrawlFrontier struct {
 	mu            sync.RWMutex
-	queuesByDepth map[int]*FIFOQueue[CrawlToken]
-	visitedUrl    Set[string]
+	queuesByDepth map[int]*collections.FIFOQueue[CrawlToken]
+	visitedUrl    collections.Set[string]
 	maxDepth      int
 	currentDepth  int
 	maxPages      int
 
 	// Retry queue for manual retry - URLs that exhausted auto-retry
-	retryQueue FIFOQueue[RetryEntry]
-	retrySet   Set[string]
+	retryQueue collections.FIFOQueue[RetryEntry]
+	retrySet   collections.Set[string]
 }
 
 func NewCrawlFrontier() CrawlFrontier {
 	return CrawlFrontier{
-		queuesByDepth: make(map[int]*FIFOQueue[CrawlToken]),
-		visitedUrl:    NewSet[string](),
+		queuesByDepth: make(map[int]*collections.FIFOQueue[CrawlToken]),
+		visitedUrl:    collections.NewSet[string](),
 	}
 }
 
@@ -110,7 +111,7 @@ func (f *CrawlFrontier) Submit(admission CrawlAdmissionCandidate) {
 
 func (f *CrawlFrontier) Enqueue(incomingToken CrawlToken) {
 	if f.queuesByDepth[incomingToken.depth] == nil {
-		f.queuesByDepth[incomingToken.depth] = NewFIFOQueue[CrawlToken]()
+		f.queuesByDepth[incomingToken.depth] = collections.NewFIFOQueue[CrawlToken]()
 	}
 	f.queuesByDepth[incomingToken.depth].Enqueue(incomingToken)
 	if incomingToken.depth > f.currentDepth {
@@ -203,11 +204,11 @@ func (f *CrawlFrontier) BookKeepForRetry(url url.URL, reason error, stage Stage,
 
 	// Initialize retry set if needed
 	if f.retrySet == nil {
-		f.retrySet = NewSet[string]()
+		f.retrySet = collections.NewSet[string]()
 	}
 	// Initialize retry queue if needed
 	if f.retryQueue == nil {
-		f.retryQueue = *NewFIFOQueue[RetryEntry]()
+		f.retryQueue = *collections.NewFIFOQueue[RetryEntry]()
 	}
 
 	key := url.String()
@@ -270,8 +271,8 @@ func (f *CrawlFrontier) ClearRetryQueue(processed []url.URL) {
 	}
 
 	// Rebuild retry queue and set, excluding processed URLs
-	newQueue := *NewFIFOQueue[RetryEntry]()
-	newSet := NewSet[string]()
+	newQueue := *collections.NewFIFOQueue[RetryEntry]()
+	newSet := collections.NewSet[string]()
 
 	for _, entry := range f.retryQueue {
 		key := entry.URL.String()

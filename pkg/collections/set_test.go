@@ -1,13 +1,13 @@
-package frontier_test
+package collections_test
 
 import (
 	"testing"
 
-	"github.com/rohmanhakim/docs-crawler/internal/frontier"
+	"github.com/rohmanhakim/docs-crawler/pkg/collections"
 )
 
 func TestAddContains(t *testing.T) {
-	set := frontier.NewSet[MySetItem]()
+	set := collections.NewSet[MySetItem]()
 	size := set.Size()
 	if size != 0 {
 		t.Errorf("expected empty, got: %d", size)
@@ -44,7 +44,7 @@ func TestAddContains(t *testing.T) {
 }
 
 func TestAddRemove(t *testing.T) {
-	set := frontier.NewSet[MySetItem]()
+	set := collections.NewSet[MySetItem]()
 	size := set.Size()
 	if size != 0 {
 		t.Errorf("expected empty, got: %d", size)
@@ -80,7 +80,7 @@ func TestAddRemove(t *testing.T) {
 }
 
 func TestAddClear(t *testing.T) {
-	set := frontier.NewSet[MySetItem]()
+	set := collections.NewSet[MySetItem]()
 	size := set.Size()
 	if size != 0 {
 		t.Errorf("expected empty, got: %d", size)

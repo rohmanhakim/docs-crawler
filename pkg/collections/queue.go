@@ -1,4 +1,4 @@
-package frontier
+package collections
 
 // type QueueItem interface{}
 

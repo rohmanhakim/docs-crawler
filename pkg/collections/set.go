@@ -1,4 +1,4 @@
-package frontier
+package collections
 
 type Set[T comparable] map[T]struct{}
 
