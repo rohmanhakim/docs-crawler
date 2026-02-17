@@ -14,7 +14,7 @@ func TestAssetsError_Classifications(t *testing.T) {
 		name         string
 		cause        AssetsErrorCause
 		wantPolicy   failure.RetryPolicy
-		wantImpact   failure.CrawlImpact
+		wantImpact   failure.ImpactLevel
 		wantSeverity failure.Severity
 	}{
 		// Auto-retryable: transient network/server errors
@@ -22,35 +22,35 @@ func TestAssetsError_Classifications(t *testing.T) {
 			name:         "ErrCauseTimeout should be RetryPolicyAuto",
 			cause:        ErrCauseTimeout,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseNetworkFailure should be RetryPolicyAuto",
 			cause:        ErrCauseNetworkFailure,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseReadResponseBodyError should be RetryPolicyAuto",
 			cause:        ErrCauseReadResponseBodyError,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseRequest5xx should be RetryPolicyAuto",
 			cause:        ErrCauseRequest5xx,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseRequestTooMany should be RetryPolicyAuto",
 			cause:        ErrCauseRequestTooMany,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		// Manual retry: user-fixable errors
@@ -58,14 +58,14 @@ func TestAssetsError_Classifications(t *testing.T) {
 			name:         "ErrCauseRequestPageForbidden should be RetryPolicyManual",
 			cause:        ErrCauseRequestPageForbidden,
 			wantPolicy:   failure.RetryPolicyManual,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRetryExhausted,
 		},
 		{
 			name:         "ErrCauseDiskFull should be RetryPolicyManual",
 			cause:        ErrCauseDiskFull,
 			wantPolicy:   failure.RetryPolicyManual,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRetryExhausted,
 		},
 		// Never retry: permanent failures
@@ -73,49 +73,49 @@ func TestAssetsError_Classifications(t *testing.T) {
 			name:         "ErrCauseRepeated403 should be RetryPolicyNever",
 			cause:        ErrCauseRepeated403,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseAssetTooLarge should be RetryPolicyNever",
 			cause:        ErrCauseAssetTooLarge,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseRedirectLimitExceeded should be RetryPolicyNever",
 			cause:        ErrCauseRedirectLimitExceeded,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseContentTypeInvalid should be RetryPolicyNever",
 			cause:        ErrCauseContentTypeInvalid,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseWriteFailure should be RetryPolicyNever",
 			cause:        ErrCauseWriteFailure,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCausePathError should be RetryPolicyNever",
 			cause:        ErrCausePathError,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseHashError should be RetryPolicyNever",
 			cause:        ErrCauseHashError,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 	}
@@ -128,8 +128,8 @@ func TestAssetsError_Classifications(t *testing.T) {
 				t.Errorf("RetryPolicy() = %v, want %v", err.RetryPolicy(), tt.wantPolicy)
 			}
 
-			if err.CrawlImpact() != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", err.CrawlImpact(), tt.wantImpact)
+			if err.Impact() != tt.wantImpact {
+				t.Errorf("CrawlImpact() = %v, want %v", err.Impact(), tt.wantImpact)
 			}
 
 			if err.Severity() != tt.wantSeverity {

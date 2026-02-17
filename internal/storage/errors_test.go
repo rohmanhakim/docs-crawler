@@ -14,7 +14,7 @@ func TestStorageError_Classifications(t *testing.T) {
 		name         string
 		cause        StorageErrorCause
 		wantPolicy   failure.RetryPolicy
-		wantImpact   failure.CrawlImpact
+		wantImpact   failure.ImpactLevel
 		wantSeverity failure.Severity
 	}{
 		// Manual retry: user-fixable errors
@@ -22,7 +22,7 @@ func TestStorageError_Classifications(t *testing.T) {
 			name:         "ErrCauseDiskFull should be RetryPolicyManual",
 			cause:        ErrCauseDiskFull,
 			wantPolicy:   failure.RetryPolicyManual,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRetryExhausted,
 		},
 		// Never retry: permanent failures
@@ -30,21 +30,21 @@ func TestStorageError_Classifications(t *testing.T) {
 			name:         "ErrCauseWriteFailure should be RetryPolicyNever",
 			cause:        ErrCauseWriteFailure,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseHashComputationFailed should be RetryPolicyNever",
 			cause:        ErrCauseHashComputationFailed,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCausePathError should be RetryPolicyNever",
 			cause:        ErrCausePathError,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 	}
@@ -57,8 +57,8 @@ func TestStorageError_Classifications(t *testing.T) {
 				t.Errorf("RetryPolicy() = %v, want %v", err.RetryPolicy(), tt.wantPolicy)
 			}
 
-			if err.CrawlImpact() != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", err.CrawlImpact(), tt.wantImpact)
+			if err.Impact() != tt.wantImpact {
+				t.Errorf("CrawlImpact() = %v, want %v", err.Impact(), tt.wantImpact)
 			}
 
 			if err.Severity() != tt.wantSeverity {

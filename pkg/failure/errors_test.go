@@ -28,15 +28,15 @@ func TestRetryPolicyValues(t *testing.T) {
 	}
 }
 
-// TestCrawlImpactValues verifies that CrawlImpact constants have expected values
-func TestCrawlImpactValues(t *testing.T) {
+// TestImpactLevelValues verifies that ImpactLevel constants have expected values
+func TestImpactLevelValues(t *testing.T) {
 	tests := []struct {
 		name     string
-		impact   CrawlImpact
+		impact   ImpactLevel
 		wantZero bool
 	}{
-		{"ImpactContinue is 0", ImpactContinue, true},
-		{"ImpactAbort is 1", ImpactAbort, false},
+		{"ImpactLevelContinue is 0", ImpactLevelContinue, true},
+		{"ImpactLevelAbort is 1", ImpactLevelAbort, false},
 	}
 
 	for _, tt := range tests {
@@ -77,7 +77,7 @@ func TestSeverityValues(t *testing.T) {
 type mockError struct {
 	err         string
 	retryPolicy RetryPolicy
-	crawlImpact CrawlImpact
+	impactLevel ImpactLevel
 	severity    Severity
 }
 
@@ -89,8 +89,8 @@ func (e *mockError) RetryPolicy() RetryPolicy {
 	return e.retryPolicy
 }
 
-func (e *mockError) CrawlImpact() CrawlImpact {
-	return e.crawlImpact
+func (e *mockError) Impact() ImpactLevel {
+	return e.impactLevel
 }
 
 func (e *mockError) Severity() Severity {
@@ -108,25 +108,25 @@ func TestClassifiedErrorImplementations(t *testing.T) {
 		name       string
 		err        ClassifiedError
 		wantPolicy RetryPolicy
-		wantImpact CrawlImpact
+		wantImpact ImpactLevel
 	}{
 		{
 			name:       "auto-retry error",
-			err:        &mockError{err: "auto-retry", retryPolicy: RetryPolicyAuto, crawlImpact: ImpactContinue},
+			err:        &mockError{err: "auto-retry", retryPolicy: RetryPolicyAuto, impactLevel: ImpactLevelContinue},
 			wantPolicy: RetryPolicyAuto,
-			wantImpact: ImpactContinue,
+			wantImpact: ImpactLevelContinue,
 		},
 		{
 			name:       "manual retry error",
-			err:        &mockError{err: "manual-retry", retryPolicy: RetryPolicyManual, crawlImpact: ImpactContinue},
+			err:        &mockError{err: "manual-retry", retryPolicy: RetryPolicyManual, impactLevel: ImpactLevelContinue},
 			wantPolicy: RetryPolicyManual,
-			wantImpact: ImpactContinue,
+			wantImpact: ImpactLevelContinue,
 		},
 		{
 			name:       "never retry error",
-			err:        &mockError{err: "never-retry", retryPolicy: RetryPolicyNever, crawlImpact: ImpactAbort},
+			err:        &mockError{err: "never-retry", retryPolicy: RetryPolicyNever, impactLevel: ImpactLevelAbort},
 			wantPolicy: RetryPolicyNever,
-			wantImpact: ImpactAbort,
+			wantImpact: ImpactLevelAbort,
 		},
 	}
 
@@ -135,8 +135,8 @@ func TestClassifiedErrorImplementations(t *testing.T) {
 			if got := tt.err.RetryPolicy(); got != tt.wantPolicy {
 				t.Errorf("RetryPolicy() = %v, want %v", got, tt.wantPolicy)
 			}
-			if got := tt.err.CrawlImpact(); got != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", got, tt.wantImpact)
+			if got := tt.err.Impact(); got != tt.wantImpact {
+				t.Errorf("Impact() = %v, want %v", got, tt.wantImpact)
 			}
 		})
 	}

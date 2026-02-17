@@ -51,7 +51,7 @@ const (
 	ErrCauseBrokenAtomicBlock NormalizationErrorCause = "broken atomic block"
 )
 
-// normalizationErrorClassifications provides explicit retry policy and crawl impact
+// normalizationErrorClassifications provides explicit retry policy and impact level
 // for each NormalizationErrorCause. Content processing errors are deterministic -
 // retrying the same content yields the same error.
 //
@@ -59,28 +59,28 @@ const (
 // - All causes: Never retry - content processing errors are deterministic and permanent
 var normalizationErrorClassifications = map[NormalizationErrorCause]struct {
 	Policy failure.RetryPolicy
-	Impact failure.CrawlImpact
+	Impact failure.ImpactLevel
 }{
-	ErrCauseBrokenH1Invariant:        {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseEmptyContent:             {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseSectionDerivationFailed:  {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseTitleExtractionFailed:    {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseHashComputationFailed:    {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseFrontmatterMarshalFailed: {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseSkippedHeadingLevels:     {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseOrphanContent:            {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseEmptySection:             {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseBrokenAtomicBlock:        {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseBrokenH1Invariant:        {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseEmptyContent:             {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseSectionDerivationFailed:  {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseTitleExtractionFailed:    {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseHashComputationFailed:    {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseFrontmatterMarshalFailed: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseSkippedHeadingLevels:     {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseOrphanContent:            {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseEmptySection:             {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseBrokenAtomicBlock:        {failure.RetryPolicyNever, failure.ImpactLevelContinue},
 }
 
 // NormalizationError represents an error that occurred during markdown normalization.
 // It implements failure.ClassifiedError interface with explicit retry policy
-// and crawl impact based on the error cause.
+// and impact level based on the error cause.
 type NormalizationError struct {
 	Message string
 	Cause   NormalizationErrorCause
 	policy  failure.RetryPolicy
-	impact  failure.CrawlImpact
+	impact  failure.ImpactLevel
 }
 
 // NewNormalizationError creates a new NormalizationError with explicit classification based on cause.
@@ -100,7 +100,7 @@ func (e *NormalizationError) Error() string {
 }
 
 func (e *NormalizationError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	switch e.policy {
@@ -121,9 +121,9 @@ func (e *NormalizationError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-// CrawlImpact returns how the scheduler should respond to this error.
+// Impact returns how the scheduler should respond to this error.
 // Normalization errors never abort the crawl - they are per-URL failures.
-func (e *NormalizationError) CrawlImpact() failure.CrawlImpact {
+func (e *NormalizationError) Impact() failure.ImpactLevel {
 	return e.impact
 }
 

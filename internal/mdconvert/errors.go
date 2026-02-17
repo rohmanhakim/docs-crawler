@@ -13,7 +13,7 @@ const (
 	ErrCauseConversionFailure ConversionErrorCause = "conversion failed"
 )
 
-// conversionErrorClassifications provides explicit retry policy and crawl impact
+// conversionErrorClassifications provides explicit retry policy and impact level
 // for each ConversionErrorCause. Content processing errors are deterministic -
 // retrying the same content yields the same error.
 //
@@ -21,19 +21,19 @@ const (
 // - ConversionFailure: Never retry - conversion errors are deterministic and permanent
 var conversionErrorClassifications = map[ConversionErrorCause]struct {
 	Policy failure.RetryPolicy
-	Impact failure.CrawlImpact
+	Impact failure.ImpactLevel
 }{
-	ErrCauseConversionFailure: {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseConversionFailure: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
 }
 
 // ConversionError represents an error that occurred during markdown conversion.
 // It implements failure.ClassifiedError interface with explicit retry policy
-// and crawl impact based on the error cause.
+// and impact level based on the error cause.
 type ConversionError struct {
 	Message string
 	Cause   ConversionErrorCause
 	policy  failure.RetryPolicy
-	impact  failure.CrawlImpact
+	impact  failure.ImpactLevel
 }
 
 // NewConversionError creates a new ConversionError with explicit classification based on cause.
@@ -53,7 +53,7 @@ func (e *ConversionError) Error() string {
 }
 
 func (e *ConversionError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	switch e.policy {
@@ -74,9 +74,9 @@ func (e *ConversionError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-// CrawlImpact returns how the scheduler should respond to this error.
+// Impact returns how the scheduler should respond to this error.
 // Conversion errors never abort the crawl - they are per-URL failures.
-func (e *ConversionError) CrawlImpact() failure.CrawlImpact {
+func (e *ConversionError) Impact() failure.ImpactLevel {
 	return e.impact
 }
 

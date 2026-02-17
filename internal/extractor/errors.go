@@ -14,7 +14,7 @@ const (
 	ErrCauseNotHTML   ExtractionErrorCause = "not an HTML content"
 )
 
-// extractionErrorClassifications provides explicit retry policy and crawl impact
+// extractionErrorClassifications provides explicit retry policy and impact level
 // for each ExtractionErrorCause. Content processing errors are deterministic -
 // retrying the same content yields the same error.
 //
@@ -23,20 +23,20 @@ const (
 // - NotHTML: Never retry - content type mismatch, retrying won't help
 var extractionErrorClassifications = map[ExtractionErrorCause]struct {
 	Policy failure.RetryPolicy
-	Impact failure.CrawlImpact
+	Impact failure.ImpactLevel
 }{
-	ErrCauseNoContent: {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseNotHTML:   {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseNoContent: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseNotHTML:   {failure.RetryPolicyNever, failure.ImpactLevelContinue},
 }
 
 // ExtractionError represents an error that occurred during content extraction.
 // It implements failure.ClassifiedError interface with explicit retry policy
-// and crawl impact based on the error cause.
+// and impact level based on the error cause.
 type ExtractionError struct {
 	Message string
 	Cause   ExtractionErrorCause
 	policy  failure.RetryPolicy
-	impact  failure.CrawlImpact
+	impact  failure.ImpactLevel
 }
 
 // NewExtractionError creates a new ExtractionError with explicit classification based on cause.
@@ -56,7 +56,7 @@ func (e *ExtractionError) Error() string {
 }
 
 func (e *ExtractionError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	switch e.policy {
@@ -77,9 +77,9 @@ func (e *ExtractionError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-// CrawlImpact returns how the scheduler should respond to this error.
+// Impact returns how the scheduler should respond to this error.
 // Extraction errors never abort the crawl - they are per-URL failures.
-func (e *ExtractionError) CrawlImpact() failure.CrawlImpact {
+func (e *ExtractionError) Impact() failure.ImpactLevel {
 	return e.impact
 }
 

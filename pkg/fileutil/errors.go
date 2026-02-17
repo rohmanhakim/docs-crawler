@@ -12,16 +12,16 @@ const (
 	ErrCausePathError FileErrorCause = "path error"
 )
 
-// fileErrorClassifications provides explicit retry policy and crawl impact
+// fileErrorClassifications provides explicit retry policy and impact level
 // for each FileErrorCause. This replaces the old Retryable boolean field
 // with explicit two-dimensional classification.
 var fileErrorClassifications = map[FileErrorCause]struct {
 	Policy failure.RetryPolicy
-	Impact failure.CrawlImpact
+	Impact failure.ImpactLevel
 }{
 	ErrCausePathError: {
 		Policy: failure.RetryPolicyNever,
-		Impact: failure.ImpactContinue,
+		Impact: failure.ImpactLevelContinue,
 	},
 }
 
@@ -29,7 +29,7 @@ type FileError struct {
 	Message string
 	Cause   FileErrorCause
 	policy  failure.RetryPolicy
-	impact  failure.CrawlImpact
+	impact  failure.ImpactLevel
 }
 
 // NewFileError creates a new FileError with explicit classification
@@ -41,7 +41,7 @@ func NewFileError(cause FileErrorCause, message string) *FileError {
 			Message: message,
 			Cause:   cause,
 			policy:  failure.RetryPolicyNever,
-			impact:  failure.ImpactContinue,
+			impact:  failure.ImpactLevelContinue,
 		}
 	}
 	return &FileError{
@@ -57,7 +57,7 @@ func (e *FileError) Error() string {
 }
 
 func (e *FileError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	if e.policy == failure.RetryPolicyNever {
@@ -73,6 +73,6 @@ func (e *FileError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-func (e *FileError) CrawlImpact() failure.CrawlImpact {
+func (e *FileError) Impact() failure.ImpactLevel {
 	return e.impact
 }

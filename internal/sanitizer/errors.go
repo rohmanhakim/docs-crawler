@@ -41,7 +41,7 @@ const (
 	ErrCauseAmbiguousDOM = "ambiguous dom structure"
 )
 
-// sanitizationErrorClassifications provides explicit retry policy and crawl impact
+// sanitizationErrorClassifications provides explicit retry policy and impact level
 // for each SanitizationErrorCause. Content processing errors are deterministic -
 // retrying the same content yields the same error.
 //
@@ -49,24 +49,24 @@ const (
 // - All causes: Never retry - content processing errors are deterministic and permanent
 var sanitizationErrorClassifications = map[SanitizationErrorCause]struct {
 	Policy failure.RetryPolicy
-	Impact failure.CrawlImpact
+	Impact failure.ImpactLevel
 }{
-	ErrCauseUnparseableHTML:     {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseCompetingRoots:      {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseNoStructuralAnchor:  {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseMultipleH1NoRoot:    {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseImpliedMultipleDocs: {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseAmbiguousDOM:        {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseUnparseableHTML:     {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseCompetingRoots:      {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseNoStructuralAnchor:  {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseMultipleH1NoRoot:    {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseImpliedMultipleDocs: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseAmbiguousDOM:        {failure.RetryPolicyNever, failure.ImpactLevelContinue},
 }
 
 // SanitizationError represents an error that occurred during HTML sanitization.
 // It implements failure.ClassifiedError interface with explicit retry policy
-// and crawl impact based on the error cause.
+// and impact level based on the error cause.
 type SanitizationError struct {
 	Message string
 	Cause   SanitizationErrorCause
 	policy  failure.RetryPolicy
-	impact  failure.CrawlImpact
+	impact  failure.ImpactLevel
 }
 
 // NewSanitizationError creates a new SanitizationError with explicit classification based on cause.
@@ -86,7 +86,7 @@ func (e *SanitizationError) Error() string {
 }
 
 func (e *SanitizationError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	switch e.policy {
@@ -107,9 +107,9 @@ func (e *SanitizationError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-// CrawlImpact returns how the scheduler should respond to this error.
+// Impact returns how the scheduler should respond to this error.
 // Sanitization errors never abort the crawl - they are per-URL failures.
-func (e *SanitizationError) CrawlImpact() failure.CrawlImpact {
+func (e *SanitizationError) Impact() failure.ImpactLevel {
 	return e.impact
 }
 

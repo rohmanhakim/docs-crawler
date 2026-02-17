@@ -21,32 +21,32 @@ const (
 	ErrCauseRepeated403           = "repeated 403s"
 )
 
-// fetchErrorClassifications provides explicit retry policy and crawl impact
+// fetchErrorClassifications provides explicit retry policy and impact level
 // for each FetchErrorCause. This replaces the old Retryable boolean field
 // with explicit two-dimensional classification.
 var fetchErrorClassifications = map[FetchErrorCause]struct {
 	Policy failure.RetryPolicy
-	Impact failure.CrawlImpact
+	Impact failure.ImpactLevel
 }{
-	ErrCauseTimeout:               {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseNetworkFailure:        {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseReadResponseBodyError: {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseContentTypeInvalid:    {failure.RetryPolicyManual, failure.ImpactContinue},
-	ErrCauseRedirectLimitExceeded: {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseRequestPageForbidden:  {failure.RetryPolicyManual, failure.ImpactContinue},
-	ErrCauseRequestTooMany:        {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseRequest5xx:            {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseRepeated403:           {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseTimeout:               {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseNetworkFailure:        {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseReadResponseBodyError: {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseContentTypeInvalid:    {failure.RetryPolicyManual, failure.ImpactLevelContinue},
+	ErrCauseRedirectLimitExceeded: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseRequestPageForbidden:  {failure.RetryPolicyManual, failure.ImpactLevelContinue},
+	ErrCauseRequestTooMany:        {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseRequest5xx:            {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseRepeated403:           {failure.RetryPolicyNever, failure.ImpactLevelContinue},
 }
 
 // FetchError represents an error that occurred during HTTP fetch operations.
 // It implements failure.ClassifiedError interface with explicit retry policy
-// and crawl impact based on the error cause.
+// and impact level based on the error cause.
 type FetchError struct {
 	Message string
 	Cause   FetchErrorCause
 	policy  failure.RetryPolicy
-	impact  failure.CrawlImpact
+	impact  failure.ImpactLevel
 }
 
 // NewFetchError creates a new FetchError with explicit classification based on cause.
@@ -66,7 +66,7 @@ func (e *FetchError) Error() string {
 }
 
 func (e *FetchError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	switch e.policy {
@@ -87,9 +87,9 @@ func (e *FetchError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-// CrawlImpact returns how the scheduler should respond to this error.
+// Impact returns how the scheduler should respond to this error.
 // Fetch errors never abort the crawl - they are per-URL failures.
-func (e *FetchError) CrawlImpact() failure.CrawlImpact {
+func (e *FetchError) Impact() failure.ImpactLevel {
 	return e.impact
 }
 

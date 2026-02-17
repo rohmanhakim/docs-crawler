@@ -26,37 +26,37 @@ const (
 	ErrCauseHashError             = "hash error"
 )
 
-// assetsErrorClassifications provides explicit retry policy and crawl impact
+// assetsErrorClassifications provides explicit retry policy and impact level
 // for each AssetsErrorCause. This replaces the old Retryable boolean field
 // with explicit two-dimensional classification.
 var assetsErrorClassifications = map[AssetsErrorCause]struct {
 	Policy failure.RetryPolicy
-	Impact failure.CrawlImpact
+	Impact failure.ImpactLevel
 }{
-	ErrCauseTimeout:               {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseNetworkFailure:        {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseReadResponseBodyError: {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseRequest5xx:            {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseRequestTooMany:        {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseRequestPageForbidden:  {failure.RetryPolicyManual, failure.ImpactContinue},
-	ErrCauseDiskFull:              {failure.RetryPolicyManual, failure.ImpactContinue},
-	ErrCauseRepeated403:           {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseAssetTooLarge:         {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseRedirectLimitExceeded: {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseContentTypeInvalid:    {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseWriteFailure:          {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCausePathError:             {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseHashError:             {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseTimeout:               {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseNetworkFailure:        {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseReadResponseBodyError: {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseRequest5xx:            {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseRequestTooMany:        {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseRequestPageForbidden:  {failure.RetryPolicyManual, failure.ImpactLevelContinue},
+	ErrCauseDiskFull:              {failure.RetryPolicyManual, failure.ImpactLevelContinue},
+	ErrCauseRepeated403:           {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseAssetTooLarge:         {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseRedirectLimitExceeded: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseContentTypeInvalid:    {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseWriteFailure:          {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCausePathError:             {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseHashError:             {failure.RetryPolicyNever, failure.ImpactLevelContinue},
 }
 
 // AssetsError represents an error that occurred during asset resolution.
 // It implements failure.ClassifiedError interface with explicit retry policy
-// and crawl impact based on the error cause.
+// and impact level based on the error cause.
 type AssetsError struct {
 	Message string
 	Cause   AssetsErrorCause
 	policy  failure.RetryPolicy
-	impact  failure.CrawlImpact
+	impact  failure.ImpactLevel
 }
 
 // NewAssetsError creates a new AssetsError with explicit classification based on cause.
@@ -76,7 +76,7 @@ func (e *AssetsError) Error() string {
 }
 
 func (e *AssetsError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	switch e.policy {
@@ -97,9 +97,9 @@ func (e *AssetsError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-// CrawlImpact returns how the scheduler should respond to this error.
+// Impact returns how the scheduler should respond to this error.
 // Asset errors never abort the crawl - they are per-URL failures.
-func (e *AssetsError) CrawlImpact() failure.CrawlImpact {
+func (e *AssetsError) Impact() failure.ImpactLevel {
 	return e.impact
 }
 

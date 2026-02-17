@@ -17,6 +17,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/html"
@@ -38,6 +39,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -92,6 +94,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -133,6 +136,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -181,6 +185,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -224,6 +229,7 @@ func TestScheduler_Resolve_DiskFullError_ContinuesCrawl(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -272,6 +278,7 @@ func TestScheduler_Resolve_DiskFullError_ContinuesCrawl(t *testing.T) {
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -312,6 +319,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -359,6 +367,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -399,6 +408,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Only expect one Decide call for the seed URL
@@ -447,6 +457,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -494,6 +505,7 @@ func TestScheduler_Resolve_DiskFullError_DoesNotPreventSubsequentCalls(t *testin
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -542,6 +554,7 @@ func TestScheduler_Resolve_DiskFullError_DoesNotPreventSubsequentCalls(t *testin
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -585,6 +598,7 @@ func createSchedulerWithAllMocks(
 	mockResolver assets.Resolver,
 	mockStorage *storageMock,
 	mockSleeper *sleeperMock,
+	mockFailureJournal failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
 	// Create real components if mocks not provided
@@ -630,6 +644,7 @@ func createSchedulerWithAllMocks(
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	return &s
 }

@@ -10,13 +10,13 @@ const (
 	RetryPolicyNever                     // Permanent failure, do not track for retry
 )
 
-// CrawlImpact defines how the scheduler should respond
-// This controls crawl lifecycle decisions
-type CrawlImpact int
+// ImpactLevel defines how the scheduler should respond
+// This controls processing lifecycle decisions
+type ImpactLevel int
 
 const (
-	ImpactContinue CrawlImpact = iota // Continue to next URL (default)
-	ImpactAbort                       // Abort entire crawl (systemic failure)
+	ImpactLevelContinue ImpactLevel = iota // Continue to next item (default)
+	ImpactLevelAbort                       // Abort entire operation (systemic failure)
 )
 
 // Severity provides observability and legacy compatibility
@@ -37,9 +37,9 @@ type ClassifiedError interface {
 	// Used by retry handler
 	RetryPolicy() RetryPolicy
 
-	// CrawlImpact controls scheduler continuation/abortion
+	// Impact controls processing continuation/abortion
 	// Used by scheduler
-	CrawlImpact() CrawlImpact
+	Impact() ImpactLevel
 
 	// Severity provides observability and legacy compatibility
 	// Used by: metadata recording, logging, monitoring

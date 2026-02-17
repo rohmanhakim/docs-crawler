@@ -20,6 +20,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -428,6 +429,7 @@ func createSchedulerWithAllMocksAndNormalize(
 	mockNormalize *normalizeMock,
 	mockStorage *storageMock,
 	mockSleeper *sleeperMock,
+	mockFailureJournal ...failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
 	// Create real components if mocks not provided
@@ -448,15 +450,13 @@ func createSchedulerWithAllMocksAndNormalize(
 		setupNormalizeMockWithSuccess(mockNormalize)
 	}
 
-	// Setup frontier mock expectations that are common to all tests
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0)
-	mockFrontier.On("IsDepthExhausted", mock.Anything).Return(true)
-	mockFrontier.On("CurrentMinDepth").Return(-1)
-	mockFrontier.On("Submit", mock.Anything).Return()
-	// Provide a default Dequeue to return no more URLs after the test's specific token
-	mockFrontier.On("Dequeue").Return(frontier.CrawlToken{}, false)
-	// Dequeue is expected to be set up by each test explicitly using SetupDequeueToReturn
+	// Create a failure journal if none provided
+	var journal failurejournal.Journal
+	if len(mockFailureJournal) > 0 && mockFailureJournal[0] != nil {
+		journal = mockFailureJournal[0]
+	} else {
+		journal = failurejournal.NewInMemoryJournal()
+	}
 
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
@@ -473,6 +473,7 @@ func createSchedulerWithAllMocksAndNormalize(
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		journal,
 	)
 	return &s
 }

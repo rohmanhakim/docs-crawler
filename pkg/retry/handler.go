@@ -26,8 +26,8 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 			err: NewRetryError(
 				ErrZeroAttempt,
 				"max attempt cannot be 0",
-				failure.RetryPolicyNever, // Zero attempt is a configuration error
-				failure.ImpactContinue,   // But it doesn't abort the crawl
+				failure.RetryPolicyNever,    // Zero attempt is a configuration error
+				failure.ImpactLevelContinue, // But it doesn't abort the crawl
 				nil,
 			),
 			attempts: 0,
@@ -80,9 +80,9 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 		err: NewRetryError(
 			ErrExhaustedAttempts,
 			fmt.Sprintf("exhausted %d attempts. Last error: %v", retryParam.MaxAttempts, lastErr),
-			failure.RetryPolicyManual, // Exhausted auto-retry → manual retry eligible
-			failure.ImpactContinue,    // Don't abort crawl
-			lastErr,                   // Preserve original error
+			failure.RetryPolicyManual,   // Exhausted auto-retry → manual retry eligible
+			failure.ImpactLevelContinue, // Don't abort crawl
+			lastErr,                     // Preserve original error
 		),
 		attempts: retryParam.MaxAttempts,
 	}

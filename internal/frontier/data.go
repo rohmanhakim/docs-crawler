@@ -111,23 +111,3 @@ func (d DiscoveryMetadata) Depth() int {
 func (d DiscoveryMetadata) DelayOverride() *time.Duration {
 	return d.delayOverride
 }
-
-// Stage represents a pipeline stage that can fail and be retried.
-type Stage string
-
-const (
-	StageFetch   Stage = "fetch"
-	StageAsset   Stage = "asset"
-	StageStorage Stage = "storage"
-)
-
-// RetryEntry represents a URL that is queued for manual retry.
-// This is used when auto-retry is exhausted but the user may want to retry later.
-// The fields are designed to map directly to FailureRecord for future persistence.
-type RetryEntry struct {
-	URL        url.URL
-	Reason     string
-	Timestamp  time.Time
-	Stage      Stage // Pipeline stage that failed - for Failure Journal
-	RetryCount int   // Number of auto-retry attempts before manual - for Failure Journal
-}

@@ -13,6 +13,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
@@ -22,6 +23,7 @@ import (
 // If mockSanitizer is nil, a real sanitizer will be created.
 // If mockConvert is nil, a convert mock with default success will be created.
 // If mockNormalize is nil, a normalize mock with default success will be created.
+// If mockFailureJournal is not provided, a real in-memory journal will be created.
 func createSchedulerForTest(
 	t *testing.T,
 	ctx context.Context,
@@ -37,6 +39,7 @@ func createSchedulerForTest(
 	mockNormalize *normalizeMock,
 	mockStorage *storageMock,
 	mockSleeper timeutil.Sleeper,
+	mockFailureJournal ...failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
 	// Create a real extractor if none provided
@@ -62,6 +65,11 @@ func createSchedulerForTest(
 		mockNormalize = newNormalizeMockForTest(t)
 		setupNormalizeMockWithSuccess(mockNormalize)
 	}
+	// Create a failure journal if none provided
+	var journal failurejournal.Journal = failurejournal.NewInMemoryJournal()
+	if len(mockFailureJournal) > 0 && mockFailureJournal[0] != nil {
+		journal = mockFailureJournal[0]
+	}
 
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
@@ -78,6 +86,7 @@ func createSchedulerForTest(
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		journal,
 	)
 	return &s
 }

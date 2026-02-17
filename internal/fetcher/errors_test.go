@@ -14,7 +14,7 @@ func TestFetchError_Classifications(t *testing.T) {
 		name         string
 		cause        FetchErrorCause
 		wantPolicy   failure.RetryPolicy
-		wantImpact   failure.CrawlImpact
+		wantImpact   failure.ImpactLevel
 		wantSeverity failure.Severity
 	}{
 		// ErrCauseTimeout - transient network issue, should auto-retry
@@ -22,7 +22,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseTimeout should be RetryPolicyAuto",
 			cause:        ErrCauseTimeout,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		// ErrCauseNetworkFailure - transient network issue, should auto-retry
@@ -30,7 +30,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseNetworkFailure should be RetryPolicyAuto",
 			cause:        ErrCauseNetworkFailure,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		// ErrCauseReadResponseBodyError - transient read issue, should auto-retry
@@ -38,7 +38,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseReadResponseBodyError should be RetryPolicyAuto",
 			cause:        ErrCauseReadResponseBodyError,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		// ErrCauseContentTypeInvalid - non-recoverable content issue, manual retry eligible
@@ -46,7 +46,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseContentTypeInvalid should be RetryPolicyManual",
 			cause:        ErrCauseContentTypeInvalid,
 			wantPolicy:   failure.RetryPolicyManual,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRetryExhausted,
 		},
 		// ErrCauseRedirectLimitExceeded - permanent config issue, never retry
@@ -54,7 +54,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseRedirectLimitExceeded should be RetryPolicyNever",
 			cause:        ErrCauseRedirectLimitExceeded,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		// ErrCauseRequestPageForbidden - auth issue, manual retry eligible after user fixes auth
@@ -62,7 +62,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseRequestPageForbidden should be RetryPolicyManual",
 			cause:        ErrCauseRequestPageForbidden,
 			wantPolicy:   failure.RetryPolicyManual,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRetryExhausted,
 		},
 		// ErrCauseRequestTooMany - rate limit, should auto-retry with backoff
@@ -70,7 +70,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseRequestTooMany should be RetryPolicyAuto",
 			cause:        ErrCauseRequestTooMany,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		// ErrCauseRequest5xx - server error, should auto-retry
@@ -78,7 +78,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseRequest5xx should be RetryPolicyAuto",
 			cause:        ErrCauseRequest5xx,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		// ErrCauseRepeated403 - repeated auth failures, never retry
@@ -86,7 +86,7 @@ func TestFetchError_Classifications(t *testing.T) {
 			name:         "ErrCauseRepeated403 should be RetryPolicyNever",
 			cause:        ErrCauseRepeated403,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 	}
@@ -99,8 +99,8 @@ func TestFetchError_Classifications(t *testing.T) {
 				t.Errorf("RetryPolicy() = %v, want %v", err.RetryPolicy(), tt.wantPolicy)
 			}
 
-			if err.CrawlImpact() != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", err.CrawlImpact(), tt.wantImpact)
+			if err.Impact() != tt.wantImpact {
+				t.Errorf("Impact() = %v, want %v", err.Impact(), tt.wantImpact)
 			}
 
 			if err.Severity() != tt.wantSeverity {

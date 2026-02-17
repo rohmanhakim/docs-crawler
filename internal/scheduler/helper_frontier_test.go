@@ -1,7 +1,6 @@
 package scheduler_test
 
 import (
-	"net/url"
 	"testing"
 
 	"github.com/rohmanhakim/docs-crawler/internal/config"
@@ -17,8 +16,6 @@ type frontierMock struct {
 	// disableAutoEnqueue prevents automatic enqueueing of tokens on Submit()
 	// This allows tests to explicitly control Dequeue return values via OnDequeue()
 	disableAutoEnqueue bool
-	// retryQueue tracks URLs added for manual retry
-	retryQueue map[string]url.URL
 }
 
 func (f *frontierMock) Init(cfg config.Config) {
@@ -108,41 +105,6 @@ func (f *frontierMock) OnDequeue(token frontier.CrawlToken, ok bool) *mock.Call 
 // This is a convenience wrapper around OnDequeue().Once().
 func (f *frontierMock) SetupDequeueToReturn(token frontier.CrawlToken, ok bool) {
 	f.OnDequeue(token, ok).Once()
-}
-
-// BookKeepForRetry tracks a URL for manual retry (new interface method)
-func (f *frontierMock) BookKeepForRetry(targetURL url.URL, reason error, stage frontier.Stage, retryCount int) {
-	// Initialize retry queue if needed
-	if f.retryQueue == nil {
-		f.retryQueue = make(map[string]url.URL)
-	}
-	// Track URL in retry queue (deduplicate by URL string)
-	f.retryQueue[targetURL.String()] = targetURL
-}
-
-// GetRetryCandidates returns URLs eligible for manual retry (new interface method)
-func (f *frontierMock) GetRetryCandidates() []url.URL {
-	if f.retryQueue == nil {
-		return nil
-	}
-	candidates := make([]url.URL, 0, len(f.retryQueue))
-	for _, u := range f.retryQueue {
-		candidates = append(candidates, u)
-	}
-	return candidates
-}
-
-// RetryQueueSize returns the number of URLs in retry queue (new interface method)
-func (f *frontierMock) RetryQueueSize() int {
-	if f.retryQueue == nil {
-		return 0
-	}
-	return len(f.retryQueue)
-}
-
-// ClearRetryQueue clears URLs from retry queue (new interface method)
-func (f *frontierMock) ClearRetryQueue(processed []url.URL) {
-	// No-op for tests that don't need to verify this
 }
 
 func newFrontierMockForTest(t *testing.T) *frontierMock {

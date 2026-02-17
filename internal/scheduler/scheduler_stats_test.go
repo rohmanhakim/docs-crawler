@@ -14,6 +14,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -174,6 +175,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 		normalizeMock,
 		mockStorage,
 		mockSleeper,
+		failurejournal.NewInMemoryJournal(),
 	)
 
 	tmpDir := t.TempDir()

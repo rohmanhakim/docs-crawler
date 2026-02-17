@@ -7,14 +7,14 @@ import (
 )
 
 // TestConversionError_Classifications tests that all ConversionErrorCause values
-// have the correct RetryPolicy and CrawlImpact classification.
+// have the correct RetryPolicy and ImpactLevel classification.
 // This ensures the two-dimensional error classification is correctly applied.
 func TestConversionError_Classifications(t *testing.T) {
 	tests := []struct {
 		name         string
 		cause        ConversionErrorCause
 		wantPolicy   failure.RetryPolicy
-		wantImpact   failure.CrawlImpact
+		wantImpact   failure.ImpactLevel
 		wantSeverity failure.Severity
 	}{
 		// Never retry: content processing errors are deterministic
@@ -22,7 +22,7 @@ func TestConversionError_Classifications(t *testing.T) {
 			name:         "ErrCauseConversionFailure should be RetryPolicyNever",
 			cause:        ErrCauseConversionFailure,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 	}
@@ -35,8 +35,8 @@ func TestConversionError_Classifications(t *testing.T) {
 				t.Errorf("RetryPolicy() = %v, want %v", err.RetryPolicy(), tt.wantPolicy)
 			}
 
-			if err.CrawlImpact() != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", err.CrawlImpact(), tt.wantImpact)
+			if err.Impact() != tt.wantImpact {
+				t.Errorf("ImpactLevel() = %v, want %v", err.Impact(), tt.wantImpact)
 			}
 
 			if err.Severity() != tt.wantSeverity {

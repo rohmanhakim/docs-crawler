@@ -21,7 +21,7 @@ const (
 	ErrCauseParseError           = "failed to parse robots.txt"
 )
 
-// robotsErrorClassifications provides explicit retry policy and crawl impact
+// robotsErrorClassifications provides explicit retry policy and impact level
 // for each RobotsErrorCause. This replaces the old Retryable boolean field
 // with explicit two-dimensional classification.
 //
@@ -37,27 +37,27 @@ const (
 // - HttpUnexpectedStatus: Never retry, unknown status, likely permanent
 var robotsErrorClassifications = map[RobotsErrorCause]struct {
 	Policy failure.RetryPolicy
-	Impact failure.CrawlImpact
+	Impact failure.ImpactLevel
 }{
-	ErrCauseHttpTooManyRequests:  {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseHttpServerError:      {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseHttpFetchFailure:     {failure.RetryPolicyAuto, failure.ImpactContinue},
-	ErrCauseDisallowRoot:         {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseParseError:           {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseInvalidRobotsUrl:     {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCausePreFetchFailure:      {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseHttpTooManyRedirects: {failure.RetryPolicyNever, failure.ImpactContinue},
-	ErrCauseHttpUnexpectedStatus: {failure.RetryPolicyNever, failure.ImpactContinue},
+	ErrCauseHttpTooManyRequests:  {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseHttpServerError:      {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseHttpFetchFailure:     {failure.RetryPolicyAuto, failure.ImpactLevelContinue},
+	ErrCauseDisallowRoot:         {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseParseError:           {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseInvalidRobotsUrl:     {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCausePreFetchFailure:      {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseHttpTooManyRedirects: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseHttpUnexpectedStatus: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
 }
 
 // RobotsError represents an error that occurred during robots.txt processing.
 // It implements failure.ClassifiedError interface with explicit retry policy
-// and crawl impact based on the error cause.
+// and impact level based on the error cause.
 type RobotsError struct {
 	Message string
 	Cause   RobotsErrorCause
 	policy  failure.RetryPolicy
-	impact  failure.CrawlImpact
+	impact  failure.ImpactLevel
 }
 
 // NewRobotsError creates a new RobotsError with explicit classification based on cause.
@@ -77,7 +77,7 @@ func (e *RobotsError) Error() string {
 }
 
 func (e *RobotsError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	switch e.policy {
@@ -98,9 +98,9 @@ func (e *RobotsError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-// CrawlImpact returns how the scheduler should respond to this error.
+// Impact returns how the scheduler should respond to this error.
 // Robots errors never abort the crawl - they are per-URL failures.
-func (e *RobotsError) CrawlImpact() failure.CrawlImpact {
+func (e *RobotsError) Impact() failure.ImpactLevel {
 	return e.impact
 }
 

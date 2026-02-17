@@ -7,14 +7,14 @@ import (
 )
 
 // TestSanitizationError_Classifications tests that all SanitizationErrorCause values
-// have the correct RetryPolicy and CrawlImpact classification.
+// have the correct RetryPolicy and ImpactLevel classification.
 // This ensures the two-dimensional error classification is correctly applied.
 func TestSanitizationError_Classifications(t *testing.T) {
 	tests := []struct {
 		name         string
 		cause        SanitizationErrorCause
 		wantPolicy   failure.RetryPolicy
-		wantImpact   failure.CrawlImpact
+		wantImpact   failure.ImpactLevel
 		wantSeverity failure.Severity
 	}{
 		// Never retry: content processing errors are deterministic
@@ -22,42 +22,42 @@ func TestSanitizationError_Classifications(t *testing.T) {
 			name:         "ErrCauseUnparseableHTML should be RetryPolicyNever",
 			cause:        ErrCauseUnparseableHTML,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseCompetingRoots should be RetryPolicyNever",
 			cause:        ErrCauseCompetingRoots,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseNoStructuralAnchor should be RetryPolicyNever",
 			cause:        ErrCauseNoStructuralAnchor,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseMultipleH1NoRoot should be RetryPolicyNever",
 			cause:        ErrCauseMultipleH1NoRoot,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseImpliedMultipleDocs should be RetryPolicyNever",
 			cause:        ErrCauseImpliedMultipleDocs,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseAmbiguousDOM should be RetryPolicyNever",
 			cause:        ErrCauseAmbiguousDOM,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 	}
@@ -70,8 +70,8 @@ func TestSanitizationError_Classifications(t *testing.T) {
 				t.Errorf("RetryPolicy() = %v, want %v", err.RetryPolicy(), tt.wantPolicy)
 			}
 
-			if err.CrawlImpact() != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", err.CrawlImpact(), tt.wantImpact)
+			if err.Impact() != tt.wantImpact {
+				t.Errorf("ImpactLevel() = %v, want %v", err.Impact(), tt.wantImpact)
 			}
 
 			if err.Severity() != tt.wantSeverity {

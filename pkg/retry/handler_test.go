@@ -42,8 +42,8 @@ func (m *mockError) RetryPolicy() failure.RetryPolicy {
 	return failure.RetryPolicyManual
 }
 
-func (m *mockError) CrawlImpact() failure.CrawlImpact {
-	return failure.ImpactContinue
+func (m *mockError) Impact() failure.ImpactLevel {
+	return failure.ImpactLevelContinue
 }
 
 // TestRetry_SuccessOnFirstAttempt verifies that a successful function returns immediately
@@ -532,8 +532,8 @@ func (e *errorWithoutIsRetryable) RetryPolicy() failure.RetryPolicy {
 	return failure.RetryPolicyAuto
 }
 
-func (e *errorWithoutIsRetryable) CrawlImpact() failure.CrawlImpact {
-	return failure.ImpactContinue
+func (e *errorWithoutIsRetryable) Impact() failure.ImpactLevel {
+	return failure.ImpactLevelContinue
 }
 
 // TestRetry_DefaultRetryableWhenNoIsRetryable verifies backward compatibility

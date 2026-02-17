@@ -18,7 +18,7 @@ import (
 )
 
 // TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl verifies that HTTP 403 errors
-// do not abort the crawl and the URL is tracked in the retry queue.
+// do not abort the crawl and the URL is tracked in the failure journal.
 func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -29,6 +29,7 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Setup robot to allow
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -62,7 +63,7 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 		msg:         "forbidden (403)",
 		severity:    failure.SeverityRetryExhausted,
 		retryPolicy: failure.RetryPolicyManual,
-		crawlImpact: failure.ImpactContinue,
+		impactLevel: failure.ImpactLevelContinue,
 	}
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, forbiddenErr)
@@ -82,6 +83,7 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -101,12 +103,12 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 	// The error should be handled gracefully
 	t.Logf("Execution result: err=%v", execErr)
 
-	// Verify: retry queue should have the URL
-	assert.Equal(t, 1, mockFrontier.RetryQueueSize(), "URL should be in retry queue")
+	// Verify: failure journal should have recorded the URL
+	mockFailureJournal.AssertCalled(t, "Record", mock.Anything)
 }
 
 // TestScheduler_ErrorHandling_ManualRetry_Tracked verifies that errors with
-// RetryPolicyManual are tracked in the retry queue.
+// RetryPolicyManual are tracked in the failure journal.
 func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -117,6 +119,7 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -146,7 +149,7 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 		msg:         "non-HTML content type",
 		severity:    failure.SeverityRetryExhausted,
 		retryPolicy: failure.RetryPolicyManual,
-		crawlImpact: failure.ImpactContinue,
+		impactLevel: failure.ImpactLevelContinue,
 	}
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, contentTypeErr)
@@ -166,6 +169,7 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -184,8 +188,8 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 	// Verify: error is handled, not fatal
 	t.Logf("Execution result: err=%v", execErr)
 
-	// Verify: URL tracked in retry queue
-	assert.Equal(t, 1, mockFrontier.RetryQueueSize(), "URL should be tracked for manual retry")
+	// Verify: failure journal recorded the URL
+	mockFailureJournal.AssertCalled(t, "Record", mock.Anything)
 }
 
 // TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl verifies that errors with
@@ -200,6 +204,7 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -229,7 +234,7 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 		msg:         "systemic failure: critical service unavailable",
 		severity:    failure.SeverityFatal,
 		retryPolicy: failure.RetryPolicyNever,
-		crawlImpact: failure.ImpactAbort,
+		impactLevel: failure.ImpactLevelAbort,
 	}
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, systemicErr)
@@ -249,6 +254,7 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -270,7 +276,7 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 }
 
 // TestScheduler_ErrorHandling_StorageError_ManualRetry verifies that storage errors
-// with RetryPolicyManual are tracked in the retry queue.
+// with RetryPolicyManual are tracked in the failure journal.
 func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -281,6 +287,7 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -333,6 +340,7 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -364,6 +372,7 @@ func TestScheduler_ErrorHandling_ConfigError_AbortsCrawl(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	s := createSchedulerForTest(
 		t,
@@ -380,6 +389,7 @@ func TestScheduler_ErrorHandling_ConfigError_AbortsCrawl(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -413,6 +423,7 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -448,7 +459,7 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 		msg:         "rate limited (429)",
 		severity:    failure.SeverityRetryExhausted,
 		retryPolicy: failure.RetryPolicyManual,
-		crawlImpact: failure.ImpactContinue,
+		impactLevel: failure.ImpactLevelContinue,
 	}
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, retryErr).Once()
@@ -476,6 +487,7 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -494,12 +506,12 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 	// Verify: crawl completed (not aborted)
 	t.Logf("Execution result: err=%v", execErr)
 
-	// Verify: at least one URL is in retry queue (the one that failed with manual retry)
-	assert.GreaterOrEqual(t, mockFrontier.RetryQueueSize(), 1, "Failed URL should be in retry queue")
+	// Verify: failure journal recorded the failed URL (the one that failed with manual retry)
+	mockFailureJournal.AssertCalled(t, "Record", mock.Anything)
 }
 
 // TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked verifies that errors with
-// RetryPolicyAuto are NOT tracked in the retry queue (they're handled by retry handler).
+// RetryPolicyAuto are NOT tracked in the failure journal (they're handled by retry handler).
 func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -510,6 +522,7 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -539,7 +552,7 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 		msg:         "temporary network failure",
 		severity:    failure.SeverityRecoverable,
 		retryPolicy: failure.RetryPolicyAuto,
-		crawlImpact: failure.ImpactContinue,
+		impactLevel: failure.ImpactLevelContinue,
 	}
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, retryableErr)
@@ -559,6 +572,7 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -577,12 +591,12 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 	// Verify: error handled gracefully
 	t.Logf("Execution result: err=%v", execErr)
 
-	// Verify: retry queue should NOT have the URL (auto-retry errors handled by retry handler)
-	assert.Equal(t, 0, mockFrontier.RetryQueueSize(), "Auto-retry errors should NOT be in retry queue")
+	// Verify: failure journal should NOT have recorded the URL (auto-retry errors handled by retry handler)
+	mockFailureJournal.AssertNotCalled(t, "Record", mock.Anything)
 }
 
 // TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked verifies that errors with
-// RetryPolicyNever are NOT tracked in the retry queue (permanent failures).
+// RetryPolicyNever are NOT tracked in the failure journal (permanent failures).
 func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -593,6 +607,7 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -622,7 +637,7 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 		msg:         "invalid content type - not retryable",
 		severity:    failure.SeverityRecoverable,
 		retryPolicy: failure.RetryPolicyNever,
-		crawlImpact: failure.ImpactContinue,
+		impactLevel: failure.ImpactLevelContinue,
 	}
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, permanentErr)
@@ -642,6 +657,7 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -660,6 +676,6 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 	// Verify: error handled gracefully
 	t.Logf("Execution result: err=%v", execErr)
 
-	// Verify: retry queue should NOT have the URL (never-retry errors are permanent)
-	assert.Equal(t, 0, mockFrontier.RetryQueueSize(), "Never-retry errors should NOT be in retry queue")
+	// Verify: failure journal should NOT have recorded the URL (never-retry errors are permanent)
+	mockFailureJournal.AssertNotCalled(t, "Record", mock.Anything)
 }

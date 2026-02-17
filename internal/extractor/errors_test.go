@@ -14,7 +14,7 @@ func TestExtractionError_Classifications(t *testing.T) {
 		name         string
 		cause        ExtractionErrorCause
 		wantPolicy   failure.RetryPolicy
-		wantImpact   failure.CrawlImpact
+		wantImpact   failure.ImpactLevel
 		wantSeverity failure.Severity
 	}{
 		// Never retry: content processing errors are deterministic
@@ -22,14 +22,14 @@ func TestExtractionError_Classifications(t *testing.T) {
 			name:         "ErrCauseNoContent should be RetryPolicyNever",
 			cause:        ErrCauseNoContent,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseNotHTML should be RetryPolicyNever",
 			cause:        ErrCauseNotHTML,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 	}
@@ -42,8 +42,8 @@ func TestExtractionError_Classifications(t *testing.T) {
 				t.Errorf("RetryPolicy() = %v, want %v", err.RetryPolicy(), tt.wantPolicy)
 			}
 
-			if err.CrawlImpact() != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", err.CrawlImpact(), tt.wantImpact)
+			if err.Impact() != tt.wantImpact {
+				t.Errorf("CrawlImpact() = %v, want %v", err.Impact(), tt.wantImpact)
 			}
 
 			if err.Severity() != tt.wantSeverity {

@@ -301,7 +301,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	fatalErr := &mockClassifiedError{
 		msg:         "invalid URL scheme",
 		severity:    failure.SeverityFatal,
-		crawlImpact: failure.ImpactAbort,
+		impactLevel: failure.ImpactLevelAbort,
 	}
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetcher.FetchResult{}, fatalErr)

@@ -7,7 +7,7 @@ type mockClassifiedError struct {
 	msg         string
 	severity    failure.Severity
 	retryPolicy failure.RetryPolicy
-	crawlImpact failure.CrawlImpact
+	impactLevel failure.ImpactLevel
 }
 
 func (e *mockClassifiedError) Error() string {
@@ -22,6 +22,6 @@ func (e *mockClassifiedError) RetryPolicy() failure.RetryPolicy {
 	return e.retryPolicy
 }
 
-func (e *mockClassifiedError) CrawlImpact() failure.CrawlImpact {
-	return e.crawlImpact
+func (e *mockClassifiedError) Impact() failure.ImpactLevel {
+	return e.impactLevel
 }

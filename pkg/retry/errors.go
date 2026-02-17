@@ -20,7 +20,7 @@ type RetryError struct {
 	Cause   RetryErrorCause
 	wrapped error               // Original error that caused the retry failure
 	policy  failure.RetryPolicy // Cached policy for interface method
-	impact  failure.CrawlImpact // Cached impact for interface method
+	impact  failure.ImpactLevel // Cached impact for interface method
 }
 
 // NewRetryError creates a new RetryError with explicit classification.
@@ -28,9 +28,9 @@ type RetryError struct {
 //   - cause: The error cause (ErrZeroAttempt or ErrExhaustedAttempts)
 //   - message: Human-readable error message
 //   - policy: failure.RetryPolicyAuto, failure.RetryPolicyManual, or failure.RetryPolicyNever
-//   - impact: failure.ImpactContinue or failure.ImpactAbort
+//   - impact: failure.ImpactLevelContinue or failure.ImpactLevelAbort
 //   - wrapped: The original error that caused the retry failure (may be nil)
-func NewRetryError(cause RetryErrorCause, message string, policy failure.RetryPolicy, impact failure.CrawlImpact, wrapped error) *RetryError {
+func NewRetryError(cause RetryErrorCause, message string, policy failure.RetryPolicy, impact failure.ImpactLevel, wrapped error) *RetryError {
 	return &RetryError{
 		Message: message,
 		Cause:   cause,
@@ -56,7 +56,7 @@ func (e *RetryError) Unwrap() error {
 // Severity returns the severity for observability.
 // Derives from policy and impact for backward compatibility.
 func (e *RetryError) Severity() failure.Severity {
-	if e.impact == failure.ImpactAbort {
+	if e.impact == failure.ImpactLevelAbort {
 		return failure.SeverityFatal
 	}
 	switch e.policy {
@@ -77,9 +77,9 @@ func (e *RetryError) RetryPolicy() failure.RetryPolicy {
 	return e.policy
 }
 
-// CrawlImpact returns how the scheduler should respond to this error.
+// Impact returns how the scheduler should respond to this error.
 // RetryError should never abort the crawl. It returns the cached impact.
-func (e *RetryError) CrawlImpact() failure.CrawlImpact {
+func (e *RetryError) Impact() failure.ImpactLevel {
 	return e.impact
 }
 

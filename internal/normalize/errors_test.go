@@ -14,7 +14,7 @@ func TestNormalizationError_Classifications(t *testing.T) {
 		name         string
 		cause        NormalizationErrorCause
 		wantPolicy   failure.RetryPolicy
-		wantImpact   failure.CrawlImpact
+		wantImpact   failure.ImpactLevel
 		wantSeverity failure.Severity
 	}{
 		// Never retry: content processing errors are deterministic
@@ -22,70 +22,70 @@ func TestNormalizationError_Classifications(t *testing.T) {
 			name:         "ErrCauseBrokenH1Invariant should be RetryPolicyNever",
 			cause:        ErrCauseBrokenH1Invariant,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseEmptyContent should be RetryPolicyNever",
 			cause:        ErrCauseEmptyContent,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseSectionDerivationFailed should be RetryPolicyNever",
 			cause:        ErrCauseSectionDerivationFailed,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseTitleExtractionFailed should be RetryPolicyNever",
 			cause:        ErrCauseTitleExtractionFailed,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseHashComputationFailed should be RetryPolicyNever",
 			cause:        ErrCauseHashComputationFailed,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseFrontmatterMarshalFailed should be RetryPolicyNever",
 			cause:        ErrCauseFrontmatterMarshalFailed,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseSkippedHeadingLevels should be RetryPolicyNever",
 			cause:        ErrCauseSkippedHeadingLevels,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseOrphanContent should be RetryPolicyNever",
 			cause:        ErrCauseOrphanContent,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseEmptySection should be RetryPolicyNever",
 			cause:        ErrCauseEmptySection,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseBrokenAtomicBlock should be RetryPolicyNever",
 			cause:        ErrCauseBrokenAtomicBlock,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 	}
@@ -98,8 +98,8 @@ func TestNormalizationError_Classifications(t *testing.T) {
 				t.Errorf("RetryPolicy() = %v, want %v", err.RetryPolicy(), tt.wantPolicy)
 			}
 
-			if err.CrawlImpact() != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", err.CrawlImpact(), tt.wantImpact)
+			if err.Impact() != tt.wantImpact {
+				t.Errorf("CrawlImpact() = %v, want %v", err.Impact(), tt.wantImpact)
 			}
 
 			if err.Severity() != tt.wantSeverity {

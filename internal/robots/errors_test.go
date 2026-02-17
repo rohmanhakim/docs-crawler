@@ -7,14 +7,14 @@ import (
 )
 
 // TestRobotsError_Classifications tests that all RobotsErrorCause values
-// have the correct RetryPolicy and CrawlImpact classification.
+// have the correct RetryPolicy and Impact classification.
 // This ensures the two-dimensional error classification is correctly applied.
 func TestRobotsError_Classifications(t *testing.T) {
 	tests := []struct {
 		name         string
 		cause        RobotsErrorCause
 		wantPolicy   failure.RetryPolicy
-		wantImpact   failure.CrawlImpact
+		wantImpact   failure.ImpactLevel
 		wantSeverity failure.Severity
 	}{
 		// Auto-retryable: transient network/server errors
@@ -22,21 +22,21 @@ func TestRobotsError_Classifications(t *testing.T) {
 			name:         "ErrCauseHttpTooManyRequests should be RetryPolicyAuto",
 			cause:        ErrCauseHttpTooManyRequests,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseHttpServerError should be RetryPolicyAuto",
 			cause:        ErrCauseHttpServerError,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseHttpFetchFailure should be RetryPolicyAuto",
 			cause:        ErrCauseHttpFetchFailure,
 			wantPolicy:   failure.RetryPolicyAuto,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		// Never retry: policy decisions and permanent failures
@@ -44,42 +44,42 @@ func TestRobotsError_Classifications(t *testing.T) {
 			name:         "ErrCauseDisallowRoot should be RetryPolicyNever",
 			cause:        ErrCauseDisallowRoot,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseParseError should be RetryPolicyNever",
 			cause:        ErrCauseParseError,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseInvalidRobotsUrl should be RetryPolicyNever",
 			cause:        ErrCauseInvalidRobotsUrl,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCausePreFetchFailure should be RetryPolicyNever",
 			cause:        ErrCausePreFetchFailure,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseHttpTooManyRedirects should be RetryPolicyNever",
 			cause:        ErrCauseHttpTooManyRedirects,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 		{
 			name:         "ErrCauseHttpUnexpectedStatus should be RetryPolicyNever",
 			cause:        ErrCauseHttpUnexpectedStatus,
 			wantPolicy:   failure.RetryPolicyNever,
-			wantImpact:   failure.ImpactContinue,
+			wantImpact:   failure.ImpactLevelContinue,
 			wantSeverity: failure.SeverityRecoverable,
 		},
 	}
@@ -92,8 +92,8 @@ func TestRobotsError_Classifications(t *testing.T) {
 				t.Errorf("RetryPolicy() = %v, want %v", err.RetryPolicy(), tt.wantPolicy)
 			}
 
-			if err.CrawlImpact() != tt.wantImpact {
-				t.Errorf("CrawlImpact() = %v, want %v", err.CrawlImpact(), tt.wantImpact)
+			if err.Impact() != tt.wantImpact {
+				t.Errorf("Impact() = %v, want %v", err.Impact(), tt.wantImpact)
 			}
 
 			if err.Severity() != tt.wantSeverity {
