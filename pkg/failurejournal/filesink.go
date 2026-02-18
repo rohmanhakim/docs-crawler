@@ -114,7 +114,12 @@ func (s *FileSink) Clear() error {
 	defer s.mu.Unlock()
 
 	s.records = s.records[:0]
-	return os.Remove(s.path)
+
+	// Ignore error if file doesn't exist
+	if err := os.Remove(s.path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // Count returns the number of recorded failures.
