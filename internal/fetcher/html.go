@@ -132,14 +132,16 @@ func (h *HtmlFetcher) recordFetchError(callerMethod string, fetchUrl url.URL, er
 	if errors.As(err, &fetchError) {
 		// record fetch error event
 		h.metadataSink.RecordError(
-			time.Now(),
-			"fetcher",
-			callerMethod,
-			mapFetchErrorToMetadataCause(fetchError),
-			err.Error(),
-			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
-			},
+			metadata.NewErrorRecord(
+				time.Now(),
+				"fetcher",
+				callerMethod,
+				mapFetchErrorToMetadataCause(fetchError),
+				err.Error(),
+				[]metadata.Attribute{
+					metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
+				},
+			),
 		)
 	}
 }
@@ -149,15 +151,17 @@ func (h *HtmlFetcher) recordRetryError(callerMethod string, fetchUrl url.URL, er
 	if errors.As(err, &retryError) {
 		// record retry error event
 		h.metadataSink.RecordError(
-			time.Now(),
-			"fetcher",
-			callerMethod,
-			metadata.CauseRetryFailure,
-			err.Error(),
-			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrMessage, retryError.Error()),
-				metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
-			},
+			metadata.NewErrorRecord(
+				time.Now(),
+				"fetcher",
+				callerMethod,
+				metadata.CauseRetryFailure,
+				err.Error(),
+				[]metadata.Attribute{
+					metadata.NewAttr(metadata.AttrMessage, retryError.Error()),
+					metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
+				},
+			),
 		)
 	}
 }

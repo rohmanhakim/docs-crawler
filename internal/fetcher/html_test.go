@@ -23,16 +23,7 @@ var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
 
 type mockMetadataSink struct {
 	fetchEvents []metadata.FetchEvent
-	errorEvents []errorEvent
-}
-
-type errorEvent struct {
-	observedAt  time.Time
-	packageName string
-	action      string
-	cause       metadata.ErrorCause
-	details     string
-	attrs       []metadata.Attribute
+	errorEvents []metadata.ErrorRecord
 }
 
 func (m *mockMetadataSink) RecordFetch(event metadata.FetchEvent) {
@@ -45,22 +36,8 @@ func (m *mockMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {}
 
 func (m *mockMetadataSink) RecordSkip(event metadata.SkipEvent) {}
 
-func (m *mockMetadataSink) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	details string,
-	attrs []metadata.Attribute,
-) {
-	m.errorEvents = append(m.errorEvents, errorEvent{
-		observedAt:  observedAt,
-		packageName: packageName,
-		action:      action,
-		cause:       cause,
-		details:     details,
-		attrs:       attrs,
-	})
+func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord) {
+	m.errorEvents = append(m.errorEvents, record)
 }
 
 // createTestRetryParam creates retry parameters for testing
@@ -185,8 +162,8 @@ func TestHtmlFetcher_Fetch_NonHTMLContent(t *testing.T) {
 	}
 
 	errorEvt := sink.errorEvents[0]
-	if errorEvt.packageName != "fetcher" {
-		t.Errorf("expected package name 'fetcher', got %s", errorEvt.packageName)
+	if errorEvt.PackageName() != "fetcher" {
+		t.Errorf("expected package name 'fetcher', got %s", errorEvt.PackageName())
 	}
 }
 
@@ -293,8 +270,8 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 	}
 
 	errorEvt := sink.errorEvents[0]
-	if errorEvt.cause != metadata.CauseRetryFailure {
-		t.Errorf("expected cause CauseRetryFailure, got %v", errorEvt.cause)
+	if errorEvt.Cause() != metadata.CauseRetryFailure {
+		t.Errorf("expected cause CauseRetryFailure, got %v", errorEvt.Cause())
 	}
 
 	// Verify retry count records actual attempts (2), not MaxAttempts
@@ -661,10 +638,10 @@ func TestHtmlFetcher_Fetch_ReadResponseBodyError(t *testing.T) {
 	}
 
 	errorEvt := sink.errorEvents[0]
-	if errorEvt.packageName != "fetcher" {
-		t.Errorf("expected package name 'fetcher', got %s", errorEvt.packageName)
+	if errorEvt.PackageName() != "fetcher" {
+		t.Errorf("expected package name 'fetcher', got %s", errorEvt.PackageName())
 	}
-	if errorEvt.cause != metadata.CauseRetryFailure {
-		t.Errorf("expected cause CauseRetryFailure, got %v", errorEvt.cause)
+	if errorEvt.Cause() != metadata.CauseRetryFailure {
+		t.Errorf("expected cause CauseRetryFailure, got %v", errorEvt.Cause())
 	}
 }
