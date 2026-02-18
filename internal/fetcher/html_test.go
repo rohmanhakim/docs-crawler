@@ -17,20 +17,13 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
-// mockMetadataSink is a test double for metadata.MetadataSink
-type mockMetadataSink struct {
-	fetchEvents    []fetchEvent
-	errorEvents    []errorEvent
-	artifactEvents []string
-}
+// mockMetadataSink is a test double for metadata.MetadataSink.
+// Compile-time check that it satisfies the full interface.
+var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
 
-type fetchEvent struct {
-	fetchUrl    string
-	httpStatus  int
-	duration    time.Duration
-	contentType string
-	retryCount  int
-	crawlDepth  int
+type mockMetadataSink struct {
+	fetchEvents []metadata.FetchEvent
+	errorEvents []errorEvent
 }
 
 type errorEvent struct {
@@ -42,37 +35,15 @@ type errorEvent struct {
 	attrs       []metadata.Attribute
 }
 
-func (m *mockMetadataSink) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-	m.fetchEvents = append(m.fetchEvents, fetchEvent{
-		fetchUrl:    fetchUrl,
-		httpStatus:  httpStatus,
-		duration:    duration,
-		contentType: contentType,
-		retryCount:  retryCount,
-		crawlDepth:  crawlDepth,
-	})
+func (m *mockMetadataSink) RecordFetch(event metadata.FetchEvent) {
+	m.fetchEvents = append(m.fetchEvents, event)
 }
 
-func (m *mockMetadataSink) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-	m.fetchEvents = append(m.fetchEvents, fetchEvent{
-		fetchUrl:   fetchUrl,
-		httpStatus: httpStatus,
-		duration:   duration,
-		retryCount: retryCount,
-	})
-}
+func (m *mockMetadataSink) RecordArtifact(record metadata.ArtifactRecord) {}
+
+func (m *mockMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {}
+
+func (m *mockMetadataSink) RecordSkip(event metadata.SkipEvent) {}
 
 func (m *mockMetadataSink) RecordError(
 	observedAt time.Time,
@@ -90,10 +61,6 @@ func (m *mockMetadataSink) RecordError(
 		details:     details,
 		attrs:       attrs,
 	})
-}
-
-func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-	m.artifactEvents = append(m.artifactEvents, path)
 }
 
 // createTestRetryParam creates retry parameters for testing
@@ -147,18 +114,25 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 	}
 
 	fetchEvt := sink.fetchEvents[0]
-	if fetchEvt.fetchUrl != server.URL {
-		t.Errorf("expected URL %s, got %s", server.URL, fetchEvt.fetchUrl)
+	if fetchEvt.FetchURL() != server.URL {
+		t.Errorf("expected URL %s, got %s", server.URL, fetchEvt.FetchURL())
 	}
-	if fetchEvt.httpStatus != http.StatusOK {
-		t.Errorf("expected status %d, got %d", http.StatusOK, fetchEvt.httpStatus)
+	if fetchEvt.HTTPStatus() != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, fetchEvt.HTTPStatus())
 	}
-	if fetchEvt.crawlDepth != 0 {
-		t.Errorf("expected crawl depth 0, got %d", fetchEvt.crawlDepth)
+	if fetchEvt.CrawlDepth() != 0 {
+		t.Errorf("expected crawl depth 0, got %d", fetchEvt.CrawlDepth())
 	}
 	// Verify retry count records actual attempts (1 for immediate success), not MaxAttempts
-	if fetchEvt.retryCount != 1 {
-		t.Errorf("expected retry count 1 (actual attempts), got %d", fetchEvt.retryCount)
+	if fetchEvt.RetryCount() != 1 {
+		t.Errorf("expected retry count 1 (actual attempts), got %d", fetchEvt.RetryCount())
+	}
+	// Verify FetchKind and absolute timestamp
+	if fetchEvt.Kind() != metadata.KindPage {
+		t.Errorf("expected Kind KindPage, got %s", fetchEvt.Kind())
+	}
+	if fetchEvt.FetchedAt().IsZero() {
+		t.Error("expected non-zero FetchedAt")
 	}
 
 	// Verify no error events were recorded
@@ -328,8 +302,8 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
 	}
 	fetchEvt := sink.fetchEvents[0]
-	if fetchEvt.retryCount != 2 {
-		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.retryCount)
+	if fetchEvt.RetryCount() != 2 {
+		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.RetryCount())
 	}
 }
 
@@ -409,8 +383,8 @@ func TestHtmlFetcher_Fetch_SuccessAfterRetry(t *testing.T) {
 		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
 	}
 	fetchEvt := sink.fetchEvents[0]
-	if fetchEvt.retryCount != 2 {
-		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.retryCount)
+	if fetchEvt.RetryCount() != 2 {
+		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.RetryCount())
 	}
 
 	// Verify no error events were recorded (success case)

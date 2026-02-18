@@ -93,14 +93,16 @@ func (h *HtmlFetcher) Fetch(
 		retryCount = retryResult.Attempts()
 	}
 
-	h.metadataSink.RecordFetch(
+	h.metadataSink.RecordFetch(metadata.NewFetchEvent(
+		startTime,
 		fetchUrl.String(),
 		statusCode,
 		duration,
 		contentType,
 		retryCount,
 		crawlDepth,
-	)
+		metadata.KindPage,
+	))
 
 	if err != nil {
 		// Use errors.Is to decide between FetchError or RetryError
