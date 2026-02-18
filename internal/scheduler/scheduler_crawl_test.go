@@ -328,6 +328,9 @@ func TestExecuteCrawlingWithState_Success_ReturnsExecutionResult(t *testing.T) {
 
 	// Verify stats ARE recorded (this is the execution phase)
 	assert.NotNil(t, mockFinalizer.recordedStats, "Stats should be recorded after execution")
+
+	// Verify failure journal was flushed on completion
+	mockFailureJournal.AssertCalled(t, "Flush")
 }
 
 // TestExecuteCrawlingWithState_EmptyFrontier_Completes verifies that when the
@@ -416,6 +419,9 @@ func TestExecuteCrawlingWithState_EmptyFrontier_Completes(t *testing.T) {
 	// Note: visited count is 1 because seed URL was submitted during init, not because it was processed
 	t.Logf("Empty frontier test: visitedCount=%d (seed was submitted during init)",
 		mockFinalizer.recordedStats.totalPages)
+
+	// Verify failure journal was flushed on completion
+	mockFailureJournal.AssertCalled(t, "Flush")
 }
 
 // TestExecuteCrawlingWithState_RecordsStatsCorrectly verifies that stats are
@@ -509,6 +515,9 @@ func TestExecuteCrawlingWithState_RecordsStatsCorrectly(t *testing.T) {
 		mockFinalizer.recordedStats.totalErrors,
 		mockFinalizer.recordedStats.totalAssets,
 		mockFinalizer.recordedStats.duration)
+
+	// Verify failure journal was flushed on completion
+	mockFailureJournal.AssertCalled(t, "Flush")
 }
 
 // ============================================================================
@@ -597,6 +606,9 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 
 	// Verify stats recorded after execution
 	assert.NotNil(t, mockFinalizer.recordedStats, "Stats should be recorded after execution")
+
+	// Verify failure journal was flushed on completion
+	mockFailureJournal.AssertCalled(t, "Flush")
 
 	t.Logf("End-to-end test passed. Final stats: pages=%d, duration=%v",
 		mockFinalizer.recordedStats.totalPages,

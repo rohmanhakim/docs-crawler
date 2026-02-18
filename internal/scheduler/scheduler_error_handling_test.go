@@ -294,6 +294,9 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	// Verify: error is returned (crawl aborted)
 	assert.Error(t, execErr, "Crawl should abort on ImpactAbort error")
 	t.Logf("Execution result: err=%v", execErr)
+
+	// Verify: failure journal is flushed even when the crawl exits early via abort
+	mockFailureJournal.AssertCalled(t, "Flush")
 }
 
 // TestScheduler_ErrorHandling_StorageError_ManualRetry verifies that storage errors

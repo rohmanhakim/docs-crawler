@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -367,6 +368,16 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	// Statistics tracking
 	var totalErrors int
 	var totalAssets int
+
+	// Ensure the failure journal is flushed to disk on crawl completion,
+	// regardless of whether execution succeeds or fails.
+	if s.failureJournal != nil {
+		defer func() {
+			if flushErr := s.failureJournal.Flush(); flushErr != nil {
+				log.Printf("failed to flush failure journal: %v", flushErr)
+			}
+		}()
+	}
 
 	// Ensure final stats are recorded even if errors occur
 	// This defer captures the execution phase duration only
