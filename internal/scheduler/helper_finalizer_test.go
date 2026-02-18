@@ -2,20 +2,15 @@ package scheduler_test
 
 import (
 	"testing"
-	"time"
+
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 )
+
+var _ metadata.CrawlFinalizer = (*mockFinalizer)(nil)
 
 // mockFinalizer is a test double that captures final crawl statistics
 type mockFinalizer struct {
-	recordedStats *capturedStats
-}
-
-type capturedStats struct {
-	totalPages            int
-	totalErrors           int
-	totalAssets           int
-	duration              time.Duration
-	manualRetryQueueCount int
+	recordedStats *metadata.CrawlStats
 }
 
 func newMockFinalizer(t *testing.T) *mockFinalizer {
@@ -25,18 +20,6 @@ func newMockFinalizer(t *testing.T) *mockFinalizer {
 	}
 }
 
-func (m *mockFinalizer) RecordFinalCrawlStats(
-	totalPages int,
-	totalErrors int,
-	totalAssets int,
-	duration time.Duration,
-	manualRetryQueueCount int,
-) {
-	m.recordedStats = &capturedStats{
-		totalPages:            totalPages,
-		totalErrors:           totalErrors,
-		totalAssets:           totalAssets,
-		duration:              duration,
-		manualRetryQueueCount: manualRetryQueueCount,
-	}
+func (m *mockFinalizer) RecordFinalCrawlStats(stats metadata.CrawlStats) {
+	m.recordedStats = &stats
 }

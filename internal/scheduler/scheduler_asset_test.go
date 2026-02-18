@@ -63,7 +63,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 
 	// Setup convert to return a specific conversion result
 	conversionResult := createConversionResultForTest("# Test Markdown\n\n![image](test.png)", nil)
-	mockConvert.On("Convert", sanitizedDoc).Return(conversionResult, nil)
+	mockConvert.On("Convert", sanitizedDoc, mock.Anything).Return(conversionResult, nil)
 
 	// Setup resolver mock to capture the input
 	var receivedConversionResult mdconvert.ConversionResult

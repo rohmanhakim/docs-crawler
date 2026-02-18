@@ -66,7 +66,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	// Setup convert mock to capture the input
 	var receivedDoc sanitizer.SanitizedHTMLDoc
 	setupConvertMockWithSuccess(mockConvert)
-	mockConvert.On("Convert", mock.Anything).
+	mockConvert.On("Convert", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receivedDoc = args.Get(0).(sanitizer.SanitizedHTMLDoc)
 		}).
@@ -111,7 +111,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	assert.NoError(t, execErr, "Failed to execute")
 
 	// Verify convert was called with the sanitized HTML doc
-	mockConvert.AssertCalled(t, "Convert", mock.Anything)
+	mockConvert.AssertCalled(t, "Convert", mock.Anything, mock.Anything)
 	assert.NotNil(t, receivedDoc, "Convert should be called with a SanitizedHTMLDoc")
 }
 
@@ -203,7 +203,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	// Should complete without fatal error
 	assert.NoError(t, execErr, "Failed to execute")
 	// Convert should be called
-	mockConvert.AssertCalled(t, "Convert", mock.Anything)
+	mockConvert.AssertCalled(t, "Convert", mock.Anything, mock.Anything)
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
@@ -292,5 +292,5 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 
 	// Recoverable errors should not abort the crawl
 	assert.NoError(t, execErr, "Recoverable convert error should not abort crawl")
-	mockConvert.AssertCalled(t, "Convert", mock.Anything)
+	mockConvert.AssertCalled(t, "Convert", mock.Anything, mock.Anything)
 }

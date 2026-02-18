@@ -186,7 +186,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 
 	// If stats were recorded, verify they're valid
 	if mockFinalizer.recordedStats != nil {
-		if mockFinalizer.recordedStats.duration < 0 {
+		if mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()) < 0 {
 			t.Error("duration should be non-negative")
 		}
 	}
@@ -297,8 +297,8 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	}
 
 	// Each execution should have its own stats
-	t.Logf("First execution: pages=%d, duration=%v", firstStats.totalPages, firstStats.duration)
-	t.Logf("Second execution: pages=%d, duration=%v", secondStats.totalPages, secondStats.duration)
+	t.Logf("First execution: pages=%d, duration=%v", firstStats.TotalPages(), firstStats.FinishedAt().Sub(firstStats.StartedAt()))
+	t.Logf("Second execution: pages=%d, duration=%v", secondStats.TotalPages(), secondStats.FinishedAt().Sub(secondStats.StartedAt()))
 }
 
 // Verify interface implementations at compile time

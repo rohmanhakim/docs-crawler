@@ -459,7 +459,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 
 	// Setup convert mock to capture the input
 	setupConvertMockWithSuccess(mockConvert)
-	mockConvert.On("Convert", mock.Anything).
+	mockConvert.On("Convert", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			sanitizedDoc = args.Get(0).(sanitizer.SanitizedHTMLDoc)
 		}).

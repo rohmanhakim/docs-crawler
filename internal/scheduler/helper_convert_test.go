@@ -17,8 +17,9 @@ type convertMock struct {
 // Convert mocks the Convert method
 func (c *convertMock) Convert(
 	sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc,
+	pageURL string,
 ) (mdconvert.ConversionResult, failure.ClassifiedError) {
-	args := c.Called(sanitizedHTMLDoc)
+	args := c.Called(sanitizedHTMLDoc, pageURL)
 	result := args.Get(0).(mdconvert.ConversionResult)
 	var err failure.ClassifiedError
 	if args.Get(1) != nil {
@@ -40,7 +41,7 @@ func setupConvertMockWithSuccess(m *convertMock) {
 		[]byte("# Test Markdown\n\nThis is test content."),
 		[]mdconvert.LinkRef{},
 	)
-	m.On("Convert", mock.Anything).Return(result, nil)
+	m.On("Convert", mock.Anything, mock.Anything).Return(result, nil)
 }
 
 // setupConvertMockWithRecoverableError sets up the convert mock to return a recoverable error
@@ -50,12 +51,7 @@ func setupConvertMockWithRecoverableError(m *convertMock) {
 		mdconvert.ErrCauseConversionFailure,
 		"recoverable conversion error",
 	)
-	m.On("Convert", mock.Anything).Return(mdconvert.ConversionResult{}, convertErr)
-}
-
-// setupConvertMockWithCustomResult sets up the convert mock to return a custom result
-func setupConvertMockWithCustomResult(m *convertMock, result mdconvert.ConversionResult) {
-	m.On("Convert", mock.Anything).Return(result, nil)
+	m.On("Convert", mock.Anything, mock.Anything).Return(mdconvert.ConversionResult{}, convertErr)
 }
 
 // createConversionResultForTest creates a ConversionResult for testing
