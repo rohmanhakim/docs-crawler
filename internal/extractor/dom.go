@@ -82,17 +82,30 @@ func (d *DomExtractor) Extract(
 		var extractionError *ExtractionError
 		errors.As(err, &extractionError)
 		d.metadataSink.RecordError(
-			time.Now(),
-			"extractor",
-			"DomExtractor.Extract",
-			mapExtractionErrorToMetadataCause(extractionError),
-			err.Error(),
-			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrURL, fmt.Sprintf("%v", sourceUrl)),
-			},
+			metadata.NewErrorRecord(
+				time.Now(),
+				"extractor",
+				"DomExtractor.Extract",
+				mapExtractionErrorToMetadataCause(extractionError),
+				err.Error(),
+				[]metadata.Attribute{
+					metadata.NewAttr(metadata.AttrURL, fmt.Sprintf("%v", sourceUrl)),
+				},
+			),
 		)
 		return ExtractionResult{}, extractionError
 	}
+	// ExtractionResult does not carry a discovered-URL count;
+	// link extraction is a downstream concern. LinksFound is 0.
+	d.metadataSink.RecordPipelineStage(
+		metadata.NewPipelineEvent(
+			metadata.StageExtract,
+			sourceUrl.String(),
+			true,
+			time.Now(),
+			0,
+		),
+	)
 	return result, nil
 }
 

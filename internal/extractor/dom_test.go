@@ -3,7 +3,6 @@ package extractor_test
 import (
 	"net/url"
 	"testing"
-	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
@@ -26,19 +25,12 @@ type recordedError struct {
 	ErrorString string
 }
 
-func (m *mockMetadataSink) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	errorString string,
-	attrs []metadata.Attribute,
-) {
+func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord) {
 	m.errors = append(m.errors, recordedError{
-		PackageName: packageName,
-		Action:      action,
-		Cause:       cause,
-		ErrorString: errorString,
+		PackageName: record.PackageName(),
+		Action:      record.Action(),
+		Cause:       record.Cause(),
+		ErrorString: record.ErrorString(),
 	})
 }
 
