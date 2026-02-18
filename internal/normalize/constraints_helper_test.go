@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 )
@@ -28,47 +27,35 @@ func loadFixture(t *testing.T, filename string) []byte {
 
 // metadataSinkMock is a mock for metadata.MetadataSink
 type metadataSinkMock struct {
-	recordErrorCalled      bool
-	recordErrorAttrs       []metadata.Attribute
-	recordFetchCalled      bool
-	recordAssetFetchCalled bool
-	recordArtifactCalled   bool
+	recordErrorCalled         bool
+	recordErrorAttrs          []metadata.Attribute
+	recordFetchCalled         bool
+	recordArtifactCalled      bool
+	recordPipelineStageCalled bool
+	recordPipelineEvent       *metadata.PipelineEvent
+	recordSkipCalled          bool
 }
 
-func (m *metadataSinkMock) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	details string,
-	attrs []metadata.Attribute,
-) {
+func (m *metadataSinkMock) RecordError(record metadata.ErrorRecord) {
 	m.recordErrorCalled = true
-	m.recordErrorAttrs = attrs
+	m.recordErrorAttrs = record.Attrs()
 }
 
-func (m *metadataSinkMock) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
+func (m *metadataSinkMock) RecordFetch(event metadata.FetchEvent) {
 	m.recordFetchCalled = true
 }
 
-func (m *metadataSinkMock) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-	m.recordAssetFetchCalled = true
+func (m *metadataSinkMock) RecordArtifact(record metadata.ArtifactRecord) {
+	m.recordArtifactCalled = true
 }
 
-func (m *metadataSinkMock) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-	m.recordArtifactCalled = true
+func (m *metadataSinkMock) RecordPipelineStage(event metadata.PipelineEvent) {
+	m.recordPipelineStageCalled = true
+	m.recordPipelineEvent = &event
+}
+
+func (m *metadataSinkMock) RecordSkip(event metadata.SkipEvent) {
+	m.recordSkipCalled = true
 }
 
 // Reset clears all recorded state
@@ -76,6 +63,10 @@ func (m *metadataSinkMock) Reset() {
 	m.recordErrorCalled = false
 	m.recordErrorAttrs = nil
 	m.recordFetchCalled = false
-	m.recordAssetFetchCalled = false
 	m.recordArtifactCalled = false
+	m.recordPipelineStageCalled = false
+	m.recordPipelineEvent = nil
+	m.recordSkipCalled = false
 }
+
+var _ metadata.MetadataSink = (*metadataSinkMock)(nil)

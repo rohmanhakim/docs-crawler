@@ -89,6 +89,26 @@ func TestNormalize_SuccessfulFrontmatterGeneration(t *testing.T) {
 	if result.Content() == nil || len(result.Content()) == 0 {
 		t.Error("expected content to be included in normalized document")
 	}
+
+	// Verify pipeline stage event is emitted on success
+	if !metadataSink.recordPipelineStageCalled {
+		t.Error("expected RecordPipelineStage to be called on successful normalization")
+	}
+	if metadataSink.recordPipelineEvent == nil {
+		t.Fatal("expected recordPipelineEvent to be set")
+	}
+	if metadataSink.recordPipelineEvent.Stage() != metadata.StageNormalize {
+		t.Errorf("expected Stage == StageNormalize, got: %s", metadataSink.recordPipelineEvent.Stage())
+	}
+	if !metadataSink.recordPipelineEvent.Success() {
+		t.Error("expected PipelineEvent.Success == true")
+	}
+	if metadataSink.recordPipelineEvent.PageURL() == "" {
+		t.Error("expected PipelineEvent.PageURL to be non-empty")
+	}
+	if metadataSink.recordPipelineEvent.PageURL() != fetchURL.String() {
+		t.Errorf("expected PipelineEvent.PageURL to be '%s', got: '%s'", fetchURL.String(), metadataSink.recordPipelineEvent.PageURL())
+	}
 }
 
 func TestNormalize_CanonicalURLNormalization(t *testing.T) {
@@ -259,10 +279,10 @@ func TestNormalize_ConstraintViolations(t *testing.T) {
 			} else {
 				foundURL := false
 				for _, attr := range metadataSink.recordErrorAttrs {
-					if attr.Key == metadata.AttrURL {
+					if attr.Key() == metadata.AttrURL {
 						foundURL = true
-						if attr.Value != fetchURL.String() {
-							t.Errorf("expected AttrURL to be '%s', got '%s'", fetchURL.String(), attr.Value)
+						if attr.Value() != fetchURL.String() {
+							t.Errorf("expected AttrURL to be '%s', got '%s'", fetchURL.String(), attr.Value())
 						}
 						break
 					}
