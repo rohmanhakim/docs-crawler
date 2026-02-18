@@ -81,6 +81,7 @@ type Recorder struct {
 	workerId string
 	mu       sync.RWMutex
 	events   []Event
+	subs     []chan<- Event // streaming subscribers; forwarded on every append
 }
 
 func NewRecorder(workerId string) Recorder {
@@ -89,13 +90,34 @@ func NewRecorder(workerId string) Recorder {
 	}
 }
 
+// Subscribe registers ch as a streaming subscriber. After this call returns,
+// every subsequent event appended to the log is forwarded to ch in a
+// non-blocking send. Events recorded before Subscribe was called are NOT
+// delivered — subscribers receive only future events (forward-only).
+//
+// ch must be a buffered channel. A zero-capacity channel will cause every
+// event to be dropped silently (the crawl is never blocked).
+func (r *Recorder) Subscribe(ch chan<- Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.subs = append(r.subs, ch)
+}
+
 // append is the single internal write path. It acquires the write lock,
-// appends the event to the log, and releases the lock.
-// TODO: Subscriber forwarding will be added here.
+// appends the event to the log, then forwards the event to each registered
+// subscriber in a non-blocking select. A slow or full subscriber channel
+// causes the event to be dropped for that subscriber; the crawl is never
+// blocked.
 func (r *Recorder) append(e Event) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, e)
+	for _, ch := range r.subs {
+		select {
+		case ch <- e:
+		default: // slow consumer: event dropped, crawl not blocked
+		}
+	}
 }
 
 // Events returns a snapshot copy of the event log.

@@ -286,3 +286,125 @@ func TestRecorder_EmptyLog(t *testing.T) {
 		t.Errorf("Events() len = %v, want 0 for a new recorder", len(events))
 	}
 }
+
+// TestRecorder_Subscribe_ReceivesEvents verifies that a subscriber registered
+// before recording receives each subsequent event via the channel.
+func TestRecorder_Subscribe_ReceivesEvents(t *testing.T) {
+	now := time.Now()
+	r := newTestRecorder(t)
+
+	ch := make(chan metadata.Event, 4)
+	r.Subscribe(ch)
+
+	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
+	r.RecordSkip(metadata.NewSkipEvent("https://example.com/skip", metadata.SkipReasonRobotsDisallow, now))
+
+	if len(ch) != 2 {
+		t.Fatalf("subscriber channel len = %v, want 2", len(ch))
+	}
+
+	first := <-ch
+	if first.Kind() != metadata.EventKindFetch {
+		t.Errorf("first event Kind = %v, want %v", first.Kind(), metadata.EventKindFetch)
+	}
+
+	second := <-ch
+	if second.Kind() != metadata.EventKindSkip {
+		t.Errorf("second event Kind = %v, want %v", second.Kind(), metadata.EventKindSkip)
+	}
+}
+
+// TestRecorder_Subscribe_SlowConsumerDoesNotBlock verifies that a subscriber
+// with a full (zero-capacity) channel does not block the append path.
+// The event must still appear in the recorder's own log.
+func TestRecorder_Subscribe_SlowConsumerDoesNotBlock(t *testing.T) {
+	now := time.Now()
+	r := newTestRecorder(t)
+
+	// Unbuffered channel — every send would block if not handled with select/default.
+	ch := make(chan metadata.Event)
+	r.Subscribe(ch)
+
+	done := make(chan struct{})
+	go func() {
+		r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// RecordFetch returned without blocking — correct.
+	case <-time.After(time.Second):
+		t.Fatal("RecordFetch blocked on a slow subscriber channel; expected non-blocking behaviour")
+	}
+
+	// Event must still be in the internal log even though the subscriber dropped it.
+	if len(r.Events()) != 1 {
+		t.Errorf("Events() len = %v, want 1 (log must be intact even when subscriber drops)", len(r.Events()))
+	}
+
+	// The unbuffered channel must have nothing in it (the send was dropped).
+	select {
+	case <-ch:
+		t.Error("slow subscriber channel received an event; expected drop via select/default")
+	default:
+		// Correct — nothing was sent.
+	}
+}
+
+// TestRecorder_Subscribe_ForwardOnly verifies that a subscriber registered
+// after some events have already been recorded does NOT receive past events —
+// only events recorded after Subscribe returns are forwarded.
+func TestRecorder_Subscribe_ForwardOnly(t *testing.T) {
+	now := time.Now()
+	r := newTestRecorder(t)
+
+	// Record one event BEFORE subscribing.
+	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com/before", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
+
+	ch := make(chan metadata.Event, 4)
+	r.Subscribe(ch)
+
+	// Record a second event AFTER subscribing.
+	r.RecordSkip(metadata.NewSkipEvent("https://example.com/after", metadata.SkipReasonRobotsDisallow, now))
+
+	// The internal log must contain both events.
+	if len(r.Events()) != 2 {
+		t.Fatalf("Events() len = %v, want 2", len(r.Events()))
+	}
+
+	// The subscriber channel must contain only the post-subscription event.
+	if len(ch) != 1 {
+		t.Fatalf("subscriber channel len = %v, want 1 (forward-only: past events must not be replayed)", len(ch))
+	}
+
+	received := <-ch
+	if received.Kind() != metadata.EventKindSkip {
+		t.Errorf("received event Kind = %v, want %v", received.Kind(), metadata.EventKindSkip)
+	}
+}
+
+// TestRecorder_Subscribe_MultipleSubscribers verifies that all registered
+// subscribers receive each event independently.
+func TestRecorder_Subscribe_MultipleSubscribers(t *testing.T) {
+	now := time.Now()
+	r := newTestRecorder(t)
+
+	ch1 := make(chan metadata.Event, 4)
+	ch2 := make(chan metadata.Event, 4)
+	r.Subscribe(ch1)
+	r.Subscribe(ch2)
+
+	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
+
+	for i, ch := range []chan metadata.Event{ch1, ch2} {
+		if len(ch) != 1 {
+			t.Errorf("subscriber %d channel len = %v, want 1", i+1, len(ch))
+			continue
+		}
+		e := <-ch
+		if e.Kind() != metadata.EventKindFetch {
+			t.Errorf("subscriber %d received Kind = %v, want %v", i+1, e.Kind(), metadata.EventKindFetch)
+		}
+	}
+}
