@@ -143,15 +143,6 @@ const (
 	CauseRetryFailure
 )
 
-type ErrorRecord struct {
-	packageName string
-	action      string
-	cause       ErrorCause
-	errorString string
-	observedAt  time.Time
-	attrs       []Attribute
-}
-
 type Attribute struct {
 	Key   AttributeKey
 	Value string
