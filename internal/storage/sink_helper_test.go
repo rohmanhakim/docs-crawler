@@ -8,82 +8,51 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 )
 
+// Compile-time interface check.
+var _ metadata.MetadataSink = (*metadataSinkMock)(nil)
+
 // metadataSinkMock is a mock for metadata.MetadataSink
 type metadataSinkMock struct {
-	recordErrorCalled      bool
-	recordErrorObservedAt  time.Time
-	recordErrorPackageName string
-	recordErrorAction      string
-	recordErrorCause       metadata.ErrorCause
-	recordErrorDetails     string
-	recordErrorAttrs       []metadata.Attribute
-	recordFetchCalled      bool
-	recordAssetFetchCalled bool
-	recordArtifactCalled   bool
-	recordArtifactKind     metadata.ArtifactKind
-	recordArtifactPath     string
-	recordArtifactAttrs    []metadata.Attribute
+	recordErrorCalled    bool
+	recordErrorRecord    metadata.ErrorRecord
+	recordFetchCalled    bool
+	recordArtifactCalled bool
+	recordArtifactRecord metadata.ArtifactRecord
+	recordPipelineCalled bool
+	recordSkipCalled     bool
 }
 
-func (m *metadataSinkMock) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	details string,
-	attrs []metadata.Attribute,
-) {
+func (m *metadataSinkMock) RecordError(record metadata.ErrorRecord) {
 	m.recordErrorCalled = true
-	m.recordErrorObservedAt = observedAt
-	m.recordErrorPackageName = packageName
-	m.recordErrorAction = action
-	m.recordErrorCause = cause
-	m.recordErrorDetails = details
-	m.recordErrorAttrs = attrs
+	m.recordErrorRecord = record
 }
 
-func (m *metadataSinkMock) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
+func (m *metadataSinkMock) RecordFetch(event metadata.FetchEvent) {
 	m.recordFetchCalled = true
 }
 
-func (m *metadataSinkMock) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-	m.recordAssetFetchCalled = true
+func (m *metadataSinkMock) RecordArtifact(record metadata.ArtifactRecord) {
+	m.recordArtifactCalled = true
+	m.recordArtifactRecord = record
 }
 
-func (m *metadataSinkMock) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-	m.recordArtifactCalled = true
-	m.recordArtifactKind = kind
-	m.recordArtifactPath = path
-	m.recordArtifactAttrs = attrs
+func (m *metadataSinkMock) RecordPipelineStage(event metadata.PipelineEvent) {
+	m.recordPipelineCalled = true
+}
+
+func (m *metadataSinkMock) RecordSkip(event metadata.SkipEvent) {
+	m.recordSkipCalled = true
 }
 
 // Reset clears all recorded state
 func (m *metadataSinkMock) Reset() {
 	m.recordErrorCalled = false
-	m.recordErrorObservedAt = time.Time{}
-	m.recordErrorPackageName = ""
-	m.recordErrorAction = ""
-	m.recordErrorCause = 0
-	m.recordErrorDetails = ""
-	m.recordErrorAttrs = nil
+	m.recordErrorRecord = metadata.ErrorRecord{}
 	m.recordFetchCalled = false
-	m.recordAssetFetchCalled = false
 	m.recordArtifactCalled = false
-	m.recordArtifactKind = ""
-	m.recordArtifactPath = ""
-	m.recordArtifactAttrs = nil
+	m.recordArtifactRecord = metadata.ArtifactRecord{}
+	m.recordPipelineCalled = false
+	m.recordSkipCalled = false
 }
 
 // createTestNormalizedDoc creates a normalized document for testing
@@ -106,14 +75,4 @@ func createTestNormalizedDoc(sourceURL, canonicalURL, contentHash string, conten
 func computeExpectedURLHash(canonicalURL string, hashAlgo hashutil.HashAlgo) string {
 	hash, _ := hashutil.HashBytes([]byte(canonicalURL), hashAlgo)
 	return hash[:12] // First 12 hex characters
-}
-
-// findAttrValue finds an attribute value by key in a slice of attributes
-func findAttrValue(attrs []metadata.Attribute, key metadata.AttributeKey) string {
-	for _, attr := range attrs {
-		if attr.Key == key {
-			return attr.Value
-		}
-	}
-	return ""
 }
