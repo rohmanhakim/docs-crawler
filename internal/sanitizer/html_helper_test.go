@@ -2,63 +2,32 @@ package sanitizer_test
 
 import (
 	"strings"
-	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"golang.org/x/net/html"
 )
 
-// mockMetadataSink is a test double for metadata.MetadataSink
+// mockMetadataSink is a test double for metadata.MetadataSink.
 type mockMetadataSink struct {
-	errors []recordedError
+	errors         []metadata.ErrorRecord
+	pipelineEvents []metadata.PipelineEvent
 }
 
-type recordedError struct {
-	timestamp   time.Time
-	packageName string
-	action      string
-	cause       metadata.ErrorCause
-	details     string
-	attrs       []metadata.Attribute
+var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
+
+func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord) {
+	m.errors = append(m.errors, record)
 }
 
-func (m *mockMetadataSink) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	details string,
-	attrs []metadata.Attribute,
-) {
-	m.errors = append(m.errors, recordedError{
-		timestamp:   observedAt,
-		packageName: packageName,
-		action:      action,
-		cause:       cause,
-		details:     details,
-		attrs:       attrs,
-	})
+func (m *mockMetadataSink) RecordFetch(event metadata.FetchEvent) {}
+
+func (m *mockMetadataSink) RecordArtifact(record metadata.ArtifactRecord) {}
+
+func (m *mockMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {
+	m.pipelineEvents = append(m.pipelineEvents, event)
 }
 
-func (m *mockMetadataSink) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-}
-
-func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-}
-func (m *mockMetadataSink) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-}
+func (m *mockMetadataSink) RecordSkip(event metadata.SkipEvent) {}
 
 // renderHtmlForTest serializes an html.Node to its HTML string representation.
 // This is used to compare sanitized output against expected fixtures.

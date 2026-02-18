@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,11 @@ func TestSanitize_SuccessCases(t *testing.T) {
 			// Assert
 			assert.NoError(t, sanitizationErr, "Sanitize should not return error for pass fixture: %s", fixture)
 			assert.NotNil(t, result.GetContentNode(), "Result should have a non-nil content node")
+
+			// A successful sanitization must emit exactly one PipelineEvent for StageSanitize.
+			require.Len(t, mockSink.pipelineEvents, 1, "Successful sanitization should emit one PipelineEvent")
+			assert.Equal(t, metadata.StageSanitize, mockSink.pipelineEvents[0].Stage())
+			assert.True(t, mockSink.pipelineEvents[0].Success())
 		})
 	}
 }
