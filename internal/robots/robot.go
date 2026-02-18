@@ -77,7 +77,7 @@ func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 	ctx := context.Background()
 	fetchResult, err := r.fetcher.Fetch(ctx, targetURL.Scheme, targetURL.Host)
 	if err != nil {
-		r.metadataSink.RecordError(
+		r.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"robots",
 			"Robot.Decide",
@@ -87,9 +87,21 @@ func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 				metadata.NewAttr(metadata.AttrURL, targetURL.String()),
 				metadata.NewAttr(metadata.AttrHost, targetURL.Host),
 			},
-		)
+		))
 		return Decision{}, err
 	}
+
+	// Emit a fetch event for the successful robots.txt retrieval.
+	r.metadataSink.RecordFetch(metadata.NewFetchEvent(
+		fetchResult.FetchedAt,
+		fetchResult.SourceURL,
+		fetchResult.HTTPStatus,
+		fetchResult.Duration,
+		fetchResult.ContentType,
+		0, // retryCount — not tracked for robots.txt fetches
+		0, // crawlDepth — not applicable for robots.txt fetches
+		metadata.KindRobots,
+	))
 
 	// Map the fetch result to a ruleSet for decision making
 	rs := MapResponseToRuleSet(fetchResult.Response, r.userAgent, fetchResult.FetchedAt)
@@ -99,7 +111,7 @@ func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 	if decideErr != nil {
 		var robotsError *RobotsError
 		if errors.As(decideErr, &robotsError) {
-			r.metadataSink.RecordError(
+			r.metadataSink.RecordError(metadata.NewErrorRecord(
 				time.Now(),
 				"robots",
 				"Robot.Decide",
@@ -110,7 +122,7 @@ func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 					metadata.NewAttr(metadata.AttrHost, targetURL.Host),
 					metadata.NewAttr(metadata.AttrPath, targetURL.Path),
 				},
-			)
+			))
 			return Decision{}, robotsError
 		}
 		// Unexpected error type

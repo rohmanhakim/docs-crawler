@@ -16,38 +16,16 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
-// mockMetadataSink is a test implementation of metadata.MetadataSink
+// mockMetadataSink is a test implementation of metadata.MetadataSink.
 type mockMetadataSink struct{}
 
-func (m *mockMetadataSink) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	details string,
-	attrs []metadata.Attribute,
-) {
-}
+var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
 
-func (m *mockMetadataSink) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-}
-
-func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-}
-func (m *mockMetadataSink) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-}
+func (m *mockMetadataSink) RecordFetch(event metadata.FetchEvent)            {}
+func (m *mockMetadataSink) RecordArtifact(record metadata.ArtifactRecord)    {}
+func (m *mockMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {}
+func (m *mockMetadataSink) RecordSkip(event metadata.SkipEvent)              {}
+func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord)          {}
 
 func TestNewRobotsFetcher(t *testing.T) {
 	sink := &mockMetadataSink{}

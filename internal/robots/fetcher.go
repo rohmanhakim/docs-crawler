@@ -39,6 +39,7 @@ type RobotsFetcher struct {
 type RobotsFetchResult struct {
 	Response    RobotsResponse
 	FetchedAt   time.Time
+	Duration    time.Duration
 	SourceURL   string
 	HTTPStatus  int
 	ContentType string
@@ -48,6 +49,7 @@ type RobotsFetchResult struct {
 type cachedResult struct {
 	Response    RobotsResponse `json:"response"`
 	FetchedAt   time.Time      `json:"fetched_at"`
+	Duration    time.Duration  `json:"duration"`
 	SourceURL   string         `json:"source_url"`
 	HTTPStatus  int            `json:"http_status"`
 	ContentType string         `json:"content_type"`
@@ -79,6 +81,7 @@ func serializeResult(result RobotsFetchResult) (string, error) {
 	cached := cachedResult{
 		Response:    result.Response,
 		FetchedAt:   result.FetchedAt,
+		Duration:    result.Duration,
 		SourceURL:   result.SourceURL,
 		HTTPStatus:  result.HTTPStatus,
 		ContentType: result.ContentType,
@@ -99,6 +102,7 @@ func deserializeResult(data string) (RobotsFetchResult, error) {
 	return RobotsFetchResult{
 		Response:    cached.Response,
 		FetchedAt:   cached.FetchedAt,
+		Duration:    cached.Duration,
 		SourceURL:   cached.SourceURL,
 		HTTPStatus:  cached.HTTPStatus,
 		ContentType: cached.ContentType,
@@ -203,6 +207,9 @@ func (f *RobotsFetcher) Fetch(ctx context.Context, scheme, hostname string) (Rob
 	if parsingError != nil {
 		return RobotsFetchResult{}, parsingError
 	}
+
+	// Stamp the total round-trip duration on the result.
+	result.Duration = time.Since(start)
 
 	// Store successful result in cache
 	if f.cache != nil {
