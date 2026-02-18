@@ -3,8 +3,10 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
@@ -93,13 +95,11 @@ func NewScheduler() Scheduler {
 	storageSink := storage.NewLocalSink(&recorder)
 	rateLimiter := limiter.NewConcurrentRateLimiter()
 	sleeper := timeutil.NewRealSleeper()
-	failureJournal := failurejournal.NewInMemoryJournal()
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
 		robot:                  &cachedRobot,
 		frontier:               &frontier,
-		failureJournal:         failureJournal,
 		htmlFetcher:            &fetcher,
 		domExtractor:           &ext,
 		htmlSanitizer:          &sanitizer,
@@ -262,6 +262,13 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 		return nil, err
 	}
 
+	// Initialize file-based failure journal in output directory.
+	// Only set if not already injected externally (e.g., via NewSchedulerWithDeps).
+	if s.failureJournal == nil {
+		journalPath := filepath.Join(cfg.OutputDir(), "failures.jsonl")
+		s.failureJournal = failurejournal.NewFileJournal(journalPath)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout())
 	defer cancel()
 	if s.ctx == nil {
@@ -362,6 +369,16 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	var totalErrors int
 	var totalAssets int
 
+	// Ensure the failure journal is flushed to disk on crawl completion,
+	// regardless of whether execution succeeds or fails.
+	if s.failureJournal != nil {
+		defer func() {
+			if flushErr := s.failureJournal.Flush(); flushErr != nil {
+				log.Printf("failed to flush failure journal: %v", flushErr)
+			}
+		}()
+	}
+
 	// Ensure final stats are recorded even if errors occur
 	// This defer captures the execution phase duration only
 	defer func() {
@@ -414,16 +431,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
+			// Note: Extraction errors are deterministic (content invalid).
+			// Do NOT record to failure journal - retrying the same content yields the same error.
 			totalErrors++
 			continue
 		}
@@ -434,16 +443,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
+			// Note: Sanitization errors are deterministic (invariant violations).
+			// Do NOT record to failure journal - retrying the same content yields the same error.
 			totalErrors++
 			continue
 		}
@@ -481,16 +482,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
+			// Note: Conversion errors are deterministic (conversion failures).
+			// Do NOT record to failure journal - retrying the same content yields the same error.
 			totalErrors++
 			continue
 		}
@@ -541,16 +534,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
+			// Note: Normalization errors are deterministic (invariant violations).
+			// Do NOT record to failure journal - retrying the same content yields the same error.
 			totalErrors++
 			continue
 		}
@@ -679,6 +664,15 @@ func (s *Scheduler) DequeueFromFrontier() (frontier.CrawlToken, bool) {
 		return frontier.CrawlToken{}, false
 	}
 	return s.frontier.Dequeue()
+}
+
+// FailureJournalPath returns the file path of the failure journal.
+// This is a test helper method to verify journal initialization.
+func (s *Scheduler) FailureJournalPath() string {
+	if s.failureJournal == nil {
+		return ""
+	}
+	return s.failureJournal.Path()
 }
 
 // getURLString safely extracts a string from a url.URL.

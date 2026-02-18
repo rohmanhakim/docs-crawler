@@ -7,6 +7,12 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// newFileJournalForTest creates a real FileJournal at the given path for use in tests
+// that need a concrete journal implementation (not a mock) with a deterministic Path().
+func newFileJournalForTest(path string) *failurejournal.FileJournal {
+	return failurejournal.NewFileJournal(path)
+}
+
 // failureJournalMock is a testify mock for the failurejournal.Journal interface
 type failureJournalMock struct {
 	mock.Mock

@@ -12,6 +12,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -294,6 +295,9 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	// Verify: error is returned (crawl aborted)
 	assert.Error(t, execErr, "Crawl should abort on ImpactAbort error")
 	t.Logf("Execution result: err=%v", execErr)
+
+	// Verify: failure journal is flushed even when the crawl exits early via abort
+	mockFailureJournal.AssertCalled(t, "Flush")
 }
 
 // TestScheduler_ErrorHandling_StorageError_ManualRetry verifies that storage errors
@@ -346,6 +350,25 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
+	// Setup storage to return a RetryPolicyManual error (disk full)
+	diskFullErr := &mockClassifiedError{
+		msg:         "disk is full",
+		severity:    failure.SeverityRetryExhausted,
+		retryPolicy: failure.RetryPolicyManual,
+		impactLevel: failure.ImpactLevelContinue,
+	}
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).
+		Return(storage.WriteResult{}, diskFullErr)
+
+	// Use mock extractor and sanitizer so the pipeline reaches the storage stage.
+	// The real extractor rejects minimal HTML bodies; mocking bypasses that.
+	mockExtractor := newExtractorMockForTest(t)
+	mockExtractor.On("SetExtractParam", mock.Anything).Return()
+	setupExtractorMockWithSuccess(mockExtractor, nil)
+
+	mockSanitizer := newSanitizerMockForTest(t)
+	setupSanitizerMockWithSuccess(mockSanitizer, []url.URL{})
+
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -355,8 +378,8 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 		mockFrontier,
 		mockRobot,
 		mockFetcher,
-		nil,
-		nil,
+		mockExtractor,
+		mockSanitizer,
 		nil,
 		nil,
 		mockStorage,
@@ -385,7 +408,11 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	_, execErr := s.ExecuteCrawlingWithState(init)
 
 	// Verify: crawl completed (storage error was handled gracefully)
+	assert.NoError(t, execErr)
 	t.Logf("Execution result: err=%v", execErr)
+
+	// Verify: failure journal recorded the URL at the storage stage
+	mockFailureJournal.AssertCalled(t, "Record", mock.Anything)
 }
 
 // TestScheduler_ErrorHandling_ConfigError_AbortsCrawl verifies that configuration
