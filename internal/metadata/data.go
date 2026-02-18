@@ -251,6 +251,15 @@ const (
 	AttrWritePath  AttributeKey = "write_path"
 	AttrMessage    AttributeKey = "message"
 
+	// AttrContentHash is the hash of the written file's content.
+	AttrContentHash AttributeKey = "content_hash"
+	// AttrURLHash is the hash derived from the page URL, used as a storage filename.
+	AttrURLHash AttributeKey = "url_hash"
+	// AttrPageURL is the source page URL providing context for asset and pipeline events.
+	AttrPageURL AttributeKey = "page_url"
+	// AttrStage is the pipeline stage name (extract, sanitize, convert, normalize).
+	AttrStage AttributeKey = "stage"
+
 	// Deprecated: AttrField is ambiguous — two call sites used it for both URLHash
 	// and ContentHash, making events uninterpretable. Use AttrContentHash or
 	// AttrURLHash instead. AttrField must not be used in new code.
