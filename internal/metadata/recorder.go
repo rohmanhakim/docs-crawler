@@ -2,7 +2,6 @@ package metadata
 
 import (
 	"sync"
-	"time"
 )
 
 /*
@@ -59,18 +58,11 @@ Concurrency:
 */
 
 type MetadataSink interface {
-	RecordError(
-		observedAt time.Time,
-		packageName string,
-		action string,
-		cause ErrorCause,
-		details string,
-		attrs []Attribute,
-	)
 	RecordFetch(event FetchEvent)
 	RecordArtifact(record ArtifactRecord)
 	RecordPipelineStage(event PipelineEvent)
 	RecordSkip(event SkipEvent)
+	RecordError(record ErrorRecord)
 }
 
 type CrawlFinalizer interface {
@@ -147,16 +139,8 @@ func (r *Recorder) RecordSkip(event SkipEvent) {
 	r.append(Event{kind: EventKindSkip, skip: &event})
 }
 
-func (r *Recorder) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause ErrorCause,
-	details string,
-	attrs []Attribute,
-) {
-	ee := NewErrorEvent(observedAt, packageName, action, cause, details, attrs)
-	r.append(Event{kind: EventKindError, error: &ee})
+func (r *Recorder) RecordError(record ErrorRecord) {
+	r.append(Event{kind: EventKindError, error: &record})
 }
 
 /*

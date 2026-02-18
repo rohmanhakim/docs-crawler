@@ -218,46 +218,51 @@ func (s SkipEvent) SkippedURL() string    { return s.skippedURL }
 func (s SkipEvent) Reason() SkipReason    { return s.reason }
 func (s SkipEvent) RecordedAt() time.Time { return s.recordedAt }
 
-// ErrorEvent wraps the parameters of RecordError for inclusion in the sealed Event log.
-type ErrorEvent struct {
-	observedAt  time.Time
+// ErrorRecord is the typed struct accepted by RecordError. It follows the same
+// constructor + accessor pattern as FetchEvent, ArtifactRecord, PipelineEvent,
+// and SkipEvent, making RecordError consistent with every other MetadataSink method.
+//
+// errorString carries the raw err.Error() string from the call site.
+// attrs holds any ad-hoc contextual key/value pairs (e.g. AttrURL, AttrAssetURL).
+type ErrorRecord struct {
 	packageName string
 	action      string
 	cause       ErrorCause
-	details     string
+	errorString string
+	observedAt  time.Time
 	attrs       []Attribute
 }
 
-// NewErrorEvent constructs an immutable ErrorEvent.
+// NewErrorRecord constructs an immutable ErrorRecord.
 // attrs is copied to prevent external mutation.
-func NewErrorEvent(
+func NewErrorRecord(
 	observedAt time.Time,
 	packageName string,
 	action string,
 	cause ErrorCause,
-	details string,
+	errorString string,
 	attrs []Attribute,
-) ErrorEvent {
+) ErrorRecord {
 	cp := make([]Attribute, len(attrs))
 	copy(cp, attrs)
-	return ErrorEvent{
+	return ErrorRecord{
 		observedAt:  observedAt,
 		packageName: packageName,
 		action:      action,
 		cause:       cause,
-		details:     details,
+		errorString: errorString,
 		attrs:       cp,
 	}
 }
 
-func (e ErrorEvent) ObservedAt() time.Time { return e.observedAt }
-func (e ErrorEvent) PackageName() string   { return e.packageName }
-func (e ErrorEvent) Action() string        { return e.action }
-func (e ErrorEvent) Cause() ErrorCause     { return e.cause }
-func (e ErrorEvent) Details() string       { return e.details }
+func (e ErrorRecord) ObservedAt() time.Time { return e.observedAt }
+func (e ErrorRecord) PackageName() string   { return e.packageName }
+func (e ErrorRecord) Action() string        { return e.action }
+func (e ErrorRecord) Cause() ErrorCause     { return e.cause }
+func (e ErrorRecord) ErrorString() string   { return e.errorString }
 
 // Attrs returns a copy of the attribute slice to prevent external mutation.
-func (e ErrorEvent) Attrs() []Attribute {
+func (e ErrorRecord) Attrs() []Attribute {
 	cp := make([]Attribute, len(e.attrs))
 	copy(cp, e.attrs)
 	return cp
@@ -283,7 +288,7 @@ type Event struct {
 	artifact *ArtifactRecord
 	pipeline *PipelineEvent
 	skip     *SkipEvent
-	error    *ErrorEvent
+	error    *ErrorRecord
 	stats    *CrawlStats
 }
 
@@ -292,7 +297,7 @@ func (e Event) Fetch() *FetchEvent        { return e.fetch }
 func (e Event) Artifact() *ArtifactRecord { return e.artifact }
 func (e Event) Pipeline() *PipelineEvent  { return e.pipeline }
 func (e Event) Skip() *SkipEvent          { return e.skip }
-func (e Event) Error() *ErrorEvent        { return e.error }
+func (e Event) Error() *ErrorRecord       { return e.error }
 func (e Event) Stats() *CrawlStats        { return e.stats }
 
 /*

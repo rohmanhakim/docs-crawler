@@ -620,10 +620,10 @@ func TestCrawlStatsConstruction(t *testing.T) {
 	}
 }
 
-func TestErrorEventConstruction(t *testing.T) {
+func TestErrorRecordConstruction(t *testing.T) {
 	now := time.Now()
 	attrs := []metadata.Attribute{metadata.NewAttr(metadata.AttrURL, "https://example.com")}
-	e := metadata.NewErrorEvent(
+	e := metadata.NewErrorRecord(
 		now,
 		"fetcher",
 		"Fetch",
@@ -633,37 +633,37 @@ func TestErrorEventConstruction(t *testing.T) {
 	)
 
 	if e.PackageName() != "fetcher" {
-		t.Errorf("ErrorEvent.PackageName() = %v, want fetcher", e.PackageName())
+		t.Errorf("ErrorRecord.PackageName() = %v, want fetcher", e.PackageName())
 	}
 	if e.Action() != "Fetch" {
-		t.Errorf("ErrorEvent.Action() = %v, want Fetch", e.Action())
+		t.Errorf("ErrorRecord.Action() = %v, want Fetch", e.Action())
 	}
 	if e.Cause() != metadata.CauseNetworkFailure {
-		t.Errorf("ErrorEvent.Cause() = %v, want %v", e.Cause(), metadata.CauseNetworkFailure)
+		t.Errorf("ErrorRecord.Cause() = %v, want %v", e.Cause(), metadata.CauseNetworkFailure)
 	}
-	if e.Details() != "connection refused" {
-		t.Errorf("ErrorEvent.Details() = %v, want connection refused", e.Details())
+	if e.ErrorString() != "connection refused" {
+		t.Errorf("ErrorRecord.ErrorString() = %v, want connection refused", e.ErrorString())
 	}
 	if e.ObservedAt() != now {
-		t.Errorf("ErrorEvent.ObservedAt() = %v, want %v", e.ObservedAt(), now)
+		t.Errorf("ErrorRecord.ObservedAt() = %v, want %v", e.ObservedAt(), now)
 	}
 	if len(e.Attrs()) != 1 {
-		t.Errorf("ErrorEvent.Attrs() len = %v, want 1", len(e.Attrs()))
+		t.Errorf("ErrorRecord.Attrs() len = %v, want 1", len(e.Attrs()))
 	}
 }
 
-func TestErrorEventAttrsImmutability(t *testing.T) {
+func TestErrorRecordAttrsImmutability(t *testing.T) {
 	// Verify that Attrs() returns a copy — mutating the returned slice must not
-	// affect the event's internal state.
+	// affect the record's internal state.
 	attrs := []metadata.Attribute{metadata.NewAttr(metadata.AttrURL, "https://example.com")}
-	e := metadata.NewErrorEvent(time.Now(), "pkg", "action", metadata.CauseUnknown, "details", attrs)
+	e := metadata.NewErrorRecord(time.Now(), "pkg", "action", metadata.CauseUnknown, "details", attrs)
 
 	got := e.Attrs()
 	got[0] = metadata.NewAttr(metadata.AttrHost, "mutated")
 
-	// The event must still return the original attribute.
+	// The record must still return the original attribute.
 	if e.Attrs()[0].Key() != metadata.AttrURL {
-		t.Error("ErrorEvent.Attrs() is not a copy — external mutation affected internal state")
+		t.Error("ErrorRecord.Attrs() is not a copy — external mutation affected internal state")
 	}
 }
 
@@ -729,10 +729,10 @@ func TestEventConstruction(t *testing.T) {
 		}
 	})
 
-	t.Run("error event getters", func(t *testing.T) {
-		ee := metadata.NewErrorEvent(time.Now(), "pkg", "action", metadata.CauseNetworkFailure, "details", nil)
-		if ee.Cause() != metadata.CauseNetworkFailure {
-			t.Errorf("ErrorEvent.Cause() = %v, want %v", ee.Cause(), metadata.CauseNetworkFailure)
+	t.Run("error record getters", func(t *testing.T) {
+		er := metadata.NewErrorRecord(time.Now(), "pkg", "action", metadata.CauseNetworkFailure, "details", nil)
+		if er.Cause() != metadata.CauseNetworkFailure {
+			t.Errorf("ErrorRecord.Cause() = %v, want %v", er.Cause(), metadata.CauseNetworkFailure)
 		}
 	})
 

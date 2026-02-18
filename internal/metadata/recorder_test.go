@@ -125,12 +125,12 @@ func TestRecorder_EachMethodAppendsOneEvent(t *testing.T) {
 		{
 			name: "RecordError appends EventKindError",
 			record: func(r *metadata.Recorder) {
-				r.RecordError(
+				r.RecordError(metadata.NewErrorRecord(
 					now, "fetcher", "Fetch",
 					metadata.CauseNetworkFailure,
 					"connection refused",
 					[]metadata.Attribute{metadata.NewAttr(metadata.AttrURL, "https://example.com")},
-				)
+				))
 			},
 			wantKind: metadata.EventKindError,
 			verify: func(t *testing.T, e metadata.Event) {
@@ -260,7 +260,7 @@ func TestRecorder_ConcurrentSafety(t *testing.T) {
 		}()
 		go func() {
 			defer wg.Done()
-			r.RecordError(now, "pkg", "action", metadata.CauseUnknown, "detail", nil)
+			r.RecordError(metadata.NewErrorRecord(now, "pkg", "action", metadata.CauseUnknown, "detail", nil))
 		}()
 	}
 
