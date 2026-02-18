@@ -2,10 +2,10 @@ package mdconvert_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,7 +103,7 @@ func TestConvert_TableDriven(t *testing.T) {
 			doc := createSanitizedDoc(t, string(htmlContent))
 			rule := createTestRule()
 
-			result, err := rule.Convert(doc)
+			result, err := rule.Convert(doc, "https://example.com/page")
 			require.NoError(t, err)
 
 			expected := loadExpectedMarkdown(t, tc.fixture)
@@ -120,11 +120,11 @@ func TestConvert_Determinism(t *testing.T) {
 
 	// Convert multiple times
 	doc1 := createSanitizedDoc(t, string(htmlContent))
-	result1, err1 := rule.Convert(doc1)
+	result1, err1 := rule.Convert(doc1, "https://example.com/page")
 	require.NoError(t, err1)
 
 	doc2 := createSanitizedDoc(t, string(htmlContent))
-	result2, err2 := rule.Convert(doc2)
+	result2, err2 := rule.Convert(doc2, "https://example.com/page")
 	require.NoError(t, err2)
 
 	// Results should be byte-for-byte identical
@@ -137,7 +137,7 @@ func TestConvert_ExtractsLinkRefs(t *testing.T) {
 	doc := createSanitizedDoc(t, string(htmlContent))
 	rule := createTestRule()
 
-	result, err := rule.Convert(doc)
+	result, err := rule.Convert(doc, "https://example.com/page")
 	require.NoError(t, err)
 
 	// Should have exactly 1 LinkRef
@@ -156,7 +156,7 @@ func TestConvert_ExtractsImageRefs(t *testing.T) {
 	doc := createSanitizedDoc(t, string(htmlContent))
 	rule := createTestRule()
 
-	result, err := rule.Convert(doc)
+	result, err := rule.Convert(doc, "https://example.com/page")
 	require.NoError(t, err)
 
 	// Should have exactly 1 LinkRef
@@ -176,7 +176,7 @@ func TestConvert_LinkRefCombinations(t *testing.T) {
 	doc := createSanitizedDoc(t, string(htmlContent))
 	rule := createTestRule()
 
-	result, err := rule.Convert(doc)
+	result, err := rule.Convert(doc, "https://example.com/page")
 	require.NoError(t, err)
 
 	// Should have exactly 5 LinkRefs in document order:
@@ -214,60 +214,31 @@ func TestConvert_LinkRefCombinations_MarkdownContent(t *testing.T) {
 	doc := createSanitizedDoc(t, string(htmlContent))
 	rule := createTestRule()
 
-	result, err := rule.Convert(doc)
+	result, err := rule.Convert(doc, "https://example.com/page")
 	require.NoError(t, err)
 
 	expected := loadExpectedMarkdown(t, "mdconvert_linkref_combinations")
 	assert.Equal(t, string(expected), string(result.GetMarkdownContent()))
 }
 
-// mockMetadataSink is a test helper that captures recorded errors
+// mockMetadataSink is a test helper that captures recorded ErrorRecords.
 type mockMetadataSink struct {
-	errors []recordedError
+	errors         []metadata.ErrorRecord
+	pipelineEvents []metadata.PipelineEvent
 }
 
-type recordedError struct {
-	packageName string
-	action      string
-	cause       metadata.ErrorCause
-	details     string
+func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord) {
+	m.errors = append(m.errors, record)
 }
 
-func (m *mockMetadataSink) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	errorString string,
-	attrs []metadata.Attribute,
-) {
-	m.errors = append(m.errors, recordedError{
-		packageName: packageName,
-		action:      action,
-		cause:       cause,
-		details:     errorString,
-	})
+func (m *mockMetadataSink) RecordFetch(event metadata.FetchEvent)         {}
+func (m *mockMetadataSink) RecordArtifact(record metadata.ArtifactRecord) {}
+func (m *mockMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {
+	m.pipelineEvents = append(m.pipelineEvents, event)
 }
+func (m *mockMetadataSink) RecordSkip(event metadata.SkipEvent) {}
 
-func (m *mockMetadataSink) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-}
-
-func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-}
-func (m *mockMetadataSink) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-}
+var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
 
 // TestConvert_ErrorMetadataRecording verifies that errors are recorded to the metadata sink.
 func TestConvert_ErrorMetadataRecording(t *testing.T) {
@@ -281,7 +252,57 @@ func TestConvert_ErrorMetadataRecording(t *testing.T) {
 	// We need to test with a scenario that causes an error.
 	// The convert function handles nil check internally, but we need to trigger an error.
 	// Let's use a valid conversion and verify no error was recorded.
-	_, err := rule.Convert(emptyDoc)
+	_, err := rule.Convert(emptyDoc, "https://example.com/page")
 	require.NoError(t, err)
 	assert.Empty(t, mockSink.errors, "No errors should be recorded for valid conversion")
+}
+
+// TestConvert_SuccessEmitsPipelineEvent verifies that a successful conversion emits one
+// PipelineEvent with Stage == StageConvert, Success == true, and a non-empty PageURL.
+func TestConvert_SuccessEmitsPipelineEvent(t *testing.T) {
+	const pageURL = "https://example.com/guide/intro"
+
+	mockSink := &mockMetadataSink{}
+	rule := mdconvert.NewRule(mockSink)
+
+	htmlContent := loadHtmlFixture(t, "mdconvert_heading_single_h1_clean.html")
+	doc := createSanitizedDoc(t, string(htmlContent))
+
+	_, err := rule.Convert(doc, pageURL)
+	require.NoError(t, err)
+
+	require.Len(t, mockSink.pipelineEvents, 1, "Expected exactly one PipelineEvent on success")
+	evt := mockSink.pipelineEvents[0]
+	assert.Equal(t, metadata.StageConvert, evt.Stage(), "Stage must be StageConvert")
+	assert.True(t, evt.Success(), "Success must be true")
+	assert.Equal(t, pageURL, evt.PageURL(), "PageURL must match the provided URL")
+	assert.False(t, evt.RecordedAt().IsZero(), "RecordedAt must be non-zero")
+}
+
+// TestConvert_ErrorEmitsAttrURL verifies that a conversion error event includes AttrURL
+// populated with the source page URL.
+func TestConvert_ErrorEmitsAttrURL(t *testing.T) {
+	const pageURL = "https://example.com/guide/intro"
+
+	mockSink := &mockMetadataSink{}
+	rule := mdconvert.NewRule(mockSink)
+
+	// createSanitizedDoc with a nil content node triggers the error path.
+	// We pass a deliberately crafted doc that returns nil from GetContentNode.
+	nilDoc := sanitizer.NewSanitizedHTMLDoc(nil, nil)
+
+	_, convErr := rule.Convert(nilDoc, pageURL)
+	require.Error(t, convErr, "Expected a conversion error for nil content node")
+
+	require.Len(t, mockSink.errors, 1, "Expected exactly one ErrorRecord on failure")
+	errRecord := mockSink.errors[0]
+
+	var foundURL bool
+	for _, attr := range errRecord.Attrs() {
+		if attr.Key() == metadata.AttrURL && attr.Value() == pageURL {
+			foundURL = true
+			break
+		}
+	}
+	assert.True(t, foundURL, "ErrorRecord must contain AttrURL with the page URL")
 }
