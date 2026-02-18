@@ -17,6 +17,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/html"
@@ -38,6 +39,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -92,6 +94,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -133,6 +136,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -181,6 +185,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -207,9 +212,10 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
-// TestScheduler_Resolve_FatalError_AbortsCrawl verifies that fatal asset resolution errors
-// cause the crawl to abort immediately.
-func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
+// TestScheduler_Resolve_DiskFullError_ContinuesCrawl verifies that disk full asset resolution
+// errors do NOT abort the crawl. Disk full is a per-URL failure with manual retry eligibility,
+// not a systemic failure that should abort the entire crawl.
+func TestScheduler_Resolve_DiskFullError_ContinuesCrawl(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
@@ -223,6 +229,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -246,12 +253,15 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 	// Setup convert
 	setupConvertMockWithSuccess(mockConvert)
 
-	// Setup resolver to return a fatal error
+	// Setup resolver to return a disk full error (manual retry, not fatal)
 	setupResolverMockWithFatalError(mockResolver)
 
 	// Setup frontier to return a token for the seed URL
 	seedURL, _ := url.Parse("http://example.com/")
 	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
+	// Storage Write must be set up since crawl continues past resolver error
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	s := createSchedulerWithAllMocks(
 		t,
@@ -268,6 +278,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -275,7 +286,7 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 
 	configData := `{
 		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 1
+		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
@@ -287,8 +298,8 @@ func TestScheduler_Resolve_FatalError_AbortsCrawl(t *testing.T) {
 	// Phase 2: Execute with state - should return fatal error
 	_, execErr := s.ExecuteCrawlingWithState(init)
 
-	// Fatal resolver error should abort the crawl
-	assert.Error(t, execErr, "Expected error for fatal resolve error")
+	// Disk full error is per-URL with manual retry — crawl should continue
+	assert.NoError(t, execErr, "Disk full error should not abort crawl")
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -308,6 +319,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -355,6 +367,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -395,6 +408,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Only expect one Decide call for the seed URL
@@ -443,6 +457,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -473,9 +488,10 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
-// TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls verifies that when Resolve()
-// returns a fatal error, the scheduler aborts and does not process more URLs.
-func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
+// TestScheduler_Resolve_DiskFullError_DoesNotPreventSubsequentCalls verifies that when Resolve()
+// returns a disk full error (manual retry), the scheduler does NOT abort and continues processing.
+// Disk full is a per-URL failure, not a systemic error warranting crawl abort.
+func TestScheduler_Resolve_DiskFullError_DoesNotPreventSubsequentCalls(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
@@ -489,9 +505,9 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	mockConvert := newConvertMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	// Only expect one Decide call for the seed URL
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
 		Allowed:    true,
 		Reason:     robots.EmptyRuleSet,
@@ -513,12 +529,15 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	// Setup convert
 	setupConvertMockWithSuccess(mockConvert)
 
-	// Setup resolver to return a fatal error using mock.Anything to ensure it gets called
+	// Setup resolver to return a disk full error (manual retry, not fatal)
 	setupResolverMockWithFatalError(mockResolver)
 
 	// Setup frontier to return a token for the seed URL
 	seedURL, _ := url.Parse("http://example.com/")
 	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
+
+	// Storage Write must be set up since crawl continues past resolver error
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	s := createSchedulerWithAllMocks(
 		t,
@@ -535,15 +554,15 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 		mockResolver,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 
-	// Use maxDepth: 1 to allow for potential additional processing
 	configData := `{
 		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 1
+		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
@@ -555,16 +574,11 @@ func TestScheduler_Resolve_FatalErrorPreventsSubsequentCalls(t *testing.T) {
 	// Phase 2: Execute with state - should return fatal error
 	_, execErr := s.ExecuteCrawlingWithState(init)
 
-	// Fatal resolver error should abort the crawl
-	assert.Error(t, execErr, "Expected error for fatal resolve error")
+	// Disk full error is per-URL with manual retry — crawl should continue
+	assert.NoError(t, execErr, "Disk full error should not abort crawl")
 
 	// Verify resolver was called
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-
-	// Verify that Robot.Decide was only called once (for seed URL)
-	// This proves that the crawl aborted before processing more URLs
-	mockRobot.AssertNumberOfCalls(t, "Decide", 1)
-	t.Logf("Resolve fatal error prevented further processing as expected")
 }
 
 // createSchedulerWithAllMocks creates a scheduler with all mocked dependencies for testing.
@@ -584,6 +598,7 @@ func createSchedulerWithAllMocks(
 	mockResolver assets.Resolver,
 	mockStorage *storageMock,
 	mockSleeper *sleeperMock,
+	mockFailureJournal failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
 	// Create real components if mocks not provided
@@ -629,6 +644,7 @@ func createSchedulerWithAllMocks(
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	return &s
 }

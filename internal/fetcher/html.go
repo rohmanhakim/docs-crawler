@@ -180,11 +180,10 @@ func (h *HtmlFetcher) performFetch(
 ) (FetchResult, failure.ClassifiedError) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchUrl.String(), nil)
 	if err != nil {
-		return FetchResult{}, &FetchError{
-			Message:   fmt.Sprintf("failed to create request: %v", err),
-			Retryable: false,
-			Cause:     ErrCauseNetworkFailure,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseNetworkFailure,
+			fmt.Sprintf("failed to create request: %v", err),
+		)
 	}
 
 	// Apply browser-like headers
@@ -196,11 +195,10 @@ func (h *HtmlFetcher) performFetch(
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		// Network/transport errors are retryable
-		return FetchResult{}, &FetchError{
-			Message:   fmt.Sprintf("request failed: %v", err),
-			Retryable: true,
-			Cause:     ErrCauseNetworkFailure,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseNetworkFailure,
+			fmt.Sprintf("request failed: %v", err),
+		)
 	}
 	defer resp.Body.Close()
 
@@ -208,64 +206,57 @@ func (h *HtmlFetcher) performFetch(
 	switch {
 	case resp.StatusCode >= 500:
 		// Server errors (5xx) are retryable
-		return FetchResult{}, &FetchError{
-			Message:   fmt.Sprintf("server error: %d", resp.StatusCode),
-			Retryable: true,
-			Cause:     ErrCauseRequest5xx,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseRequest5xx,
+			fmt.Sprintf("server error: %d", resp.StatusCode),
+		)
 
 	case resp.StatusCode == 429:
 		// Too Many Requests is retryable
-		return FetchResult{}, &FetchError{
-			Message:   "rate limited (429)",
-			Retryable: true,
-			Cause:     ErrCauseRequestTooMany,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseRequestTooMany,
+			"rate limited (429)",
+		)
 
 	case resp.StatusCode == 403:
 		// Forbidden is not retryable
-		return FetchResult{}, &FetchError{
-			Message:   "access forbidden (403)",
-			Retryable: false,
-			Cause:     ErrCauseRequestPageForbidden,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseRequestPageForbidden,
+			"access forbidden (403)",
+		)
 
 	case resp.StatusCode >= 400 && resp.StatusCode < 500:
 		// Other client errors are not retryable
-		return FetchResult{}, &FetchError{
-			Message:   fmt.Sprintf("client error: %d", resp.StatusCode),
-			Retryable: false,
-			Cause:     ErrCauseRequestPageForbidden,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseRequestPageForbidden,
+			fmt.Sprintf("client error: %d", resp.StatusCode),
+		)
 
 	case resp.StatusCode >= 300 && resp.StatusCode < 400:
 		// Redirects should be handled by http.Client, but if we get here,
 		// it means redirect limit exceeded
-		return FetchResult{}, &FetchError{
-			Message:   fmt.Sprintf("redirect error: %d", resp.StatusCode),
-			Retryable: false,
-			Cause:     ErrCauseRedirectLimitExceeded,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseRedirectLimitExceeded,
+			fmt.Sprintf("redirect error: %d", resp.StatusCode),
+		)
 	}
 
 	// Check Content-Type for HTML
 	contentType := resp.Header.Get("Content-Type")
 	if !isHTMLContent(contentType) {
-		return FetchResult{}, &FetchError{
-			Message:   fmt.Sprintf("non-HTML content type: %s", contentType),
-			Retryable: false,
-			Cause:     ErrCauseContentTypeInvalid,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseContentTypeInvalid,
+			fmt.Sprintf("non-HTML content type: %s", contentType),
+		)
 	}
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return FetchResult{}, &FetchError{
-			Message:   fmt.Sprintf("failed to read response body: %v", err),
-			Retryable: true,
-			Cause:     ErrCauseReadResponseBodyError,
-		}
+		return FetchResult{}, NewFetchError(
+			ErrCauseReadResponseBodyError,
+			fmt.Sprintf("failed to read response body: %v", err),
+		)
 	}
 
 	// Build response headers map

@@ -20,6 +20,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
+	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
@@ -65,6 +66,7 @@ type Scheduler struct {
 	crawlFinalizer         metadata.CrawlFinalizer
 	robot                  robots.Robot
 	frontier               frontier.Frontier
+	failureJournal         failurejournal.Journal
 	htmlFetcher            fetcher.Fetcher
 	domExtractor           extractor.Extractor
 	htmlSanitizer          sanitizer.Sanitizer
@@ -91,11 +93,13 @@ func NewScheduler() Scheduler {
 	storageSink := storage.NewLocalSink(&recorder)
 	rateLimiter := limiter.NewConcurrentRateLimiter()
 	sleeper := timeutil.NewRealSleeper()
+	failureJournal := failurejournal.NewInMemoryJournal()
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
 		robot:                  &cachedRobot,
 		frontier:               &frontier,
+		failureJournal:         failureJournal,
 		htmlFetcher:            &fetcher,
 		domExtractor:           &ext,
 		htmlSanitizer:          &sanitizer,
@@ -111,6 +115,7 @@ func NewScheduler() Scheduler {
 // NewSchedulerWithDeps creates a Scheduler with injected dependencies for testing.
 // This constructor allows tests to provide mock implementations of metadata interfaces
 // to verify behavior without relying on real infrastructure.
+// The failureJournal parameter is optional - if not provided, an in-memory journal will be created.
 func NewSchedulerWithDeps(
 	ctx context.Context,
 	crawlFinalizer metadata.CrawlFinalizer,
@@ -126,6 +131,7 @@ func NewSchedulerWithDeps(
 	constraint normalize.Constraint,
 	storageSink storage.Sink,
 	sleeper timeutil.Sleeper,
+	failureJournal failurejournal.Journal,
 ) Scheduler {
 	return Scheduler{
 		ctx:                    ctx,
@@ -133,6 +139,7 @@ func NewSchedulerWithDeps(
 		crawlFinalizer:         crawlFinalizer,
 		robot:                  robot,
 		frontier:               frontier,
+		failureJournal:         failureJournal,
 		htmlFetcher:            fetcher,
 		domExtractor:           domExtractor,
 		htmlSanitizer:          sanitizer,
@@ -234,6 +241,7 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 				0, // No errors during init (would need to count specific init errors)
 				0, // No assets during init
 				time.Since(initStartTime),
+				0, // No retry queue during init (no failures yet)
 			)
 		}
 	}()
@@ -359,11 +367,13 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	defer func() {
 		execDuration := time.Since(execStartTime)
 		totalPages := s.frontier.VisitedCount()
+		retryQueueCount := s.failureJournal.Count()
 		s.crawlFinalizer.RecordFinalCrawlStats(
 			totalPages,
 			totalErrors,
 			totalAssets,
 			execDuration,
+			retryQueueCount,
 		)
 	}()
 
@@ -380,8 +390,18 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// 3. Fetch Page URL
 		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryParam(cfg))
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.failureJournal.Record(failurejournal.FailureRecord{
+					URL:        getURLString(nextCrawlToken.URL()),
+					Stage:      failurejournal.StageFetch,
+					Error:      err.Error(),
+					RetryCount: 0,
+					Timestamp:  time.Now(),
+				})
 			}
 			// recoverable → log already done → count error
 			totalErrors++
@@ -391,8 +411,18 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// 4. Extract HTML DOM
 		extractionResult, err := s.domExtractor.Extract(fetchResult.URL(), fetchResult.Body())
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.failureJournal.Record(failurejournal.FailureRecord{
+					URL:        getURLString(nextCrawlToken.URL()),
+					Stage:      failurejournal.StageFetch,
+					Error:      err.Error(),
+					RetryCount: 0,
+					Timestamp:  time.Now(),
+				})
 			}
 			totalErrors++
 			continue
@@ -401,8 +431,18 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// 5. Sanitize extracted HTML
 		sanitizedHtml, err := s.htmlSanitizer.Sanitize(extractionResult.ContentNode)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.failureJournal.Record(failurejournal.FailureRecord{
+					URL:        getURLString(nextCrawlToken.URL()),
+					Stage:      failurejournal.StageFetch,
+					Error:      err.Error(),
+					RetryCount: 0,
+					Timestamp:  time.Now(),
+				})
 			}
 			totalErrors++
 			continue
@@ -438,8 +478,18 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// 6. HTML → Markdown Conversion
 		markdownDoc, err := s.markdownConversionRule.Convert(sanitizedHtml)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.failureJournal.Record(failurejournal.FailureRecord{
+					URL:        getURLString(nextCrawlToken.URL()),
+					Stage:      failurejournal.StageFetch,
+					Error:      err.Error(),
+					RetryCount: 0,
+					Timestamp:  time.Now(),
+				})
 			}
 			totalErrors++
 			continue
@@ -455,8 +505,18 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			RetryParam(cfg),
 		)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.failureJournal.Record(failurejournal.FailureRecord{
+					URL:        getURLString(nextCrawlToken.URL()),
+					Stage:      failurejournal.StageAsset,
+					Error:      err.Error(),
+					RetryCount: 0,
+					Timestamp:  time.Now(),
+				})
 			}
 			totalErrors++
 			// Continue to process the markdown even if asset resolution had errors
@@ -478,8 +538,18 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			normalizeParam,
 		)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.failureJournal.Record(failurejournal.FailureRecord{
+					URL:        getURLString(nextCrawlToken.URL()),
+					Stage:      failurejournal.StageFetch,
+					Error:      err.Error(),
+					RetryCount: 0,
+					Timestamp:  time.Now(),
+				})
 			}
 			totalErrors++
 			continue
@@ -492,8 +562,18 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			cfg.HashAlgo(),
 		)
 		if err != nil {
-			if err.Severity() == failure.SeverityFatal {
+			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
+			}
+			// Track for manual retry if eligible
+			if err.RetryPolicy() == failure.RetryPolicyManual {
+				s.failureJournal.Record(failurejournal.FailureRecord{
+					URL:        getURLString(nextCrawlToken.URL()),
+					Stage:      failurejournal.StageStorage,
+					Error:      err.Error(),
+					RetryCount: 0,
+					Timestamp:  time.Now(),
+				})
 			}
 			// recoverable → log already done → count error
 			totalErrors++
@@ -599,4 +679,10 @@ func (s *Scheduler) DequeueFromFrontier() (frontier.CrawlToken, bool) {
 		return frontier.CrawlToken{}, false
 	}
 	return s.frontier.Dequeue()
+}
+
+// getURLString safely extracts a string from a url.URL.
+// This works around potential pointer receiver issues.
+func getURLString(u url.URL) string {
+	return u.String()
 }

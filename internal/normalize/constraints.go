@@ -109,11 +109,10 @@ func normalize(
 func validateStructure(content []byte) failure.ClassifiedError {
 	// Check for empty content (Invariant N1 prerequisite)
 	if len(bytes.TrimSpace(content)) == 0 {
-		return &NormalizationError{
-			Message:   "markdown content is empty",
-			Retryable: false,
-			Cause:     ErrCauseEmptyContent,
-		}
+		return NewNormalizationError(
+			ErrCauseEmptyContent,
+			"markdown content is empty",
+		)
 	}
 
 	// Parse markdown into AST
@@ -193,11 +192,10 @@ func validateStructure(content []byte) failure.ClassifiedError {
 
 	// Check if heading inside code block was detected
 	if insideCodeBlock {
-		return &NormalizationError{
-			Message:   "heading detected inside code block",
-			Retryable: false,
-			Cause:     ErrCauseBrokenAtomicBlock,
-		}
+		return NewNormalizationError(
+			ErrCauseBrokenAtomicBlock,
+			"heading detected inside code block",
+		)
 	}
 
 	// Validate N1: Exactly one H1
@@ -209,28 +207,25 @@ func validateStructure(content []byte) failure.ClassifiedError {
 	}
 
 	if h1Count == 0 {
-		return &NormalizationError{
-			Message:   "document has no H1 heading",
-			Retryable: false,
-			Cause:     ErrCauseBrokenH1Invariant,
-		}
+		return NewNormalizationError(
+			ErrCauseBrokenH1Invariant,
+			"document has no H1 heading",
+		)
 	}
 
 	if h1Count > 1 {
-		return &NormalizationError{
-			Message:   fmt.Sprintf("document has %d H1 headings, expected exactly one", h1Count),
-			Retryable: false,
-			Cause:     ErrCauseBrokenH1Invariant,
-		}
+		return NewNormalizationError(
+			ErrCauseBrokenH1Invariant,
+			fmt.Sprintf("document has %d H1 headings, expected exactly one", h1Count),
+		)
 	}
 
 	// Validate N4: No orphan content before H1
 	if hasContentBeforeH1 {
-		return &NormalizationError{
-			Message:   "content exists before first H1 heading",
-			Retryable: false,
-			Cause:     ErrCauseOrphanContent,
-		}
+		return NewNormalizationError(
+			ErrCauseOrphanContent,
+			"content exists before first H1 heading",
+		)
 	}
 
 	// Validate N3: No skipped heading levels
@@ -238,11 +233,10 @@ func validateStructure(content []byte) failure.ClassifiedError {
 	for _, h := range headings {
 		// Check for level skip (N3)
 		if h.node.Level > prevLevel+1 && prevLevel != 0 {
-			return &NormalizationError{
-				Message:   fmt.Sprintf("heading level skipped: H%d follows H%d", h.node.Level, prevLevel),
-				Retryable: false,
-				Cause:     ErrCauseSkippedHeadingLevels,
-			}
+			return NewNormalizationError(
+				ErrCauseSkippedHeadingLevels,
+				fmt.Sprintf("heading level skipped: H%d follows H%d", h.node.Level, prevLevel),
+			)
 		}
 
 		prevLevel = h.node.Level
@@ -256,11 +250,10 @@ func validateStructure(content []byte) failure.ClassifiedError {
 			if headings[j].node.Level <= headings[i].node.Level {
 				// Next same/higher level heading found - check if current heading has content
 				if !contentAfterHeading[i] {
-					return &NormalizationError{
-						Message:   fmt.Sprintf("empty section: H%d heading has no content before next H%d", headings[i].node.Level, headings[j].node.Level),
-						Retryable: false,
-						Cause:     ErrCauseEmptySection,
-					}
+					return NewNormalizationError(
+						ErrCauseEmptySection,
+						fmt.Sprintf("empty section: H%d heading has no content before next H%d", headings[i].node.Level, headings[j].node.Level),
+					)
 				}
 				break
 			}
@@ -299,22 +292,20 @@ func generateFrontmatter(
 	canonicalURLStr := canonicalURL.String()
 	docIDHash, hashErr := hashutil.HashBytes([]byte(canonicalURLStr), normalizeParam.hashAlgo)
 	if hashErr != nil {
-		return Frontmatter{}, &NormalizationError{
-			Message:   fmt.Sprintf("failed to compute doc_id: %v", hashErr),
-			Retryable: false,
-			Cause:     ErrCauseHashComputationFailed,
-		}
+		return Frontmatter{}, NewNormalizationError(
+			ErrCauseHashComputationFailed,
+			fmt.Sprintf("failed to compute doc_id: %v", hashErr),
+		)
 	}
 	docID := string(normalizeParam.hashAlgo) + ":" + docIDHash
 
 	// Compute contentHash (hash of markdown content)
 	contentHashValue, hashErr := hashutil.HashBytes(content, normalizeParam.hashAlgo)
 	if hashErr != nil {
-		return Frontmatter{}, &NormalizationError{
-			Message:   fmt.Sprintf("failed to compute content_hash: %v", hashErr),
-			Retryable: false,
-			Cause:     ErrCauseHashComputationFailed,
-		}
+		return Frontmatter{}, NewNormalizationError(
+			ErrCauseHashComputationFailed,
+			fmt.Sprintf("failed to compute content_hash: %v", hashErr),
+		)
 	}
 	contentHash := string(normalizeParam.hashAlgo) + ":" + contentHashValue
 
@@ -349,11 +340,10 @@ func generateFrontmatter(
 func deriveSection(canonicalURL url.URL, allowedPathPrefixes []string) (string, failure.ClassifiedError) {
 	path := canonicalURL.Path
 	if path == "" || path == "/" {
-		return "", &NormalizationError{
-			Message:   "URL path is empty, cannot derive section",
-			Retryable: false,
-			Cause:     ErrCauseSectionDerivationFailed,
-		}
+		return "", NewNormalizationError(
+			ErrCauseSectionDerivationFailed,
+			"URL path is empty, cannot derive section",
+		)
 	}
 
 	// Try to strip matching allowedPathPrefix
@@ -378,11 +368,10 @@ func deriveSection(canonicalURL url.URL, allowedPathPrefixes []string) (string, 
 
 	// If nothing remains after stripping prefix, error
 	if path == "" {
-		return "", &NormalizationError{
-			Message:   "URL path has no segments after stripping allowedPathPrefix",
-			Retryable: false,
-			Cause:     ErrCauseSectionDerivationFailed,
-		}
+		return "", NewNormalizationError(
+			ErrCauseSectionDerivationFailed,
+			"URL path has no segments after stripping allowedPathPrefix",
+		)
 	}
 
 	segments := strings.Split(path, "/")
@@ -394,11 +383,10 @@ func deriveSection(canonicalURL url.URL, allowedPathPrefixes []string) (string, 
 		}
 	}
 
-	return "", &NormalizationError{
-		Message:   "URL path has no valid segments",
-		Retryable: false,
-		Cause:     ErrCauseSectionDerivationFailed,
-	}
+	return "", NewNormalizationError(
+		ErrCauseSectionDerivationFailed,
+		"URL path has no valid segments",
+	)
 }
 
 // extractTitle extracts the title from the first H1 heading in markdown content.
@@ -422,11 +410,10 @@ func extractTitle(content []byte) (string, failure.ClassifiedError) {
 			title = strings.TrimSpace(title)
 
 			if title == "" {
-				return "", &NormalizationError{
-					Message:   "H1 heading contains no text",
-					Retryable: false,
-					Cause:     ErrCauseTitleExtractionFailed,
-				}
+				return "", NewNormalizationError(
+					ErrCauseTitleExtractionFailed,
+					"H1 heading contains no text",
+				)
 			}
 
 			return title, nil
@@ -434,11 +421,10 @@ func extractTitle(content []byte) (string, failure.ClassifiedError) {
 	}
 
 	// This should not happen if validateStructure passed
-	return "", &NormalizationError{
-		Message:   "no H1 heading found in document",
-		Retryable: false,
-		Cause:     ErrCauseTitleExtractionFailed,
-	}
+	return "", NewNormalizationError(
+		ErrCauseTitleExtractionFailed,
+		"no H1 heading found in document",
+	)
 }
 
 // stripInlineMarkdown removes common inline markdown formatting from text.

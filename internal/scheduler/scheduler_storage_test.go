@@ -38,6 +38,7 @@ func TestScheduler_Write_CalledWithNormalizedDoc(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -101,6 +102,7 @@ func TestScheduler_Write_CalledWithNormalizedDoc(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -145,6 +147,7 @@ func TestScheduler_Write_SuccessfulWrite_ReturnsWriteResult(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -203,6 +206,7 @@ func TestScheduler_Write_SuccessfulWrite_ReturnsWriteResult(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -237,9 +241,10 @@ func TestScheduler_Write_SuccessfulWrite_ReturnsWriteResult(t *testing.T) {
 	assert.Equal(t, expectedWriteResult.ContentHash(), writeResults[0].ContentHash())
 }
 
-// TestScheduler_Write_FatalError_AbortsCrawl verifies that fatal storage errors
-// cause the crawl to abort immediately.
-func TestScheduler_Write_FatalError_AbortsCrawl(t *testing.T) {
+// TestScheduler_Write_WriteFailure_ContinuesCrawl verifies that write failures
+// (like permission denied) are counted but the crawl continues.
+// Storage errors are per-URL failures and should not abort the entire crawl.
+func TestScheduler_Write_WriteFailure_ContinuesCrawl(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
 	noopSink := &metadata.NoopSink{}
@@ -254,6 +259,7 @@ func TestScheduler_Write_FatalError_AbortsCrawl(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -291,13 +297,15 @@ func TestScheduler_Write_FatalError_AbortsCrawl(t *testing.T) {
 	// Setup normalize
 	setupNormalizeMockWithSuccess(mockNormalize)
 
-	// Setup storage to return a fatal error
-	storageErr := &storage.StorageError{
-		Message:   "fatal storage error: permission denied",
-		Retryable: false,
-		Cause:     storage.ErrCauseWriteFailure,
-		Path:      "/output/test.md",
-	}
+	// Setup storage to return a write failure error
+	// Per the new error classification, ErrCauseWriteFailure has:
+	// - RetryPolicy: Never (don't auto-retry)
+	// - Impact: Continue (don't abort crawl)
+	storageErr := storage.NewStorageError(
+		storage.ErrCauseWriteFailure,
+		"write failed: permission denied",
+		"/output/test.md",
+	)
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).
 		Return(storage.WriteResult{}, storageErr)
 
@@ -317,6 +325,7 @@ func TestScheduler_Write_FatalError_AbortsCrawl(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -324,7 +333,7 @@ func TestScheduler_Write_FatalError_AbortsCrawl(t *testing.T) {
 
 	configData := `{
 		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 1
+		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	assert.NoError(t, err)
@@ -339,8 +348,8 @@ func TestScheduler_Write_FatalError_AbortsCrawl(t *testing.T) {
 	// Phase 2: Execute with state
 	_, execErr := s.ExecuteCrawlingWithState(init)
 
-	// Fatal storage error should abort the crawl
-	assert.Error(t, execErr, "Expected error for fatal storage error")
+	// Write failure should NOT abort the crawl - it's a per-URL failure
+	assert.NoError(t, execErr, "Write failure should not abort crawl")
 	mockStorage.AssertCalled(t, "Write", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -361,6 +370,7 @@ func TestScheduler_Write_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -398,13 +408,12 @@ func TestScheduler_Write_RecoverableError_ContinuesCrawl(t *testing.T) {
 	// Setup normalize
 	setupNormalizeMockWithSuccess(mockNormalize)
 
-	// Setup storage to return a recoverable error (disk full is retryable)
-	storageErr := &storage.StorageError{
-		Message:   "recoverable storage error: disk full",
-		Retryable: true,
-		Cause:     storage.ErrCauseDiskFull,
-		Path:      "/output/test.md",
-	}
+	// Setup storage to return a recoverable error (disk full is manual retry)
+	storageErr := storage.NewStorageError(
+		storage.ErrCauseDiskFull,
+		"recoverable storage error: disk full",
+		"/output/test.md",
+	)
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).
 		Return(storage.WriteResult{}, storageErr)
 
@@ -424,6 +433,7 @@ func TestScheduler_Write_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -468,6 +478,7 @@ func TestScheduler_Write_MethodCallOrder(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -561,6 +572,7 @@ func TestScheduler_Write_MethodCallOrder(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -648,6 +660,7 @@ func TestScheduler_Write_CalledExactlyOncePerPage(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -705,6 +718,7 @@ func TestScheduler_Write_CalledExactlyOncePerPage(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -748,6 +762,7 @@ func TestScheduler_Write_CalledWithCorrectOutputDir(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -810,6 +825,7 @@ func TestScheduler_Write_CalledWithCorrectOutputDir(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -856,6 +872,7 @@ func TestScheduler_Write_CalledWithCorrectHashAlgo(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -917,6 +934,7 @@ func TestScheduler_Write_CalledWithCorrectHashAlgo(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -967,6 +985,7 @@ func TestScheduler_Write_MultiplePages_MultipleWriteResults(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Expect two Decide calls - one for each page
@@ -1033,6 +1052,7 @@ func TestScheduler_Write_MultiplePages_MultipleWriteResults(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()

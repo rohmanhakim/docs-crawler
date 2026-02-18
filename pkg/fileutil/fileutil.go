@@ -26,11 +26,7 @@ func EnsureDir(dir string, path ...string) failure.ClassifiedError {
 
 	assetsDir := filepath.Join(targetPath...)
 	if err := os.MkdirAll(assetsDir, 0755); err != nil {
-		return &FileError{
-			Message:   fmt.Sprintf("%v", err),
-			Retryable: false,
-			Cause:     ErrCausePathError,
-		}
+		return NewFileError(ErrCausePathError, fmt.Sprintf("%v", err))
 	}
 	return nil
 }

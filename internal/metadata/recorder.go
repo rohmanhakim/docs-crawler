@@ -106,12 +106,14 @@ func (r *Recorder) RecordFinalCrawlStats(
 	totalErrors int,
 	totalAssets int,
 	duration time.Duration,
+	manualRetryQueueCount int,
 ) {
 	stats := crawlStats{
-		totalPages:  totalPages,
-		totalErrors: totalErrors,
-		totalAssets: totalAssets,
-		durationMs:  duration.Milliseconds(),
+		totalPages:            totalPages,
+		totalErrors:           totalErrors,
+		totalAssets:           totalAssets,
+		durationMs:            duration.Milliseconds(),
+		manualRetryQueueCount: manualRetryQueueCount,
 	}
 
 	r.append(stats)
@@ -153,6 +155,7 @@ type CrawlFinalizer interface {
 		totalErrors int,
 		totalAssets int,
 		duration time.Duration,
+		manualRetryQueueCount int,
 	)
 }
 

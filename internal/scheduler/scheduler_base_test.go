@@ -35,6 +35,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
 	mockFrontier.On("VisitedCount").Return(0).Maybe()
@@ -68,6 +69,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -118,6 +120,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -153,6 +156,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -200,6 +204,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockSleeper := newSleeperMock(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -235,6 +240,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -335,6 +341,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -401,6 +408,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -451,6 +459,7 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -503,6 +512,7 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -552,6 +562,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up frontier expectations
 	mockFrontier.On("Init", mock.Anything).Return()
@@ -610,6 +621,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()

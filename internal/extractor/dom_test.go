@@ -95,7 +95,7 @@ func TestExtract_Case_B_MainEmpty(t *testing.T) {
 	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
 
 	// Check it's the right error type
-	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()), "Should be fatal error")
+	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()), "Should be recoverable error")
 
 	// Verify metadata sink received the error
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
@@ -114,7 +114,7 @@ func TestExtract_Case_C_MainNavOnly(t *testing.T) {
 	require.Error(t, err, "Expected extraction to fail for nav-only content")
 	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
 
-	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()))
+	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
 	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
@@ -162,7 +162,7 @@ func TestExtract_Case_G_NoContent(t *testing.T) {
 	require.Error(t, err, "Expected extraction to fail when no meaningful content")
 	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
 
-	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()))
+	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
 	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
@@ -180,7 +180,7 @@ func TestExtract_Case_H_NotHTML_XML(t *testing.T) {
 	require.Error(t, err, "Expected extraction to fail for XML content")
 	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
 
-	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()))
+	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
 	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
@@ -198,7 +198,7 @@ func TestExtract_Case_I_NotHTML_Text(t *testing.T) {
 	require.Error(t, err, "Expected extraction to fail for plain text")
 	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
 
-	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()))
+	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
 	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
@@ -291,7 +291,7 @@ func TestExtract_Case_Layer2Empty(t *testing.T) {
 	require.Error(t, err, "Expected extraction to fail when both layers find no meaningful content")
 	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
 
-	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()))
+	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
 	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
@@ -309,7 +309,7 @@ func TestExtract_Case_Layer2NavOnly(t *testing.T) {
 	require.Error(t, err, "Expected extraction to fail when both layers find only navigation")
 	assert.Nil(t, result.ContentNode, "ContentNode should be nil on error")
 
-	assert.Equal(t, string(failure.SeverityFatal), string(err.Severity()))
+	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
 	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))

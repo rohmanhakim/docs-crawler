@@ -36,6 +36,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up sanitizer mock with success
 	setupSanitizerMockWithSuccess(mockSanitizer, []url.URL{})
@@ -88,6 +89,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -126,6 +128,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Define expected custom extraction parameters
 	customParams := extractor.ExtractParam{
@@ -191,6 +194,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -233,6 +237,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Define custom extraction parameters from config
 	customParams := extractor.ExtractParam{
@@ -319,6 +324,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -391,6 +397,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up extractor expectations
 	mockExtractor.On("SetExtractParam", extractor.DefaultExtractParam()).Return()
@@ -482,6 +489,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -520,6 +528,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Set up extractor expectations
 	mockExtractor.On("SetExtractParam", extractor.DefaultExtractParam()).Return()
@@ -559,11 +568,10 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fetchResult, nil)
 
-	mockExtractor.On("Extract", mock.Anything, mock.Anything).Return(extractor.ExtractionResult{}, &extractor.ExtractionError{
-		Message:   "input is not valid HTML document",
-		Retryable: false,
-		Cause:     extractor.ErrCauseNotHTML,
-	})
+	mockExtractor.On("Extract", mock.Anything, mock.Anything).Return(extractor.ExtractionResult{}, extractor.NewExtractionError(
+		extractor.ErrCauseNotHTML,
+		"input is not valid HTML document",
+	))
 
 	// Create normalize mock for test
 	mockNormalize := newNormalizeMockForTest(t)
@@ -584,6 +592,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()

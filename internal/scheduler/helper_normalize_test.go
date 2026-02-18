@@ -66,23 +66,23 @@ func setupNormalizeMockWithSuccess(m *normalizeMock) {
 }
 
 // setupNormalizeMockWithFatalError sets up the normalize mock to return a fatal error
+// Note: With the new classification design, content processing errors are always SeverityRecoverable.
 func setupNormalizeMockWithFatalError(m *normalizeMock) {
-	normalizeErr := &normalize.NormalizationError{
-		Message:   "fatal normalization error: broken H1 invariant",
-		Retryable: false,
-		Cause:     normalize.ErrCauseBrokenH1Invariant,
-	}
+	normalizeErr := normalize.NewNormalizationError(
+		normalize.ErrCauseBrokenH1Invariant,
+		"fatal normalization error: broken H1 invariant",
+	)
 	m.On("Normalize", mock.Anything, mock.Anything, mock.Anything).
 		Return(normalize.NormalizedMarkdownDoc{}, normalizeErr)
 }
 
 // setupNormalizeMockWithRecoverableError sets up the normalize mock to return a recoverable error
+// Note: With the new classification design, all content processing errors return SeverityRecoverable.
 func setupNormalizeMockWithRecoverableError(m *normalizeMock) {
-	normalizeErr := &normalize.NormalizationError{
-		Message:   "recoverable normalization error",
-		Retryable: true,
-		Cause:     normalize.ErrCauseHashComputationFailed,
-	}
+	normalizeErr := normalize.NewNormalizationError(
+		normalize.ErrCauseHashComputationFailed,
+		"recoverable normalization error",
+	)
 	m.On("Normalize", mock.Anything, mock.Anything, mock.Anything).
 		Return(normalize.NormalizedMarkdownDoc{}, normalizeErr)
 }

@@ -12,7 +12,6 @@ type SanitizationErrorCause string
 const (
 	// ErrCauseUnparseableHTML:
 	// - Severity: Fatal
-	// - Retryable: No
 	// - Examples:
 	//   - HTML parser fails catastrophically
 	//   - DOM tree cannot be constructed at all
@@ -27,35 +26,59 @@ const (
 	ErrCauseUnparseableHTML = "unparseable html"
 
 	// ErrCauseCompetingRoots: Multiple competing document roots found (S3 invariant violation).
-	// - Severity: Fatal
-	// - Retryable: No
 	ErrCauseCompetingRoots = "competing document roots"
 
 	// ErrCauseNoStructuralAnchor: Document has no headings and no structural anchors (H3 invariant violation).
-	// - Severity: Fatal
-	// - Retryable: No
 	ErrCauseNoStructuralAnchor = "no structural anchor"
 
 	// ErrCauseMultipleH1NoRoot: Multiple H1 elements without a provable primary root (H2 invariant violation).
-	// - Severity: Fatal
-	// - Retryable: No
 	ErrCauseMultipleH1NoRoot = "multiple h1 without primary root"
 
 	// ErrCauseImpliedMultipleDocs: Document implies multiple documents (S5 invariant violation).
-	// - Severity: Fatal
-	// - Retryable: No
 	ErrCauseImpliedMultipleDocs = "implied multiple documents"
 
 	// ErrCauseAmbiguousDOM: Document has structurally ambiguous DOM (E1 invariant violation).
-	// - Severity: Fatal
-	// - Retryable: No
 	ErrCauseAmbiguousDOM = "ambiguous dom structure"
 )
 
+// sanitizationErrorClassifications provides explicit retry policy and impact level
+// for each SanitizationErrorCause. Content processing errors are deterministic -
+// retrying the same content yields the same error.
+//
+// Classification Rationale:
+// - All causes: Never retry - content processing errors are deterministic and permanent
+var sanitizationErrorClassifications = map[SanitizationErrorCause]struct {
+	Policy failure.RetryPolicy
+	Impact failure.ImpactLevel
+}{
+	ErrCauseUnparseableHTML:     {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseCompetingRoots:      {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseNoStructuralAnchor:  {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseMultipleH1NoRoot:    {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseImpliedMultipleDocs: {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+	ErrCauseAmbiguousDOM:        {failure.RetryPolicyNever, failure.ImpactLevelContinue},
+}
+
+// SanitizationError represents an error that occurred during HTML sanitization.
+// It implements failure.ClassifiedError interface with explicit retry policy
+// and impact level based on the error cause.
 type SanitizationError struct {
-	Message   string
-	Retryable bool
-	Cause     SanitizationErrorCause
+	Message string
+	Cause   SanitizationErrorCause
+	policy  failure.RetryPolicy
+	impact  failure.ImpactLevel
+}
+
+// NewSanitizationError creates a new SanitizationError with explicit classification based on cause.
+// The retry policy and crawl impact are determined by the error cause classification map.
+func NewSanitizationError(cause SanitizationErrorCause, message string) *SanitizationError {
+	classification := sanitizationErrorClassifications[cause]
+	return &SanitizationError{
+		Message: message,
+		Cause:   cause,
+		policy:  classification.Policy,
+		impact:  classification.Impact,
+	}
 }
 
 func (e *SanitizationError) Error() string {
@@ -63,10 +86,31 @@ func (e *SanitizationError) Error() string {
 }
 
 func (e *SanitizationError) Severity() failure.Severity {
-	if e.Retryable {
+	if e.impact == failure.ImpactLevelAbort {
+		return failure.SeverityFatal
+	}
+	switch e.policy {
+	case failure.RetryPolicyAuto:
+		return failure.SeverityRecoverable
+	case failure.RetryPolicyManual:
+		return failure.SeverityRetryExhausted
+	case failure.RetryPolicyNever:
+		return failure.SeverityRecoverable
+	default:
 		return failure.SeverityRecoverable
 	}
-	return failure.SeverityFatal
+}
+
+// RetryPolicy returns the automatic retry behavior for this error.
+// Content processing errors are deterministic and never benefit from retry.
+func (e *SanitizationError) RetryPolicy() failure.RetryPolicy {
+	return e.policy
+}
+
+// Impact returns how the scheduler should respond to this error.
+// Sanitization errors never abort the crawl - they are per-URL failures.
+func (e *SanitizationError) Impact() failure.ImpactLevel {
+	return e.impact
 }
 
 // mapSanitizationErrorToMetadataCause maps sanitizer-local error semantics

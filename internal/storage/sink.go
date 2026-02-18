@@ -92,12 +92,11 @@ func write(
 	// Hash the canonical URL using specified algorithm
 	urlHashFull, err := hashutil.HashBytes([]byte(canonicalURL), hashAlgo)
 	if err != nil {
-		return WriteResult{}, &StorageError{
-			Message:   err.Error(),
-			Retryable: false,
-			Cause:     ErrCauseHashComputationFailed,
-			Path:      "",
-		}
+		return WriteResult{}, NewStorageError(
+			ErrCauseHashComputationFailed,
+			err.Error(),
+			"",
+		)
 	}
 
 	// Use first 12 hex characters for filename (per user's requirement)
@@ -107,26 +106,24 @@ func write(
 	if err := fileutil.EnsureDir(outputDir); err != nil {
 		var fileErr *fileutil.FileError
 		if errors.As(err, &fileErr) {
-			cause := ErrCauseWriteFailure
-			retryable := false
+			var cause StorageErrorCause
 			if fileErr.Cause == fileutil.ErrCausePathError {
 				// Could be disk full or permission issue
 				cause = ErrCausePathError
-				retryable = true // disk full is retryable
+			} else {
+				cause = ErrCauseWriteFailure
 			}
-			return WriteResult{}, &StorageError{
-				Message:   err.Error(),
-				Retryable: retryable,
-				Cause:     cause,
-				Path:      outputDir,
-			}
+			return WriteResult{}, NewStorageError(
+				cause,
+				err.Error(),
+				outputDir,
+			)
 		}
-		return WriteResult{}, &StorageError{
-			Message:   err.Error(),
-			Retryable: false,
-			Cause:     ErrCauseWriteFailure,
-			Path:      outputDir,
-		}
+		return WriteResult{}, NewStorageError(
+			ErrCauseWriteFailure,
+			err.Error(),
+			outputDir,
+		)
 	}
 
 	// Construct full file path: outputDir/<url_hash>.md
@@ -136,19 +133,18 @@ func write(
 	// Write content to file
 	content := normalizedDoc.Content()
 	if err := os.WriteFile(fullPath, content, 0644); err != nil {
-		cause := ErrCauseWriteFailure
-		retryable := false
+		var cause StorageErrorCause
 		// Check if it's a disk full error (ENOSPC)
 		if errors.Is(err, syscall.ENOSPC) {
 			cause = ErrCauseDiskFull
-			retryable = true // disk full is retryable
+		} else {
+			cause = ErrCauseWriteFailure
 		}
-		return WriteResult{}, &StorageError{
-			Message:   err.Error(),
-			Retryable: retryable,
-			Cause:     cause,
-			Path:      fullPath,
-		}
+		return WriteResult{}, NewStorageError(
+			cause,
+			err.Error(),
+			fullPath,
+		)
 	}
 
 	// Get content hash from frontmatter

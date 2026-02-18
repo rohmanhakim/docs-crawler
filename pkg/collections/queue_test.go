@@ -1,13 +1,13 @@
-package frontier_test
+package collections_test
 
 import (
 	"testing"
 
-	"github.com/rohmanhakim/docs-crawler/internal/frontier"
+	"github.com/rohmanhakim/docs-crawler/pkg/collections"
 )
 
 func TestEnqueueDequeue(t *testing.T) {
-	queue := frontier.NewFIFOQueue[MyQueueItem]()
+	queue := collections.NewFIFOQueue[MyQueueItem]()
 
 	firstItem := MyQueueItem{
 		name: "First item",

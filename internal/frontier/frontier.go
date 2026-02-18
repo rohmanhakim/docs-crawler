@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/rohmanhakim/docs-crawler/internal/config"
+	"github.com/rohmanhakim/docs-crawler/pkg/collections"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
 )
 
@@ -52,8 +53,8 @@ type Frontier interface {
 
 type CrawlFrontier struct {
 	mu            sync.RWMutex
-	queuesByDepth map[int]*FIFOQueue[CrawlToken]
-	visitedUrl    Set[string]
+	queuesByDepth map[int]*collections.FIFOQueue[CrawlToken]
+	visitedUrl    collections.Set[string]
 	maxDepth      int
 	currentDepth  int
 	maxPages      int
@@ -61,8 +62,8 @@ type CrawlFrontier struct {
 
 func NewCrawlFrontier() CrawlFrontier {
 	return CrawlFrontier{
-		queuesByDepth: make(map[int]*FIFOQueue[CrawlToken]),
-		visitedUrl:    NewSet[string](),
+		queuesByDepth: make(map[int]*collections.FIFOQueue[CrawlToken]),
+		visitedUrl:    collections.NewSet[string](),
 	}
 }
 
@@ -101,7 +102,7 @@ func (f *CrawlFrontier) Submit(admission CrawlAdmissionCandidate) {
 
 func (f *CrawlFrontier) Enqueue(incomingToken CrawlToken) {
 	if f.queuesByDepth[incomingToken.depth] == nil {
-		f.queuesByDepth[incomingToken.depth] = NewFIFOQueue[CrawlToken]()
+		f.queuesByDepth[incomingToken.depth] = collections.NewFIFOQueue[CrawlToken]()
 	}
 	f.queuesByDepth[incomingToken.depth].Enqueue(incomingToken)
 	if incomingToken.depth > f.currentDepth {

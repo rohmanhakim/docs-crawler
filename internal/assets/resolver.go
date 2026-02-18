@@ -226,11 +226,7 @@ func (r *LocalResolver) resolve(
 	if len(deduplicatedAssetsUrls) > 0 {
 		// Create asset directory (decoupled from page - assets are shared)
 		if err := fileutil.EnsureDir(resolveParam.OutputDir(), "assets", "images"); err != nil {
-			return AssetfulMarkdownDoc{}, &AssetsError{
-				Message:   fmt.Sprintf("%v", err),
-				Retryable: false,
-				Cause:     ErrCausePathError,
-			}
+			return AssetfulMarkdownDoc{}, NewAssetsError(ErrCausePathError, fmt.Sprintf("%v", err))
 		}
 
 		// Fetch each asset with retry
@@ -374,11 +370,7 @@ func (r *LocalResolver) fetchAssetWithRetry(
 func (r *LocalResolver) performFetch(ctx context.Context, fetchUrl url.URL, userAgent string, maxAssetSize int64) (AssetFetchResult, failure.ClassifiedError) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchUrl.String(), nil)
 	if err != nil {
-		return AssetFetchResult{}, &AssetsError{
-			Message:   fmt.Sprintf("failed to create request: %v", err),
-			Retryable: false,
-			Cause:     ErrCauseNetworkFailure,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseNetworkFailure, fmt.Sprintf("failed to create request: %v", err))
 	}
 
 	// Apply headers for asset fetching
@@ -391,59 +383,31 @@ func (r *LocalResolver) performFetch(ctx context.Context, fetchUrl url.URL, user
 	resp, err := r.httpClient.Do(req)
 	duration := time.Since(startTime)
 	if err != nil {
-		return AssetFetchResult{}, &AssetsError{
-			Message:   fmt.Sprintf("request failed: %v", err),
-			Retryable: true,
-			Cause:     ErrCauseNetworkFailure,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseNetworkFailure, fmt.Sprintf("request failed: %v", err))
 	}
 	defer resp.Body.Close()
 
 	// Check Content-Length before downloading
 	if resp.ContentLength > maxAssetSize {
-		return AssetFetchResult{}, &AssetsError{
-			Message:   fmt.Sprintf("asset too large: %d bytes (max %d)", resp.ContentLength, maxAssetSize),
-			Retryable: false,
-			Cause:     ErrCauseAssetTooLarge,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseAssetTooLarge, fmt.Sprintf("asset too large: %d bytes (max %d)", resp.ContentLength, maxAssetSize))
 	}
 
 	// Handle HTTP status codes
 	switch {
 	case resp.StatusCode >= 500:
-		return AssetFetchResult{}, &AssetsError{
-			Message:   fmt.Sprintf("server error: %d", resp.StatusCode),
-			Retryable: true,
-			Cause:     ErrCauseRequest5xx,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseRequest5xx, fmt.Sprintf("server error: %d", resp.StatusCode))
 
 	case resp.StatusCode == 429:
-		return AssetFetchResult{}, &AssetsError{
-			Message:   "rate limited (429)",
-			Retryable: true,
-			Cause:     ErrCauseRequestTooMany,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseRequestTooMany, "rate limited (429)")
 
 	case resp.StatusCode == 403:
-		return AssetFetchResult{}, &AssetsError{
-			Message:   "access forbidden (403)",
-			Retryable: false,
-			Cause:     ErrCauseRequestPageForbidden,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseRequestPageForbidden, "access forbidden (403)")
 
 	case resp.StatusCode >= 400 && resp.StatusCode < 500:
-		return AssetFetchResult{}, &AssetsError{
-			Message:   fmt.Sprintf("client error: %d", resp.StatusCode),
-			Retryable: false,
-			Cause:     ErrCauseRequestPageForbidden,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseRequestPageForbidden, fmt.Sprintf("client error: %d", resp.StatusCode))
 
 	case resp.StatusCode >= 300 && resp.StatusCode < 400:
-		return AssetFetchResult{}, &AssetsError{
-			Message:   fmt.Sprintf("redirect error: %d", resp.StatusCode),
-			Retryable: false,
-			Cause:     ErrCauseRedirectLimitExceeded,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseRedirectLimitExceeded, fmt.Sprintf("redirect error: %d", resp.StatusCode))
 	}
 
 	// Read with hard limit to protect against:
@@ -453,20 +417,12 @@ func (r *LocalResolver) performFetch(ctx context.Context, fetchUrl url.URL, user
 	limitedReader := io.LimitReader(resp.Body, maxAssetSize+1) // +1 to detect overflow
 	body, err := io.ReadAll(limitedReader)
 	if err != nil {
-		return AssetFetchResult{}, &AssetsError{
-			Message:   fmt.Sprintf("failed to read response body: %v", err),
-			Retryable: true,
-			Cause:     ErrCauseReadResponseBodyError,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseReadResponseBodyError, fmt.Sprintf("failed to read response body: %v", err))
 	}
 
 	// Check if we hit the limit (body exceeds maxAssetSize)
 	if int64(len(body)) > maxAssetSize {
-		return AssetFetchResult{}, &AssetsError{
-			Message:   fmt.Sprintf("asset too large: exceeded max %d bytes", maxAssetSize),
-			Retryable: false,
-			Cause:     ErrCauseAssetTooLarge,
-		}
+		return AssetFetchResult{}, NewAssetsError(ErrCauseAssetTooLarge, fmt.Sprintf("asset too large: exceeded max %d bytes", maxAssetSize))
 	}
 
 	return NewAssetFetchResult(fetchUrl, resp.StatusCode, duration, body), nil
@@ -479,18 +435,10 @@ func (r *LocalResolver) writeAsset(outputDir string, originalPath string, conten
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		// Check if disk is full
 		if errors.Is(err, syscall.ENOSPC) {
-			return "", &AssetsError{
-				Message:   fmt.Sprintf("disk full: %v", err),
-				Retryable: true,
-				Cause:     ErrCauseDiskFull,
-			}
+			return "", NewAssetsError(ErrCauseDiskFull, fmt.Sprintf("disk full: %v", err))
 		}
 		// Other write failures
-		return "", &AssetsError{
-			Message:   fmt.Sprintf("write failed: %v", err),
-			Retryable: false,
-			Cause:     ErrCauseWriteFailure,
-		}
+		return "", NewAssetsError(ErrCauseWriteFailure, fmt.Sprintf("write failed: %v", err))
 	}
 	return localPath, nil
 }

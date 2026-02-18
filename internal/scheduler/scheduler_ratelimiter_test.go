@@ -26,6 +26,7 @@ func TestRateLimiter_SetBaseDelay_Called(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Expect these methods to be called during crawl initialization
 	mockLimiter.On("SetBaseDelay", mock.Anything).Return()
@@ -55,6 +56,7 @@ func TestRateLimiter_SetBaseDelay_Called(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -107,6 +109,7 @@ func TestRateLimiter_SetCrawlDelay_CalledWithCorrectDelay(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	testURL, _ := url.Parse("http://example.com/page.html")
 	host := testURL.Host
@@ -131,6 +134,7 @@ func TestRateLimiter_SetCrawlDelay_CalledWithCorrectDelay(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost(host)
 
@@ -158,6 +162,7 @@ func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Expect these methods to be called during initialization
 	mockLimiter.On("SetBaseDelay", mock.Anything).Return()
@@ -187,6 +192,7 @@ func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -231,6 +237,7 @@ func TestRateLimiter_SetRandomSeed_CalledWithConfigValue(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Expect these methods to be called during initialization
 	mockLimiter.On("SetBaseDelay", mock.Anything).Return()
@@ -260,6 +267,7 @@ func TestRateLimiter_SetRandomSeed_CalledWithConfigValue(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -296,11 +304,7 @@ func TestRateLimiter_SetRandomSeed_CalledWithConfigValue(t *testing.T) {
 // the scheduler records the error and triggers backoff via ExecuteCrawling.
 func TestBackoff_TriggersOnTooManyRequests(t *testing.T) {
 	// GIVEN: a robots error with 429 status
-	robotsErr := &robots.RobotsError{
-		Message:   "too many requests",
-		Retryable: true,
-		Cause:     robots.ErrCauseHttpTooManyRequests,
-	}
+	robotsErr := robots.NewRobotsError(robots.ErrCauseHttpTooManyRequests, "too many requests")
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -311,6 +315,7 @@ func TestBackoff_TriggersOnTooManyRequests(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	testURL, _ := url.Parse("http://example.com/page.html")
 	host := testURL.Host
@@ -337,6 +342,7 @@ func TestBackoff_TriggersOnTooManyRequests(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost(host)
 
@@ -364,11 +370,7 @@ func TestBackoff_TriggersOnTooManyRequests(t *testing.T) {
 // the scheduler records the error and triggers backoff via ExecuteCrawling.
 func TestBackoff_TriggersOnServerError(t *testing.T) {
 	// GIVEN: a robots error with 503 status
-	robotsErr := &robots.RobotsError{
-		Message:   "service unavailable",
-		Retryable: true,
-		Cause:     robots.ErrCauseHttpServerError,
-	}
+	robotsErr := robots.NewRobotsError(robots.ErrCauseHttpServerError, "service unavailable")
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -379,6 +381,7 @@ func TestBackoff_TriggersOnServerError(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	testURL, _ := url.Parse("http://example.com/page.html")
 	host := testURL.Host
@@ -405,6 +408,7 @@ func TestBackoff_TriggersOnServerError(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost(host)
 
@@ -427,11 +431,7 @@ func TestBackoff_TriggersOnServerError(t *testing.T) {
 // do not trigger backoff.
 func TestBackoff_DoesNotTriggerOnOtherErrors(t *testing.T) {
 	// GIVEN: a robots error with 403 status (not 429 or 5xx)
-	robotsErr := &robots.RobotsError{
-		Message:   "forbidden",
-		Retryable: false,
-		Cause:     robots.ErrCauseHttpUnexpectedStatus,
-	}
+	robotsErr := robots.NewRobotsError(robots.ErrCauseHttpUnexpectedStatus, "forbidden")
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -442,6 +442,7 @@ func TestBackoff_DoesNotTriggerOnOtherErrors(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	testURL, _ := url.Parse("http://example.com/page.html")
 	host := testURL.Host
@@ -470,6 +471,7 @@ func TestBackoff_DoesNotTriggerOnOtherErrors(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost(host)
 
@@ -491,11 +493,7 @@ func TestBackoff_DoesNotTriggerOnOtherErrors(t *testing.T) {
 // handles backoff when robots returns 429 for the seed URL.
 func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 	// GIVEN: a robots error with 429 status
-	robotsErr := &robots.RobotsError{
-		Message:   "too many requests",
-		Retryable: true,
-		Cause:     robots.ErrCauseHttpTooManyRequests,
-	}
+	robotsErr := robots.NewRobotsError(robots.ErrCauseHttpTooManyRequests, "too many requests")
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -506,6 +504,7 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	host := "example.com"
 
@@ -535,6 +534,7 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -585,6 +585,7 @@ func TestResetBackoff_CalledOnSuccessfulRobotsRequest(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	testURL, _ := url.Parse("http://example.com/page.html")
 	host := testURL.Host
@@ -614,6 +615,7 @@ func TestResetBackoff_CalledOnSuccessfulRobotsRequest(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost(host)
 
@@ -636,11 +638,7 @@ func TestResetBackoff_CalledOnSuccessfulRobotsRequest(t *testing.T) {
 // when the robots.txt request fails.
 func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 	// GIVEN: a robots error with 429 status
-	robotsErr := &robots.RobotsError{
-		Message:   "too many requests",
-		Retryable: true,
-		Cause:     robots.ErrCauseHttpTooManyRequests,
-	}
+	robotsErr := robots.NewRobotsError(robots.ErrCauseHttpTooManyRequests, "too many requests")
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -651,6 +649,7 @@ func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	testURL, _ := url.Parse("http://example.com/page.html")
 	host := testURL.Host
@@ -681,6 +680,7 @@ func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost(host)
 
@@ -700,11 +700,7 @@ func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 // handles backoff when robots returns 5xx for the seed URL.
 func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 	// GIVEN: a robots error with 503 status
-	robotsErr := &robots.RobotsError{
-		Message:   "service unavailable",
-		Retryable: true,
-		Cause:     robots.ErrCauseHttpServerError,
-	}
+	robotsErr := robots.NewRobotsError(robots.ErrCauseHttpServerError, "service unavailable")
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -715,6 +711,7 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	host := "example.com"
 
@@ -744,6 +741,7 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -788,6 +786,7 @@ func TestSleeper_ResolveDelayAndSleepCalled(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockSleeper := newSleeperMock(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	host := "example.com"
 	delay := 100 * time.Millisecond
@@ -823,6 +822,7 @@ func TestSleeper_ResolveDelayAndSleepCalled(t *testing.T) {
 		nil,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()

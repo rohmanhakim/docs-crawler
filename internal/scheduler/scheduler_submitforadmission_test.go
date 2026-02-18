@@ -40,6 +40,7 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -55,6 +56,7 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	// Set current host
@@ -100,6 +102,7 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -115,6 +118,7 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
@@ -145,11 +149,8 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 // encounters an infrastructure error, it returns the error and does not submit to frontier.
 func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 	// GIVEN: robots encounters an infrastructure error (e.g., 500)
-	robotsErr := &robots.RobotsError{
-		Message:   "http error: 500",
-		Retryable: false,
-		Cause:     robots.ErrCauseHttpServerError,
-	}
+	robotsErr := robots.NewRobotsError(robots.ErrCauseHttpServerError, "http error: 500")
+
 	mockRobot := NewRobotsMockForTest(t)
 	mockRobot.OnDecide(mock.Anything, robots.Decision{}, robotsErr)
 
@@ -160,6 +161,7 @@ func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -175,6 +177,7 @@ func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
@@ -220,6 +223,7 @@ func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -235,6 +239,7 @@ func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
@@ -290,6 +295,7 @@ func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay(t *testin
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	s := createSchedulerForTest(
 		t,
@@ -306,6 +312,7 @@ func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay(t *testin
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
@@ -362,6 +369,7 @@ func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -377,6 +385,7 @@ func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	host := testURL1.Host
@@ -441,6 +450,7 @@ func TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	s := createSchedulerForTest(
 		t,
@@ -457,6 +467,7 @@ func TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays(t *testing.T) {
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	// Submit URL from first host
@@ -502,6 +513,7 @@ func TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -517,6 +529,7 @@ func TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay(t *testing.T) {
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
@@ -565,6 +578,7 @@ func TestSubmitUrlForAdmission_PreservesSourceContextAndDepth(t *testing.T) {
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -580,6 +594,7 @@ func TestSubmitUrlForAdmission_PreservesSourceContextAndDepth(t *testing.T) {
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	testURL, _ := url.Parse("https://example.com/page.html")
@@ -672,6 +687,7 @@ func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
 			mockFrontier := newFrontierMockForTest(t)
 			mockFetcher := newFetcherMockForTest(t)
 			mockStorage := newStorageMockForTest(t)
+			mockFailureJournal := newFailureJournalMockForTest(t)
 			s := createSchedulerForTest(
 				t,
 				ctx,
@@ -687,6 +703,7 @@ func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
 				nil,
 				mockStorage,
 				nil,
+				mockFailureJournal,
 			)
 
 			s.SetCurrentHost(testURL.Host)
@@ -784,6 +801,7 @@ func TestSubmitUrlForAdmission_CanonicalizesBeforeRobotsCheck(t *testing.T) {
 			mockFrontier := newFrontierMockForTest(t)
 			mockFetcher := newFetcherMockForTest(t)
 			mockStorage := newStorageMockForTest(t)
+			mockFailureJournal := newFailureJournalMockForTest(t)
 			s := createSchedulerForTest(
 				t,
 				ctx,
@@ -799,6 +817,7 @@ func TestSubmitUrlForAdmission_CanonicalizesBeforeRobotsCheck(t *testing.T) {
 				nil,
 				mockStorage,
 				nil,
+				mockFailureJournal,
 			)
 
 			s.SetCurrentHost(inputURL.Host)
@@ -862,6 +881,7 @@ func TestSubmitUrlForAdmission_EquivalentURLsTreatedAsSame(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 	s := createSchedulerForTest(
 		t,
 		ctx,
@@ -877,6 +897,7 @@ func TestSubmitUrlForAdmission_EquivalentURLsTreatedAsSame(t *testing.T) {
 		nil,
 		mockStorage,
 		nil,
+		mockFailureJournal,
 	)
 
 	host := "example.com"

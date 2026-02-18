@@ -23,10 +23,11 @@ crawlStats
   - Must be constructed without reading metadata
 */
 type crawlStats struct {
-	totalPages  int
-	totalErrors int
-	totalAssets int
-	durationMs  int64
+	totalPages            int
+	totalErrors           int
+	totalAssets           int
+	durationMs            int64
+	manualRetryQueueCount int // URLs in manual retry queue at crawl completion
 }
 
 type ArtifactKind string
@@ -141,15 +142,6 @@ const (
 	CauseInvariantViolation
 	CauseRetryFailure
 )
-
-type ErrorRecord struct {
-	packageName string
-	action      string
-	cause       ErrorCause
-	errorString string
-	observedAt  time.Time
-	attrs       []Attribute
-}
 
 type Attribute struct {
 	Key   AttributeKey

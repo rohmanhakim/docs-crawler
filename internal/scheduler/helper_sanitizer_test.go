@@ -41,12 +41,12 @@ func setupSanitizerMockWithSuccess(m *sanitizerMock, discoveredURLs []url.URL) {
 }
 
 // setupSanitizerMockWithFatalError sets up the sanitizer mock to return a fatal error
+// Note: With the new classification design, content processing errors are SeverityRecoverable.
 func setupSanitizerMockWithFatalError(m *sanitizerMock) {
-	sanitizerErr := &sanitizer.SanitizationError{
-		Message:   "fatal sanitization error",
-		Retryable: false,
-		Cause:     sanitizer.ErrCauseCompetingRoots,
-	}
+	sanitizerErr := sanitizer.NewSanitizationError(
+		sanitizer.ErrCauseCompetingRoots,
+		"fatal sanitization error",
+	)
 	m.On("Sanitize", mock.Anything).Return(sanitizer.SanitizedHTMLDoc{}, sanitizerErr)
 }
 

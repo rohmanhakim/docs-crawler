@@ -11,10 +11,11 @@ type mockFinalizer struct {
 }
 
 type capturedStats struct {
-	totalPages  int
-	totalErrors int
-	totalAssets int
-	duration    time.Duration
+	totalPages            int
+	totalErrors           int
+	totalAssets           int
+	duration              time.Duration
+	manualRetryQueueCount int
 }
 
 func newMockFinalizer(t *testing.T) *mockFinalizer {
@@ -29,11 +30,13 @@ func (m *mockFinalizer) RecordFinalCrawlStats(
 	totalErrors int,
 	totalAssets int,
 	duration time.Duration,
+	manualRetryQueueCount int,
 ) {
 	m.recordedStats = &capturedStats{
-		totalPages:  totalPages,
-		totalErrors: totalErrors,
-		totalAssets: totalAssets,
-		duration:    duration,
+		totalPages:            totalPages,
+		totalErrors:           totalErrors,
+		totalAssets:           totalAssets,
+		duration:              duration,
+		manualRetryQueueCount: manualRetryQueueCount,
 	}
 }

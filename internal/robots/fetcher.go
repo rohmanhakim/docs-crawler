@@ -126,11 +126,10 @@ func (f *RobotsFetcher) Fetch(ctx context.Context, scheme, hostname string) (Rob
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, robotsURL, nil)
 	if err != nil {
-		return RobotsFetchResult{}, &RobotsError{
-			Message:   fmt.Sprintf("failed to create request: %v", err),
-			Retryable: false,
-			Cause:     ErrCausePreFetchFailure,
-		}
+		return RobotsFetchResult{}, NewRobotsError(
+			ErrCausePreFetchFailure,
+			fmt.Sprintf("failed to create request: %v", err),
+		)
 	}
 
 	// Set browser-like headers
@@ -141,11 +140,10 @@ func (f *RobotsFetcher) Fetch(ctx context.Context, scheme, hostname string) (Rob
 	resp, err := f.httpClient.Do(req)
 
 	if err != nil {
-		return RobotsFetchResult{}, &RobotsError{
-			Message:   fmt.Sprintf("failed to fetch robots.txt: %v", err),
-			Retryable: true,
-			Cause:     ErrCauseHttpFetchFailure,
-		}
+		return RobotsFetchResult{}, NewRobotsError(
+			ErrCauseHttpFetchFailure,
+			fmt.Sprintf("failed to fetch robots.txt: %v", err),
+		)
 	}
 	defer resp.Body.Close()
 
@@ -161,19 +159,17 @@ func (f *RobotsFetcher) Fetch(ctx context.Context, scheme, hostname string) (Rob
 	case resp.StatusCode >= 300 && resp.StatusCode < 400:
 		// Redirects should be followed by http.Client automatically
 		// If we get here, it means there were too many redirects or a redirect loop
-		return RobotsFetchResult{}, &RobotsError{
-			Message:   fmt.Sprintf("redirect loop or too many redirects for %s", robotsURL),
-			Retryable: true,
-			Cause:     ErrCauseHttpTooManyRedirects,
-		}
+		return RobotsFetchResult{}, NewRobotsError(
+			ErrCauseHttpTooManyRedirects,
+			fmt.Sprintf("redirect loop or too many redirects for %s", robotsURL),
+		)
 
 	case resp.StatusCode == 429:
 		// Too Many Requests - treat as server error per spec
-		return RobotsFetchResult{}, &RobotsError{
-			Message:   fmt.Sprintf("rate limited (429) when fetching %s", robotsURL),
-			Retryable: true,
-			Cause:     ErrCauseHttpTooManyRequests,
-		}
+		return RobotsFetchResult{}, NewRobotsError(
+			ErrCauseHttpTooManyRequests,
+			fmt.Sprintf("rate limited (429) when fetching %s", robotsURL),
+		)
 
 	case resp.StatusCode >= 400 && resp.StatusCode < 500:
 		// 4xx errors (except 429) mean no robots.txt exists
@@ -192,18 +188,16 @@ func (f *RobotsFetcher) Fetch(ctx context.Context, scheme, hostname string) (Rob
 
 	case resp.StatusCode >= 500:
 		// 5xx errors are server errors - should retry
-		return RobotsFetchResult{}, &RobotsError{
-			Message:   fmt.Sprintf("server error (%d) when fetching %s", resp.StatusCode, robotsURL),
-			Retryable: true,
-			Cause:     ErrCauseHttpServerError,
-		}
+		return RobotsFetchResult{}, NewRobotsError(
+			ErrCauseHttpServerError,
+			fmt.Sprintf("server error (%d) when fetching %s", resp.StatusCode, robotsURL),
+		)
 
 	default:
-		return RobotsFetchResult{}, &RobotsError{
-			Message:   fmt.Sprintf("unexpected status code %d for %s", resp.StatusCode, robotsURL),
-			Retryable: true,
-			Cause:     ErrCauseHttpUnexpectedStatus,
-		}
+		return RobotsFetchResult{}, NewRobotsError(
+			ErrCauseHttpUnexpectedStatus,
+			fmt.Sprintf("unexpected status code %d for %s", resp.StatusCode, robotsURL),
+		)
 	}
 
 	if parsingError != nil {
@@ -228,11 +222,10 @@ func (f *RobotsFetcher) parseSuccessfulResponse(resp *http.Response, hostname, s
 
 	content, err := io.ReadAll(limitedReader)
 	if err != nil {
-		return RobotsFetchResult{}, &RobotsError{
-			Message:   fmt.Sprintf("failed to read robots.txt body: %v", err),
-			Retryable: true,
-			Cause:     ErrCauseParseError,
-		}
+		return RobotsFetchResult{}, NewRobotsError(
+			ErrCauseParseError,
+			fmt.Sprintf("failed to read robots.txt body: %v", err),
+		)
 	}
 
 	// Check if content exceeded max size

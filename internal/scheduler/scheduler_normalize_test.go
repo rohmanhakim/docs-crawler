@@ -20,6 +20,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -43,6 +44,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -103,6 +105,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -145,6 +148,7 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -198,6 +202,7 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -224,96 +229,6 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
-// TestScheduler_Normalize_FatalError_AbortsCrawl verifies that fatal normalization errors
-// cause the crawl to abort immediately.
-func TestScheduler_Normalize_FatalError_AbortsCrawl(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockConvert := newConvertMockForTest(t)
-	mockResolver := newResolverMockForTest(t)
-	mockNormalize := newNormalizeMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer
-	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	// Setup convert
-	setupConvertMockWithSuccess(mockConvert)
-
-	// Setup resolver
-	setupResolverMockWithSuccess(mockResolver)
-
-	// Setup normalize to return a fatal error
-	setupNormalizeMockWithFatalError(mockNormalize)
-
-	// Setup frontier to return a token for the seed URL
-	seedURL, _ := url.Parse("http://example.com/")
-	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
-
-	s := createSchedulerWithAllMocksAndNormalize(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFrontier,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		mockConvert,
-		mockResolver,
-		mockNormalize,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 1
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Phase 1: Initialize
-	init, err := s.InitializeCrawling(configPath)
-	assert.NoError(t, err, "Failed to initialize")
-
-	// Phase 2: Execute with state - should return fatal error
-	_, execErr := s.ExecuteCrawlingWithState(init)
-
-	// Fatal normalize error should abort the crawl
-	assert.Error(t, execErr, "Expected error for fatal normalize error")
-	mockNormalize.AssertCalled(t, "Normalize", mock.Anything, mock.Anything, mock.Anything)
-}
-
 // TestScheduler_Normalize_RecoverableError_ContinuesCrawl verifies that recoverable
 // normalization errors are counted but the crawl continues.
 func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
@@ -331,6 +246,7 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -380,6 +296,7 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -421,6 +338,7 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	// Only expect one Decide call for the seed URL
@@ -471,6 +389,7 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	tmpDir := t.TempDir()
@@ -501,105 +420,6 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 	t.Logf("Execution completed with %d write results", len(exec.WriteResults()))
 }
 
-// TestScheduler_Normalize_FatalErrorPreventsSubsequentCalls verifies that when Normalize()
-// returns a fatal error, the scheduler aborts and does not process more URLs.
-func TestScheduler_Normalize_FatalErrorPreventsSubsequentCalls(t *testing.T) {
-	ctx := context.Background()
-	mockFinalizer := newMockFinalizer(t)
-	noopSink := &metadata.NoopSink{}
-	mockLimiter := newRateLimiterMockForTest(t)
-	mockFetcher := newFetcherMockForTest(t)
-	mockRobot := NewRobotsMockForTest(t)
-	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
-	mockExtractor := newExtractorMockForTest(t)
-	mockSanitizer := newSanitizerMockForTest(t)
-	mockConvert := newConvertMockForTest(t)
-	mockResolver := newResolverMockForTest(t)
-	mockNormalize := newNormalizeMockForTest(t)
-	mockStorage := newStorageMockForTest(t)
-
-	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
-	// Only expect one Decide call for the seed URL
-	mockRobot.OnDecide(mock.Anything, robots.Decision{
-		Allowed:    true,
-		Reason:     robots.EmptyRuleSet,
-		CrawlDelay: 0,
-	}, nil).Once()
-
-	mockSleeper.On("Sleep", mock.Anything).Return()
-	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
-	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-
-	// Setup extractor
-	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
-	setupExtractorMockWithSuccess(mockExtractor, contentNode)
-	mockExtractor.On("SetExtractParam", mock.Anything).Return()
-
-	// Setup sanitizer
-	mockSanitizer.On("Sanitize", contentNode).Return(createSanitizedHTMLDocForTest(nil), nil)
-
-	// Setup convert
-	setupConvertMockWithSuccess(mockConvert)
-
-	// Setup resolver
-	setupResolverMockWithSuccess(mockResolver)
-
-	// Setup normalize to return a fatal error using mock.Anything to ensure it gets called
-	setupNormalizeMockWithFatalError(mockNormalize)
-
-	// Setup frontier to return a token for the seed URL
-	seedURL, _ := url.Parse("http://example.com/")
-	mockFrontier.SetupDequeueToReturn(frontier.NewCrawlToken(*seedURL, 0), true)
-
-	s := createSchedulerWithAllMocksAndNormalize(
-		t,
-		ctx,
-		mockFinalizer,
-		noopSink,
-		mockLimiter,
-		mockRobot,
-		mockFrontier,
-		mockFetcher,
-		mockExtractor,
-		mockSanitizer,
-		mockConvert,
-		mockResolver,
-		mockNormalize,
-		mockStorage,
-		mockSleeper,
-	)
-
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
-
-	// Use maxDepth: 1 to allow for potential additional processing
-	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
-		"maxDepth": 1
-	}`
-	err := os.WriteFile(configPath, []byte(configData), 0644)
-	assert.NoError(t, err)
-
-	// Phase 1: Initialize
-	init, err := s.InitializeCrawling(configPath)
-	assert.NoError(t, err, "Failed to initialize")
-
-	// Phase 2: Execute with state - should return fatal error
-	_, execErr := s.ExecuteCrawlingWithState(init)
-
-	// Fatal normalize error should abort the crawl
-	assert.Error(t, execErr, "Expected error for fatal normalize error")
-
-	// Verify normalize was called
-	mockNormalize.AssertCalled(t, "Normalize", mock.Anything, mock.Anything, mock.Anything)
-
-	// Verify that Robot.Decide was only called once (for seed URL)
-	// This proves that the crawl aborted before processing more URLs
-	mockRobot.AssertNumberOfCalls(t, "Decide", 1)
-	t.Logf("Normalize fatal error prevented further processing as expected")
-}
-
 // createSchedulerWithAllMocksAndNormalize creates a scheduler with all mocked dependencies including a custom normalize mock.
 func createSchedulerWithAllMocksAndNormalize(
 	t *testing.T,
@@ -617,6 +437,7 @@ func createSchedulerWithAllMocksAndNormalize(
 	mockNormalize *normalizeMock,
 	mockStorage *storageMock,
 	mockSleeper *sleeperMock,
+	mockFailureJournal failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
 	// Create real components if mocks not provided
@@ -637,16 +458,6 @@ func createSchedulerWithAllMocksAndNormalize(
 		setupNormalizeMockWithSuccess(mockNormalize)
 	}
 
-	// Setup frontier mock expectations that are common to all tests
-	mockFrontier.On("Init", mock.Anything).Return()
-	mockFrontier.On("VisitedCount").Return(0)
-	mockFrontier.On("IsDepthExhausted", mock.Anything).Return(true)
-	mockFrontier.On("CurrentMinDepth").Return(-1)
-	mockFrontier.On("Submit", mock.Anything).Return()
-	// Provide a default Dequeue to return no more URLs after the test's specific token
-	mockFrontier.On("Dequeue").Return(frontier.CrawlToken{}, false)
-	// Dequeue is expected to be set up by each test explicitly using SetupDequeueToReturn
-
 	s := scheduler.NewSchedulerWithDeps(
 		ctx,
 		mockFinalizer,
@@ -662,6 +473,7 @@ func createSchedulerWithAllMocksAndNormalize(
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	return &s
 }
@@ -717,6 +529,7 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Setup robots
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -787,6 +600,7 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 
 	// Override current host (needed for some internal logic)
@@ -832,6 +646,7 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -904,6 +719,7 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")
 
@@ -949,6 +765,7 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -1017,6 +834,7 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")
 
@@ -1063,6 +881,7 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 	mockResolver := newResolverMockForTest(t)
 	mockNormalize := newNormalizeMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -1131,6 +950,7 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 		mockNormalize,
 		mockStorage,
 		mockSleeper,
+		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")
 
