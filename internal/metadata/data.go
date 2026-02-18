@@ -4,30 +4,42 @@ import (
 	"time"
 )
 
+// FetchKind discriminates the type of resource that was fetched.
+type FetchKind string
+
+const (
+	KindPage   FetchKind = "page"
+	KindAsset  FetchKind = "asset"
+	KindRobots FetchKind = "robots"
+)
+
+// FetchEvent represents a completed HTTP fetch for any resource kind.
 type FetchEvent struct {
-	fetchUrl    string
-	httpStatus  int
-	duration    time.Duration
-	contentType string
-	retryCount  int
-	crawlDepth  int
+	FetchedAt   time.Time
+	FetchURL    string
+	HTTPStatus  int
+	Duration    time.Duration
+	ContentType string
+	RetryCount  int
+	CrawlDepth  int
+	Kind        FetchKind
 }
 
 /*
-crawlStats
-  - Represents a terminal, derived summary of a completed crawl
-  - Contains only aggregate counts and durations
-  - Is computed by the scheduler after crawl termination
-  - Is recorded exactly once
-  - Must not influence scheduling, retries, or crawl termination
-  - Must be constructed without reading metadata
+CrawlStats represents a terminal, derived summary of a completed crawl.
+  - Contains only aggregate counts and timestamps.
+  - Is computed by the scheduler after crawl termination.
+  - Is recorded exactly once.
+  - Must not influence scheduling, retries, or crawl termination.
+  - Must be constructed without reading metadata.
 */
-type crawlStats struct {
-	totalPages            int
-	totalErrors           int
-	totalAssets           int
-	durationMs            int64
-	manualRetryQueueCount int // URLs in manual retry queue at crawl completion
+type CrawlStats struct {
+	StartedAt             time.Time
+	FinishedAt            time.Time
+	TotalPages            int
+	TotalErrors           int
+	TotalAssets           int
+	ManualRetryQueueCount int // URLs in manual retry queue at crawl completion
 }
 
 type ArtifactKind string
@@ -44,6 +56,77 @@ type ArtifactRecord struct {
 	ContentHash string
 	Overwrite   bool
 	Bytes       int64
+	RecordedAt  time.Time
+}
+
+// PipelineStage identifies a processing stage in the crawl pipeline.
+type PipelineStage string
+
+const (
+	StageExtract   PipelineStage = "extract"
+	StageSanitize  PipelineStage = "sanitize"
+	StageConvert   PipelineStage = "convert"
+	StageNormalize PipelineStage = "normalize"
+)
+
+// PipelineEvent represents the outcome of a single pipeline stage for a given page.
+type PipelineEvent struct {
+	Stage      PipelineStage
+	PageURL    string
+	Success    bool
+	RecordedAt time.Time
+	// LinksFound is populated on success for StageExtract only.
+	LinksFound int
+}
+
+// SkipReason classifies why a URL was not crawled.
+type SkipReason string
+
+const (
+	SkipReasonRobotsDisallow SkipReason = "robots_disallow"
+	SkipReasonOutOfScope     SkipReason = "out_of_scope"
+	SkipReasonAlreadyVisited SkipReason = "already_visited"
+)
+
+// SkipEvent records that a URL was admitted to the frontier but not crawled.
+type SkipEvent struct {
+	SkippedURL string
+	Reason     SkipReason
+	RecordedAt time.Time
+}
+
+// ErrorEvent wraps the parameters of RecordError for inclusion in the sealed Event log.
+type ErrorEvent struct {
+	ObservedAt  time.Time
+	PackageName string
+	Action      string
+	Cause       ErrorCause
+	Details     string
+	Attrs       []Attribute
+}
+
+// EventKind discriminates the concrete payload type stored in an Event.
+type EventKind string
+
+const (
+	EventKindFetch    EventKind = "fetch"
+	EventKindArtifact EventKind = "artifact"
+	EventKindPipeline EventKind = "pipeline"
+	EventKindSkip     EventKind = "skip"
+	EventKindError    EventKind = "error"
+	EventKindStats    EventKind = "stats"
+)
+
+// Event is a sealed discriminated union of all event types recorded by the Recorder.
+// Only the pointer field matching Kind is non-nil.
+type Event struct {
+	Kind     EventKind
+	Fetch    *FetchEvent
+	Artifact *ArtifactRecord
+	Pipeline *PipelineEvent
+	Skip     *SkipEvent
+	Error    *ErrorEvent
+	Stats    *CrawlStats
 }
 
 /*
@@ -163,9 +246,13 @@ const (
 	AttrHost       AttributeKey = "host"
 	AttrPath       AttributeKey = "path"
 	AttrDepth      AttributeKey = "depth"
-	AttrField      AttributeKey = "field"
 	AttrHTTPStatus AttributeKey = "http_status"
 	AttrAssetURL   AttributeKey = "asset_url"
 	AttrWritePath  AttributeKey = "write_path"
 	AttrMessage    AttributeKey = "message"
+
+	// Deprecated: AttrField is ambiguous — two call sites used it for both URLHash
+	// and ContentHash, making events uninterpretable. Use AttrContentHash or
+	// AttrURLHash instead. AttrField must not be used in new code.
+	AttrField AttributeKey = "field"
 )

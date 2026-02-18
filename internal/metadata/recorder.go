@@ -108,18 +108,9 @@ func (r *Recorder) RecordFinalCrawlStats(
 	duration time.Duration,
 	manualRetryQueueCount int,
 ) {
-	stats := crawlStats{
-		totalPages:            totalPages,
-		totalErrors:           totalErrors,
-		totalAssets:           totalAssets,
-		durationMs:            duration.Milliseconds(),
-		manualRetryQueueCount: manualRetryQueueCount,
-	}
-
-	r.append(stats)
 }
 
-func (r *Recorder) append(crawlStats) {}
+func (r *Recorder) append(Event) {}
 
 type MetadataSink interface {
 	RecordError(
