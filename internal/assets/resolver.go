@@ -93,24 +93,32 @@ func (r *LocalResolver) Resolve(
 	scheme := pageUrl.Scheme
 
 	fetchEventCallback := func(retryCount int, fetchResult AssetFetchResult) {
-		url := fetchResult.URL()
-		r.metadataSink.RecordAssetFetch(
-			url.String(),
+		assetURL := fetchResult.URL()
+		r.metadataSink.RecordFetch(metadata.NewFetchEvent(
+			fetchResult.FetchedAt(),
+			assetURL.String(),
 			fetchResult.Status(),
 			fetchResult.Duration(),
+			"", // contentType not available for assets
 			retryCount,
-		)
+			0, // crawlDepth not applicable for assets
+			metadata.KindAsset,
+		))
 	}
 
-	// Asset callback - only called when actual new write happens
-	assetCallback := func(localPath string) {
-		r.metadataSink.RecordArtifact(
+	// Asset callback - only called when actual new write happens.
+	// Carries the remote asset URL, content hash, and byte count so RecordArtifact
+	// can be fully populated.
+	assetCallback := func(localPath string, assetURL string, contentHash string, bytes int64) {
+		r.metadataSink.RecordArtifact(metadata.NewArtifactRecord(
 			metadata.ArtifactAsset,
 			localPath,
-			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrURL, pageUrl.String()),
-			},
-		)
+			assetURL,
+			contentHash,
+			false,
+			bytes,
+			time.Now(),
+		))
 	}
 
 	assetfulMarkdownDoc, err := r.resolve(
@@ -126,32 +134,32 @@ func (r *LocalResolver) Resolve(
 
 	// Record errors for missing URLs
 	for urlStr, cause := range assetfulMarkdownDoc.MissingAssets() {
-		r.metadataSink.RecordError(
+		r.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"assets",
 			"Resolver.Resolve",
 			mapAssetsErrorToMetadataCause(AssetsError{Cause: cause}),
 			fmt.Sprintf("missing asset: %s", urlStr),
 			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrMessage, urlStr),
+				metadata.NewAttr(metadata.AttrAssetURL, urlStr),
 				metadata.NewAttr(metadata.AttrURL, pageUrl.String()),
 			},
-		)
+		))
 	}
 
 	// Record errors for unparseable URLs
 	for _, unparseableURL := range assetfulMarkdownDoc.UnparseableURLs() {
-		r.metadataSink.RecordError(
+		r.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"assets",
 			"Resolver.Resolve",
 			metadata.CauseContentInvalid,
 			fmt.Sprintf("unparseable asset URL: %s", unparseableURL),
 			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrMessage, unparseableURL),
+				metadata.NewAttr(metadata.AttrAssetURL, unparseableURL),
 				metadata.NewAttr(metadata.AttrURL, pageUrl.String()),
 			},
-		)
+		))
 	}
 
 	// Record error for write failure (with polymorphism)
@@ -174,7 +182,7 @@ func (r *LocalResolver) Resolve(
 			details = err.Error()
 		}
 
-		r.metadataSink.RecordError(
+		r.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"assets",
 			"Resolver.Resolve",
@@ -184,7 +192,7 @@ func (r *LocalResolver) Resolve(
 				metadata.NewAttr(metadata.AttrWritePath, resolveParam.OutputDir()),
 				metadata.NewAttr(metadata.AttrURL, pageUrl.String()),
 			},
-		)
+		))
 		return AssetfulMarkdownDoc{}, err
 	}
 
@@ -199,7 +207,7 @@ func (r *LocalResolver) resolve(
 	scheme string,
 	retryParam retry.RetryParam,
 	fetchCallback func(int, AssetFetchResult),
-	assetCallback func(string),
+	assetCallback func(localPath string, assetURL string, contentHash string, bytes int64),
 ) (AssetfulMarkdownDoc, failure.ClassifiedError) {
 	// Extract image URLs from link refs
 	var imageURLs []url.URL
@@ -245,7 +253,7 @@ func (r *LocalResolver) resolve(
 					missingAssetErrors[assetURL.String()] = ErrCauseNetworkFailure
 				}
 				// Call fetchCallback even on failure with empty result (but with URL)
-				fetchCallback(retryCount, NewAssetFetchResult(assetURL, 0, 0, nil))
+				fetchCallback(retryCount, NewAssetFetchResult(assetURL, 0, 0, time.Time{}, nil))
 				// Continue with next asset (missing assets are reported, not fatal)
 				continue
 			}
@@ -293,7 +301,7 @@ func (r *LocalResolver) resolve(
 			r.hashToPath[contentHash] = localPath
 
 			// Call assetCallback ONLY for actual new writes (not content-hash dedups)
-			assetCallback(localPath)
+			assetCallback(localPath, assetURL.String(), contentHash, int64(len(assetData)))
 		}
 	}
 
@@ -425,7 +433,7 @@ func (r *LocalResolver) performFetch(ctx context.Context, fetchUrl url.URL, user
 		return AssetFetchResult{}, NewAssetsError(ErrCauseAssetTooLarge, fmt.Sprintf("asset too large: exceeded max %d bytes", maxAssetSize))
 	}
 
-	return NewAssetFetchResult(fetchUrl, resp.StatusCode, duration, body), nil
+	return NewAssetFetchResult(fetchUrl, resp.StatusCode, duration, startTime, body), nil
 }
 
 func (r *LocalResolver) writeAsset(outputDir string, originalPath string, contentHash string, extension string, data []byte) (string, failure.ClassifiedError) {

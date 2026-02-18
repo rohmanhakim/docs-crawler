@@ -14,118 +14,59 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
-// assetFetchRecord stores the parameters passed to RecordAssetFetch
-type assetFetchRecord struct {
-	FetchUrl   string
-	HTTPStatus int
-	Duration   time.Duration
-	RetryCount int
-}
+// compile-time interface check
+var _ metadata.MetadataSink = (*metadataSinkMock)(nil)
 
-// errorRecord stores the parameters passed to RecordError
-type errorRecord struct {
-	ObservedAt  time.Time
-	PackageName string
-	Action      string
-	Cause       metadata.ErrorCause
-	Details     string
-	Attrs       []metadata.Attribute
-}
-
-// artifactRecord stores the parameters passed to RecordArtifact
-type artifactRecord struct {
-	Kind  metadata.ArtifactKind
-	Path  string
-	Attrs []metadata.Attribute
-}
-
-// metadataSinkMock is a mock for metadata.MetadataSink
+// metadataSinkMock implements metadata.MetadataSink for use in assets tests.
 type metadataSinkMock struct {
-	recordErrorCalled      bool
-	recordFetchCalled      bool
-	recordAssetFetchCalled bool
-	recordArtifactCalled   bool
-	assetFetchRecords      []assetFetchRecord
-	errorRecords           []errorRecord
-	artifactRecords        []artifactRecord
+	recordErrorCalled    bool
+	recordFetchCalled    bool
+	recordArtifactCalled bool
+	fetchRecords         []metadata.FetchEvent
+	errorRecords         []metadata.ErrorRecord
+	artifactRecords      []metadata.ArtifactRecord
 }
 
-func (m *metadataSinkMock) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	details string,
-	attrs []metadata.Attribute,
-) {
-	m.recordErrorCalled = true
-	m.errorRecords = append(m.errorRecords, errorRecord{
-		ObservedAt:  observedAt,
-		PackageName: packageName,
-		Action:      action,
-		Cause:       cause,
-		Details:     details,
-		Attrs:       attrs,
-	})
-}
-
-func (m *metadataSinkMock) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
+func (m *metadataSinkMock) RecordFetch(event metadata.FetchEvent) {
 	m.recordFetchCalled = true
+	m.fetchRecords = append(m.fetchRecords, event)
 }
 
-func (m *metadataSinkMock) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-	m.recordAssetFetchCalled = true
-	m.assetFetchRecords = append(m.assetFetchRecords, assetFetchRecord{
-		FetchUrl:   fetchUrl,
-		HTTPStatus: httpStatus,
-		Duration:   duration,
-		RetryCount: retryCount,
-	})
-}
-
-func (m *metadataSinkMock) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
+func (m *metadataSinkMock) RecordArtifact(record metadata.ArtifactRecord) {
 	m.recordArtifactCalled = true
-	m.artifactRecords = append(m.artifactRecords, artifactRecord{
-		Kind:  kind,
-		Path:  path,
-		Attrs: attrs,
-	})
+	m.artifactRecords = append(m.artifactRecords, record)
 }
 
-// GetAssetFetchRecords returns all recorded asset fetch calls
-func (m *metadataSinkMock) GetAssetFetchRecords() []assetFetchRecord {
-	return m.assetFetchRecords
+func (m *metadataSinkMock) RecordPipelineStage(_ metadata.PipelineEvent) {}
+
+func (m *metadataSinkMock) RecordSkip(_ metadata.SkipEvent) {}
+
+func (m *metadataSinkMock) RecordError(record metadata.ErrorRecord) {
+	m.recordErrorCalled = true
+	m.errorRecords = append(m.errorRecords, record)
 }
 
-// GetErrorRecords returns all recorded error calls
-func (m *metadataSinkMock) GetErrorRecords() []errorRecord {
+// GetFetchRecords returns all recorded FetchEvent calls.
+func (m *metadataSinkMock) GetFetchRecords() []metadata.FetchEvent {
+	return m.fetchRecords
+}
+
+// GetErrorRecords returns all recorded ErrorRecord calls.
+func (m *metadataSinkMock) GetErrorRecords() []metadata.ErrorRecord {
 	return m.errorRecords
 }
 
-// GetArtifactRecords returns all recorded artifact calls
-func (m *metadataSinkMock) GetArtifactRecords() []artifactRecord {
+// GetArtifactRecords returns all recorded ArtifactRecord calls.
+func (m *metadataSinkMock) GetArtifactRecords() []metadata.ArtifactRecord {
 	return m.artifactRecords
 }
 
-// Reset clears all recorded state
+// Reset clears all recorded state.
 func (m *metadataSinkMock) Reset() {
 	m.recordErrorCalled = false
 	m.recordFetchCalled = false
-	m.recordAssetFetchCalled = false
 	m.recordArtifactCalled = false
-	m.assetFetchRecords = nil
+	m.fetchRecords = nil
 	m.errorRecords = nil
 	m.artifactRecords = nil
 }
