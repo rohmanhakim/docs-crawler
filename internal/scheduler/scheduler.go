@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
@@ -93,13 +94,11 @@ func NewScheduler() Scheduler {
 	storageSink := storage.NewLocalSink(&recorder)
 	rateLimiter := limiter.NewConcurrentRateLimiter()
 	sleeper := timeutil.NewRealSleeper()
-	failureJournal := failurejournal.NewInMemoryJournal()
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
 		robot:                  &cachedRobot,
 		frontier:               &frontier,
-		failureJournal:         failureJournal,
 		htmlFetcher:            &fetcher,
 		domExtractor:           &ext,
 		htmlSanitizer:          &sanitizer,
@@ -260,6 +259,13 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 			},
 		)
 		return nil, err
+	}
+
+	// Initialize file-based failure journal in output directory.
+	// Only set if not already injected externally (e.g., via NewSchedulerWithDeps).
+	if s.failureJournal == nil {
+		journalPath := filepath.Join(cfg.OutputDir(), "failures.jsonl")
+		s.failureJournal = failurejournal.NewFileJournal(journalPath)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout())
@@ -647,6 +653,15 @@ func (s *Scheduler) DequeueFromFrontier() (frontier.CrawlToken, bool) {
 		return frontier.CrawlToken{}, false
 	}
 	return s.frontier.Dequeue()
+}
+
+// FailureJournalPath returns the file path of the failure journal.
+// This is a test helper method to verify journal initialization.
+func (s *Scheduler) FailureJournalPath() string {
+	if s.failureJournal == nil {
+		return ""
+	}
+	return s.failureJournal.Path()
 }
 
 // getURLString safely extracts a string from a url.URL.

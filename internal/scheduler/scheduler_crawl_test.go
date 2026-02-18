@@ -2,6 +2,8 @@ package scheduler_test
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,6 +12,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -598,6 +601,113 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 	t.Logf("End-to-end test passed. Final stats: pages=%d, duration=%v",
 		mockFinalizer.recordedStats.totalPages,
 		mockFinalizer.recordedStats.duration)
+}
+
+// TestInitializeCrawling_SetsFileJournalPath verifies that InitializeCrawling
+// initializes a file-based failure journal with the correct path derived from
+// the config's output directory.
+// This test uses NewScheduler() (the production constructor, no journal injected)
+// and a real HTTP test server to serve robots.txt so InitializeCrawling can complete.
+func TestInitializeCrawling_SetsFileJournalPath(t *testing.T) {
+	// Setup a real test HTTP server to handle the robots.txt request
+	server := setupTestServer(t, "User-agent: *\nAllow: /")
+	defer server.Close()
+
+	// Parse the server URL to extract host (e.g. "127.0.0.1:PORT")
+	serverURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("failed to parse server URL: %v", err)
+	}
+	serverHost := serverURL.Host
+
+	// Use the production constructor — no failure journal is injected
+	s := scheduler.NewScheduler()
+
+	tmpDir := t.TempDir()
+	outputDir := filepath.Join(tmpDir, "output")
+	configPath := filepath.Join(tmpDir, "config.json")
+
+	// Write config pointing seed URL at the test server, with a known output dir
+	configData := fmt.Sprintf(`{
+		"seedUrls": [{"Scheme": "http", "Host": "%s"}],
+		"outputDir": "%s"
+	}`, serverHost, outputDir)
+	err = os.WriteFile(configPath, []byte(configData), 0644)
+	assert.NoError(t, err)
+
+	// Execute InitializeCrawling
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, init)
+
+	// The failure journal path must be <outputDir>/failures.jsonl
+	expectedPath := filepath.Join(outputDir, "failures.jsonl")
+	assert.Equal(t, expectedPath, s.FailureJournalPath(),
+		"InitializeCrawling should initialize a FileJournal at <outputDir>/failures.jsonl")
+}
+
+// TestInitializeCrawling_InjectedJournalNotReplaced verifies that when a journal
+// is already set (e.g., via NewSchedulerWithDeps), InitializeCrawling does NOT
+// overwrite it with a new FileJournal.
+// Uses a real FileJournal with a sentinel path so Path() returns a deterministic value.
+func TestInitializeCrawling_InjectedJournalNotReplaced(t *testing.T) {
+	ctx := context.Background()
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockStorage := newStorageMockForTest(t)
+
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockSleeper.On("Sleep", mock.Anything).Return()
+
+	// Inject a real FileJournal at a sentinel path. Since Path() is a concrete method
+	// (not a mock), it reliably returns the injected path regardless of other defaults.
+	sentinelPath := "/injected/sentinel/failures.jsonl"
+	injectedJournal := newFileJournalForTest(sentinelPath)
+
+	s := createSchedulerForTest(
+		t,
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockRobot,
+		mockFetcher,
+		nil,
+		nil,
+		nil,
+		nil,
+		mockStorage,
+		mockSleeper,
+		injectedJournal,
+	)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"outputDir": "/some/output"
+	}`
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	assert.NoError(t, err)
+
+	_, err = s.InitializeCrawling(configPath)
+	assert.NoError(t, err)
+
+	// The injected journal must still be in place (path must be the sentinel)
+	assert.Equal(t, sentinelPath, s.FailureJournalPath(),
+		"InitializeCrawling must not overwrite an already-injected failure journal")
 }
 
 // TestSplit_InitFailure_RecordsStats verifies that when initialization fails,
