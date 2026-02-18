@@ -67,27 +67,15 @@ func (r *Recorder) RecordError(
 	errorString string,
 	attrs []Attribute,
 ) {
-
 }
 
-func (r *Recorder) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-}
+func (r *Recorder) RecordFetch(event FetchEvent) {}
 
-func (r *Recorder) RecordArtifact(kind ArtifactKind, path string, attrs []Attribute) {}
-func (r *Recorder) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-}
+func (r *Recorder) RecordArtifact(record ArtifactRecord) {}
+
+func (r *Recorder) RecordPipelineStage(event PipelineEvent) {}
+
+func (r *Recorder) RecordSkip(event SkipEvent) {}
 
 /*
 RecordFinalCrawlStats records a terminal, derived summary of a completed crawl.
@@ -101,16 +89,9 @@ Contract:
     not accumulated incrementally via the recorder.
   - Recorded stats MUST NOT influence control flow or scheduling.
 */
-func (r *Recorder) RecordFinalCrawlStats(
-	totalPages int,
-	totalErrors int,
-	totalAssets int,
-	duration time.Duration,
-	manualRetryQueueCount int,
-) {
-}
+func (r *Recorder) RecordFinalCrawlStats(stats CrawlStats) {}
 
-func (r *Recorder) append(Event) {}
+func (r *Recorder) append(e Event) {}
 
 type MetadataSink interface {
 	RecordError(
@@ -122,32 +103,17 @@ type MetadataSink interface {
 		attrs []Attribute,
 	)
 
-	RecordFetch(
-		fetchUrl string,
-		httpStatus int,
-		duration time.Duration,
-		contentType string,
-		retryCount int,
-		crawlDepth int,
-	)
-	RecordArtifact(kind ArtifactKind, path string, attrs []Attribute)
+	RecordFetch(event FetchEvent)
 
-	RecordAssetFetch(
-		fetchUrl string,
-		httpStatus int,
-		duration time.Duration,
-		retryCount int,
-	)
+	RecordArtifact(record ArtifactRecord)
+
+	RecordPipelineStage(event PipelineEvent)
+
+	RecordSkip(event SkipEvent)
 }
 
 type CrawlFinalizer interface {
-	RecordFinalCrawlStats(
-		totalPages int,
-		totalErrors int,
-		totalAssets int,
-		duration time.Duration,
-		manualRetryQueueCount int,
-	)
+	RecordFinalCrawlStats(stats CrawlStats)
 }
 
 // NoopSink, struct that implements metadata.Sink but does nothing
@@ -164,24 +130,14 @@ func (n *NoopSink) RecordError(
 	errorString string,
 	attrs []Attribute,
 ) {
-
 }
 
-func (n *NoopSink) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-}
+func (n *NoopSink) RecordFetch(event FetchEvent) {}
 
-func (n *NoopSink) RecordArtifact(kind ArtifactKind, path string, attrs []Attribute) {}
-func (n *NoopSink) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-}
+func (n *NoopSink) RecordArtifact(record ArtifactRecord) {}
+
+func (n *NoopSink) RecordPipelineStage(event PipelineEvent) {}
+
+func (n *NoopSink) RecordSkip(event SkipEvent) {}
+
+var _ MetadataSink = (*NoopSink)(nil)
