@@ -15,15 +15,47 @@ const (
 
 // FetchEvent represents a completed HTTP fetch for any resource kind.
 type FetchEvent struct {
-	FetchedAt   time.Time
-	FetchURL    string
-	HTTPStatus  int
-	Duration    time.Duration
-	ContentType string
-	RetryCount  int
-	CrawlDepth  int
-	Kind        FetchKind
+	fetchedAt   time.Time
+	fetchURL    string
+	httpStatus  int
+	duration    time.Duration
+	contentType string
+	retryCount  int
+	crawlDepth  int
+	kind        FetchKind
 }
+
+// NewFetchEvent constructs an immutable FetchEvent.
+func NewFetchEvent(
+	fetchedAt time.Time,
+	fetchURL string,
+	httpStatus int,
+	duration time.Duration,
+	contentType string,
+	retryCount int,
+	crawlDepth int,
+	kind FetchKind,
+) FetchEvent {
+	return FetchEvent{
+		fetchedAt:   fetchedAt,
+		fetchURL:    fetchURL,
+		httpStatus:  httpStatus,
+		duration:    duration,
+		contentType: contentType,
+		retryCount:  retryCount,
+		crawlDepth:  crawlDepth,
+		kind:        kind,
+	}
+}
+
+func (f FetchEvent) FetchedAt() time.Time    { return f.fetchedAt }
+func (f FetchEvent) FetchURL() string        { return f.fetchURL }
+func (f FetchEvent) HTTPStatus() int         { return f.httpStatus }
+func (f FetchEvent) Duration() time.Duration { return f.duration }
+func (f FetchEvent) ContentType() string     { return f.contentType }
+func (f FetchEvent) RetryCount() int         { return f.retryCount }
+func (f FetchEvent) CrawlDepth() int         { return f.crawlDepth }
+func (f FetchEvent) Kind() FetchKind         { return f.kind }
 
 /*
 CrawlStats represents a terminal, derived summary of a completed crawl.
@@ -34,13 +66,39 @@ CrawlStats represents a terminal, derived summary of a completed crawl.
   - Must be constructed without reading metadata.
 */
 type CrawlStats struct {
-	StartedAt             time.Time
-	FinishedAt            time.Time
-	TotalPages            int
-	TotalErrors           int
-	TotalAssets           int
-	ManualRetryQueueCount int // URLs in manual retry queue at crawl completion
+	startedAt             time.Time
+	finishedAt            time.Time
+	totalPages            int
+	totalErrors           int
+	totalAssets           int
+	manualRetryQueueCount int // URLs in manual retry queue at crawl completion
 }
+
+// NewCrawlStats constructs an immutable CrawlStats.
+func NewCrawlStats(
+	startedAt time.Time,
+	finishedAt time.Time,
+	totalPages int,
+	totalErrors int,
+	totalAssets int,
+	manualRetryQueueCount int,
+) CrawlStats {
+	return CrawlStats{
+		startedAt:             startedAt,
+		finishedAt:            finishedAt,
+		totalPages:            totalPages,
+		totalErrors:           totalErrors,
+		totalAssets:           totalAssets,
+		manualRetryQueueCount: manualRetryQueueCount,
+	}
+}
+
+func (c CrawlStats) StartedAt() time.Time       { return c.startedAt }
+func (c CrawlStats) FinishedAt() time.Time      { return c.finishedAt }
+func (c CrawlStats) TotalPages() int            { return c.totalPages }
+func (c CrawlStats) TotalErrors() int           { return c.totalErrors }
+func (c CrawlStats) TotalAssets() int           { return c.totalAssets }
+func (c CrawlStats) ManualRetryQueueCount() int { return c.manualRetryQueueCount }
 
 type ArtifactKind string
 
@@ -50,14 +108,43 @@ const (
 )
 
 type ArtifactRecord struct {
-	Kind        ArtifactKind
-	WritePath   string
-	SourceURL   string
-	ContentHash string
-	Overwrite   bool
-	Bytes       int64
-	RecordedAt  time.Time
+	kind        ArtifactKind
+	writePath   string
+	sourceURL   string
+	contentHash string
+	overwrite   bool
+	bytes       int64
+	recordedAt  time.Time
 }
+
+// NewArtifactRecord constructs an immutable ArtifactRecord.
+func NewArtifactRecord(
+	kind ArtifactKind,
+	writePath string,
+	sourceURL string,
+	contentHash string,
+	overwrite bool,
+	bytes int64,
+	recordedAt time.Time,
+) ArtifactRecord {
+	return ArtifactRecord{
+		kind:        kind,
+		writePath:   writePath,
+		sourceURL:   sourceURL,
+		contentHash: contentHash,
+		overwrite:   overwrite,
+		bytes:       bytes,
+		recordedAt:  recordedAt,
+	}
+}
+
+func (a ArtifactRecord) Kind() ArtifactKind    { return a.kind }
+func (a ArtifactRecord) WritePath() string     { return a.writePath }
+func (a ArtifactRecord) SourceURL() string     { return a.sourceURL }
+func (a ArtifactRecord) ContentHash() string   { return a.contentHash }
+func (a ArtifactRecord) Overwrite() bool       { return a.overwrite }
+func (a ArtifactRecord) Bytes() int64          { return a.bytes }
+func (a ArtifactRecord) RecordedAt() time.Time { return a.recordedAt }
 
 // PipelineStage identifies a processing stage in the crawl pipeline.
 type PipelineStage string
@@ -71,13 +158,36 @@ const (
 
 // PipelineEvent represents the outcome of a single pipeline stage for a given page.
 type PipelineEvent struct {
-	Stage      PipelineStage
-	PageURL    string
-	Success    bool
-	RecordedAt time.Time
-	// LinksFound is populated on success for StageExtract only.
-	LinksFound int
+	stage      PipelineStage
+	pageURL    string
+	success    bool
+	recordedAt time.Time
+	// linksFound is populated on success for StageExtract only.
+	linksFound int
 }
+
+// NewPipelineEvent constructs an immutable PipelineEvent.
+func NewPipelineEvent(
+	stage PipelineStage,
+	pageURL string,
+	success bool,
+	recordedAt time.Time,
+	linksFound int,
+) PipelineEvent {
+	return PipelineEvent{
+		stage:      stage,
+		pageURL:    pageURL,
+		success:    success,
+		recordedAt: recordedAt,
+		linksFound: linksFound,
+	}
+}
+
+func (p PipelineEvent) Stage() PipelineStage  { return p.stage }
+func (p PipelineEvent) PageURL() string       { return p.pageURL }
+func (p PipelineEvent) Success() bool         { return p.success }
+func (p PipelineEvent) RecordedAt() time.Time { return p.recordedAt }
+func (p PipelineEvent) LinksFound() int       { return p.linksFound }
 
 // SkipReason classifies why a URL was not crawled.
 type SkipReason string
@@ -90,19 +200,67 @@ const (
 
 // SkipEvent records that a URL was admitted to the frontier but not crawled.
 type SkipEvent struct {
-	SkippedURL string
-	Reason     SkipReason
-	RecordedAt time.Time
+	skippedURL string
+	reason     SkipReason
+	recordedAt time.Time
 }
+
+// NewSkipEvent constructs an immutable SkipEvent.
+func NewSkipEvent(skippedURL string, reason SkipReason, recordedAt time.Time) SkipEvent {
+	return SkipEvent{
+		skippedURL: skippedURL,
+		reason:     reason,
+		recordedAt: recordedAt,
+	}
+}
+
+func (s SkipEvent) SkippedURL() string    { return s.skippedURL }
+func (s SkipEvent) Reason() SkipReason    { return s.reason }
+func (s SkipEvent) RecordedAt() time.Time { return s.recordedAt }
 
 // ErrorEvent wraps the parameters of RecordError for inclusion in the sealed Event log.
 type ErrorEvent struct {
-	ObservedAt  time.Time
-	PackageName string
-	Action      string
-	Cause       ErrorCause
-	Details     string
-	Attrs       []Attribute
+	observedAt  time.Time
+	packageName string
+	action      string
+	cause       ErrorCause
+	details     string
+	attrs       []Attribute
+}
+
+// NewErrorEvent constructs an immutable ErrorEvent.
+// attrs is copied to prevent external mutation.
+func NewErrorEvent(
+	observedAt time.Time,
+	packageName string,
+	action string,
+	cause ErrorCause,
+	details string,
+	attrs []Attribute,
+) ErrorEvent {
+	cp := make([]Attribute, len(attrs))
+	copy(cp, attrs)
+	return ErrorEvent{
+		observedAt:  observedAt,
+		packageName: packageName,
+		action:      action,
+		cause:       cause,
+		details:     details,
+		attrs:       cp,
+	}
+}
+
+func (e ErrorEvent) ObservedAt() time.Time { return e.observedAt }
+func (e ErrorEvent) PackageName() string   { return e.packageName }
+func (e ErrorEvent) Action() string        { return e.action }
+func (e ErrorEvent) Cause() ErrorCause     { return e.cause }
+func (e ErrorEvent) Details() string       { return e.details }
+
+// Attrs returns a copy of the attribute slice to prevent external mutation.
+func (e ErrorEvent) Attrs() []Attribute {
+	cp := make([]Attribute, len(e.attrs))
+	copy(cp, e.attrs)
+	return cp
 }
 
 // EventKind discriminates the concrete payload type stored in an Event.
@@ -120,14 +278,22 @@ const (
 // Event is a sealed discriminated union of all event types recorded by the Recorder.
 // Only the pointer field matching Kind is non-nil.
 type Event struct {
-	Kind     EventKind
-	Fetch    *FetchEvent
-	Artifact *ArtifactRecord
-	Pipeline *PipelineEvent
-	Skip     *SkipEvent
-	Error    *ErrorEvent
-	Stats    *CrawlStats
+	kind     EventKind
+	fetch    *FetchEvent
+	artifact *ArtifactRecord
+	pipeline *PipelineEvent
+	skip     *SkipEvent
+	error    *ErrorEvent
+	stats    *CrawlStats
 }
+
+func (e Event) Kind() EventKind           { return e.kind }
+func (e Event) Fetch() *FetchEvent        { return e.fetch }
+func (e Event) Artifact() *ArtifactRecord { return e.artifact }
+func (e Event) Pipeline() *PipelineEvent  { return e.pipeline }
+func (e Event) Skip() *SkipEvent          { return e.skip }
+func (e Event) Error() *ErrorEvent        { return e.error }
+func (e Event) Stats() *CrawlStats        { return e.stats }
 
 /*
 	ErrorCause is a closed, canonical classification used exclusively for
@@ -227,16 +393,19 @@ const (
 )
 
 type Attribute struct {
-	Key   AttributeKey
-	Value string
+	key   AttributeKey
+	value string
 }
 
 func NewAttr(key AttributeKey, val string) Attribute {
 	return Attribute{
-		Key:   key,
-		Value: val,
+		key:   key,
+		value: val,
 	}
 }
+
+func (a Attribute) Key() AttributeKey { return a.key }
+func (a Attribute) Value() string     { return a.value }
 
 type AttributeKey string
 

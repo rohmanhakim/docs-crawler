@@ -91,12 +91,12 @@ func TestNewAttr(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := metadata.NewAttr(tt.key, tt.value)
 
-			if got.Key != tt.wantKey {
-				t.Errorf("NewAttr().Key = %v, want %v", got.Key, tt.wantKey)
+			if got.Key() != tt.wantKey {
+				t.Errorf("NewAttr().Key() = %v, want %v", got.Key(), tt.wantKey)
 			}
 
-			if got.Value != tt.wantVal {
-				t.Errorf("NewAttr().Value = %v, want %v", got.Value, tt.wantVal)
+			if got.Value() != tt.wantVal {
+				t.Errorf("NewAttr().Value() = %v, want %v", got.Value(), tt.wantVal)
 			}
 		})
 	}
@@ -259,25 +259,20 @@ func TestAttributeKey(t *testing.T) {
 }
 
 func TestAttributeFields(t *testing.T) {
-	// Test that Attribute struct fields are accessible and can be set
-	attr := metadata.Attribute{
-		Key:   metadata.AttrURL,
-		Value: "https://example.com/page",
+	attr := metadata.NewAttr(metadata.AttrURL, "https://example.com/page")
+
+	if attr.Key() != metadata.AttrURL {
+		t.Errorf("Attribute.Key() = %v, want %v", attr.Key(), metadata.AttrURL)
 	}
 
-	// Verify field access
-	if attr.Key != metadata.AttrURL {
-		t.Errorf("Attribute.Key = %v, want %v", attr.Key, metadata.AttrURL)
+	if attr.Value() != "https://example.com/page" {
+		t.Errorf("Attribute.Value() = %v, want %v", attr.Value(), "https://example.com/page")
 	}
 
-	if attr.Value != "https://example.com/page" {
-		t.Errorf("Attribute.Value = %v, want %v", attr.Value, "https://example.com/page")
-	}
-
-	// Test modification
-	attr.Value = "https://example.com/updated"
-	if attr.Value != "https://example.com/updated" {
-		t.Errorf("Attribute.Value after modification = %v, want %v", attr.Value, "https://example.com/updated")
+	// Attributes are immutable — verify a new one reflects the updated value
+	updated := metadata.NewAttr(metadata.AttrURL, "https://example.com/updated")
+	if updated.Value() != "https://example.com/updated" {
+		t.Errorf("Attribute.Value() after new construction = %v, want %v", updated.Value(), "https://example.com/updated")
 	}
 }
 
@@ -441,48 +436,75 @@ func TestFetchKind(t *testing.T) {
 
 func TestFetchEventConstruction(t *testing.T) {
 	now := time.Now()
-	e := metadata.FetchEvent{
-		FetchedAt:   now,
-		FetchURL:    "https://example.com/page",
-		HTTPStatus:  200,
-		Duration:    time.Second,
-		ContentType: "text/html",
-		RetryCount:  1,
-		CrawlDepth:  2,
-		Kind:        metadata.KindPage,
-	}
+	e := metadata.NewFetchEvent(
+		now,
+		"https://example.com/page",
+		200,
+		time.Second,
+		"text/html",
+		1,
+		2,
+		metadata.KindPage,
+	)
 
-	if e.FetchURL != "https://example.com/page" {
-		t.Errorf("FetchEvent.FetchURL = %v, want %v", e.FetchURL, "https://example.com/page")
+	if e.FetchURL() != "https://example.com/page" {
+		t.Errorf("FetchEvent.FetchURL() = %v, want %v", e.FetchURL(), "https://example.com/page")
 	}
-	if e.Kind != metadata.KindPage {
-		t.Errorf("FetchEvent.Kind = %v, want %v", e.Kind, metadata.KindPage)
+	if e.Kind() != metadata.KindPage {
+		t.Errorf("FetchEvent.Kind() = %v, want %v", e.Kind(), metadata.KindPage)
 	}
-	if e.FetchedAt != now {
-		t.Errorf("FetchEvent.FetchedAt = %v, want %v", e.FetchedAt, now)
+	if e.FetchedAt() != now {
+		t.Errorf("FetchEvent.FetchedAt() = %v, want %v", e.FetchedAt(), now)
+	}
+	if e.HTTPStatus() != 200 {
+		t.Errorf("FetchEvent.HTTPStatus() = %v, want 200", e.HTTPStatus())
+	}
+	if e.Duration() != time.Second {
+		t.Errorf("FetchEvent.Duration() = %v, want %v", e.Duration(), time.Second)
+	}
+	if e.ContentType() != "text/html" {
+		t.Errorf("FetchEvent.ContentType() = %v, want text/html", e.ContentType())
+	}
+	if e.RetryCount() != 1 {
+		t.Errorf("FetchEvent.RetryCount() = %v, want 1", e.RetryCount())
+	}
+	if e.CrawlDepth() != 2 {
+		t.Errorf("FetchEvent.CrawlDepth() = %v, want 2", e.CrawlDepth())
 	}
 }
 
 func TestArtifactRecordConstruction(t *testing.T) {
 	now := time.Now()
-	r := metadata.ArtifactRecord{
-		Kind:        metadata.ArtifactMarkdown,
-		WritePath:   "/output/page.md",
-		SourceURL:   "https://example.com/page",
-		ContentHash: "abc123",
-		Overwrite:   false,
-		Bytes:       1024,
-		RecordedAt:  now,
-	}
+	r := metadata.NewArtifactRecord(
+		metadata.ArtifactMarkdown,
+		"/output/page.md",
+		"https://example.com/page",
+		"abc123",
+		false,
+		1024,
+		now,
+	)
 
-	if r.Kind != metadata.ArtifactMarkdown {
-		t.Errorf("ArtifactRecord.Kind = %v, want %v", r.Kind, metadata.ArtifactMarkdown)
+	if r.Kind() != metadata.ArtifactMarkdown {
+		t.Errorf("ArtifactRecord.Kind() = %v, want %v", r.Kind(), metadata.ArtifactMarkdown)
 	}
-	if r.SourceURL != "https://example.com/page" {
-		t.Errorf("ArtifactRecord.SourceURL = %v, want %v", r.SourceURL, "https://example.com/page")
+	if r.WritePath() != "/output/page.md" {
+		t.Errorf("ArtifactRecord.WritePath() = %v, want /output/page.md", r.WritePath())
 	}
-	if r.RecordedAt != now {
-		t.Errorf("ArtifactRecord.RecordedAt = %v, want %v", r.RecordedAt, now)
+	if r.SourceURL() != "https://example.com/page" {
+		t.Errorf("ArtifactRecord.SourceURL() = %v, want %v", r.SourceURL(), "https://example.com/page")
+	}
+	if r.ContentHash() != "abc123" {
+		t.Errorf("ArtifactRecord.ContentHash() = %v, want abc123", r.ContentHash())
+	}
+	if r.Overwrite() != false {
+		t.Errorf("ArtifactRecord.Overwrite() = %v, want false", r.Overwrite())
+	}
+	if r.Bytes() != 1024 {
+		t.Errorf("ArtifactRecord.Bytes() = %v, want 1024", r.Bytes())
+	}
+	if r.RecordedAt() != now {
+		t.Errorf("ArtifactRecord.RecordedAt() = %v, want %v", r.RecordedAt(), now)
 	}
 }
 
@@ -509,22 +531,28 @@ func TestPipelineStage(t *testing.T) {
 
 func TestPipelineEventConstruction(t *testing.T) {
 	now := time.Now()
-	e := metadata.PipelineEvent{
-		Stage:      metadata.StageExtract,
-		PageURL:    "https://example.com/page",
-		Success:    true,
-		RecordedAt: now,
-		LinksFound: 5,
-	}
+	e := metadata.NewPipelineEvent(
+		metadata.StageExtract,
+		"https://example.com/page",
+		true,
+		now,
+		5,
+	)
 
-	if e.Stage != metadata.StageExtract {
-		t.Errorf("PipelineEvent.Stage = %v, want %v", e.Stage, metadata.StageExtract)
+	if e.Stage() != metadata.StageExtract {
+		t.Errorf("PipelineEvent.Stage() = %v, want %v", e.Stage(), metadata.StageExtract)
 	}
-	if !e.Success {
-		t.Error("PipelineEvent.Success = false, want true")
+	if e.PageURL() != "https://example.com/page" {
+		t.Errorf("PipelineEvent.PageURL() = %v, want https://example.com/page", e.PageURL())
 	}
-	if e.LinksFound != 5 {
-		t.Errorf("PipelineEvent.LinksFound = %v, want 5", e.LinksFound)
+	if !e.Success() {
+		t.Error("PipelineEvent.Success() = false, want true")
+	}
+	if e.RecordedAt() != now {
+		t.Errorf("PipelineEvent.RecordedAt() = %v, want %v", e.RecordedAt(), now)
+	}
+	if e.LinksFound() != 5 {
+		t.Errorf("PipelineEvent.LinksFound() = %v, want 5", e.LinksFound())
 	}
 }
 
@@ -550,62 +578,92 @@ func TestSkipReason(t *testing.T) {
 
 func TestSkipEventConstruction(t *testing.T) {
 	now := time.Now()
-	e := metadata.SkipEvent{
-		SkippedURL: "https://example.com/disallowed",
-		Reason:     metadata.SkipReasonRobotsDisallow,
-		RecordedAt: now,
-	}
+	e := metadata.NewSkipEvent(
+		"https://example.com/disallowed",
+		metadata.SkipReasonRobotsDisallow,
+		now,
+	)
 
-	if e.SkippedURL != "https://example.com/disallowed" {
-		t.Errorf("SkipEvent.SkippedURL = %v, want %v", e.SkippedURL, "https://example.com/disallowed")
+	if e.SkippedURL() != "https://example.com/disallowed" {
+		t.Errorf("SkipEvent.SkippedURL() = %v, want %v", e.SkippedURL(), "https://example.com/disallowed")
 	}
-	if e.Reason != metadata.SkipReasonRobotsDisallow {
-		t.Errorf("SkipEvent.Reason = %v, want %v", e.Reason, metadata.SkipReasonRobotsDisallow)
+	if e.Reason() != metadata.SkipReasonRobotsDisallow {
+		t.Errorf("SkipEvent.Reason() = %v, want %v", e.Reason(), metadata.SkipReasonRobotsDisallow)
+	}
+	if e.RecordedAt() != now {
+		t.Errorf("SkipEvent.RecordedAt() = %v, want %v", e.RecordedAt(), now)
 	}
 }
 
 func TestCrawlStatsConstruction(t *testing.T) {
 	start := time.Now()
 	end := start.Add(5 * time.Second)
-	s := metadata.CrawlStats{
-		StartedAt:             start,
-		FinishedAt:            end,
-		TotalPages:            10,
-		TotalErrors:           2,
-		TotalAssets:           5,
-		ManualRetryQueueCount: 1,
-	}
+	s := metadata.NewCrawlStats(start, end, 10, 2, 5, 1)
 
-	if s.StartedAt != start {
-		t.Errorf("CrawlStats.StartedAt = %v, want %v", s.StartedAt, start)
+	if s.StartedAt() != start {
+		t.Errorf("CrawlStats.StartedAt() = %v, want %v", s.StartedAt(), start)
 	}
-	if !s.FinishedAt.After(s.StartedAt) {
-		t.Error("CrawlStats.FinishedAt must be after StartedAt")
+	if !s.FinishedAt().After(s.StartedAt()) {
+		t.Error("CrawlStats.FinishedAt() must be after StartedAt()")
 	}
-	if s.TotalPages != 10 {
-		t.Errorf("CrawlStats.TotalPages = %v, want 10", s.TotalPages)
+	if s.TotalPages() != 10 {
+		t.Errorf("CrawlStats.TotalPages() = %v, want 10", s.TotalPages())
+	}
+	if s.TotalErrors() != 2 {
+		t.Errorf("CrawlStats.TotalErrors() = %v, want 2", s.TotalErrors())
+	}
+	if s.TotalAssets() != 5 {
+		t.Errorf("CrawlStats.TotalAssets() = %v, want 5", s.TotalAssets())
+	}
+	if s.ManualRetryQueueCount() != 1 {
+		t.Errorf("CrawlStats.ManualRetryQueueCount() = %v, want 1", s.ManualRetryQueueCount())
 	}
 }
 
 func TestErrorEventConstruction(t *testing.T) {
 	now := time.Now()
-	e := metadata.ErrorEvent{
-		ObservedAt:  now,
-		PackageName: "fetcher",
-		Action:      "Fetch",
-		Cause:       metadata.CauseNetworkFailure,
-		Details:     "connection refused",
-		Attrs:       []metadata.Attribute{metadata.NewAttr(metadata.AttrURL, "https://example.com")},
-	}
+	attrs := []metadata.Attribute{metadata.NewAttr(metadata.AttrURL, "https://example.com")}
+	e := metadata.NewErrorEvent(
+		now,
+		"fetcher",
+		"Fetch",
+		metadata.CauseNetworkFailure,
+		"connection refused",
+		attrs,
+	)
 
-	if e.PackageName != "fetcher" {
-		t.Errorf("ErrorEvent.PackageName = %v, want fetcher", e.PackageName)
+	if e.PackageName() != "fetcher" {
+		t.Errorf("ErrorEvent.PackageName() = %v, want fetcher", e.PackageName())
 	}
-	if e.Cause != metadata.CauseNetworkFailure {
-		t.Errorf("ErrorEvent.Cause = %v, want %v", e.Cause, metadata.CauseNetworkFailure)
+	if e.Action() != "Fetch" {
+		t.Errorf("ErrorEvent.Action() = %v, want Fetch", e.Action())
 	}
-	if len(e.Attrs) != 1 {
-		t.Errorf("ErrorEvent.Attrs len = %v, want 1", len(e.Attrs))
+	if e.Cause() != metadata.CauseNetworkFailure {
+		t.Errorf("ErrorEvent.Cause() = %v, want %v", e.Cause(), metadata.CauseNetworkFailure)
+	}
+	if e.Details() != "connection refused" {
+		t.Errorf("ErrorEvent.Details() = %v, want connection refused", e.Details())
+	}
+	if e.ObservedAt() != now {
+		t.Errorf("ErrorEvent.ObservedAt() = %v, want %v", e.ObservedAt(), now)
+	}
+	if len(e.Attrs()) != 1 {
+		t.Errorf("ErrorEvent.Attrs() len = %v, want 1", len(e.Attrs()))
+	}
+}
+
+func TestErrorEventAttrsImmutability(t *testing.T) {
+	// Verify that Attrs() returns a copy — mutating the returned slice must not
+	// affect the event's internal state.
+	attrs := []metadata.Attribute{metadata.NewAttr(metadata.AttrURL, "https://example.com")}
+	e := metadata.NewErrorEvent(time.Now(), "pkg", "action", metadata.CauseUnknown, "details", attrs)
+
+	got := e.Attrs()
+	got[0] = metadata.NewAttr(metadata.AttrHost, "mutated")
+
+	// The event must still return the original attribute.
+	if e.Attrs()[0].Key() != metadata.AttrURL {
+		t.Error("ErrorEvent.Attrs() is not a copy — external mutation affected internal state")
 	}
 }
 
@@ -633,69 +691,56 @@ func TestEventKind(t *testing.T) {
 }
 
 func TestEventConstruction(t *testing.T) {
-	t.Run("fetch event", func(t *testing.T) {
-		fe := &metadata.FetchEvent{Kind: metadata.KindPage, FetchURL: "https://example.com"}
-		e := metadata.Event{Kind: metadata.EventKindFetch, Fetch: fe}
-		if e.Kind != metadata.EventKindFetch {
-			t.Errorf("Event.Kind = %v, want %v", e.Kind, metadata.EventKindFetch)
+	t.Run("fetch event getters", func(t *testing.T) {
+		fe := metadata.NewFetchEvent(
+			time.Now(), "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage,
+		)
+		if fe.Kind() != metadata.KindPage {
+			t.Errorf("FetchEvent.Kind() = %v, want %v", fe.Kind(), metadata.KindPage)
 		}
-		if e.Fetch == nil {
-			t.Error("Event.Fetch must not be nil for fetch event")
-		}
-	})
-
-	t.Run("artifact event", func(t *testing.T) {
-		ar := &metadata.ArtifactRecord{Kind: metadata.ArtifactMarkdown}
-		e := metadata.Event{Kind: metadata.EventKindArtifact, Artifact: ar}
-		if e.Kind != metadata.EventKindArtifact {
-			t.Errorf("Event.Kind = %v, want %v", e.Kind, metadata.EventKindArtifact)
-		}
-		if e.Artifact == nil {
-			t.Error("Event.Artifact must not be nil for artifact event")
+		if fe.FetchURL() != "https://example.com" {
+			t.Errorf("FetchEvent.FetchURL() = %v, want https://example.com", fe.FetchURL())
 		}
 	})
 
-	t.Run("pipeline event", func(t *testing.T) {
-		pe := &metadata.PipelineEvent{Stage: metadata.StageExtract, Success: true}
-		e := metadata.Event{Kind: metadata.EventKindPipeline, Pipeline: pe}
-		if e.Kind != metadata.EventKindPipeline {
-			t.Errorf("Event.Kind = %v, want %v", e.Kind, metadata.EventKindPipeline)
-		}
-		if e.Pipeline == nil {
-			t.Error("Event.Pipeline must not be nil for pipeline event")
+	t.Run("artifact record getters", func(t *testing.T) {
+		ar := metadata.NewArtifactRecord(
+			metadata.ArtifactMarkdown, "/out/page.md", "https://example.com", "hash", false, 512, time.Now(),
+		)
+		if ar.Kind() != metadata.ArtifactMarkdown {
+			t.Errorf("ArtifactRecord.Kind() = %v, want %v", ar.Kind(), metadata.ArtifactMarkdown)
 		}
 	})
 
-	t.Run("skip event", func(t *testing.T) {
-		se := &metadata.SkipEvent{Reason: metadata.SkipReasonRobotsDisallow}
-		e := metadata.Event{Kind: metadata.EventKindSkip, Skip: se}
-		if e.Kind != metadata.EventKindSkip {
-			t.Errorf("Event.Kind = %v, want %v", e.Kind, metadata.EventKindSkip)
+	t.Run("pipeline event getters", func(t *testing.T) {
+		pe := metadata.NewPipelineEvent(metadata.StageExtract, "https://example.com", true, time.Now(), 3)
+		if pe.Stage() != metadata.StageExtract {
+			t.Errorf("PipelineEvent.Stage() = %v, want %v", pe.Stage(), metadata.StageExtract)
 		}
-		if e.Skip == nil {
-			t.Error("Event.Skip must not be nil for skip event")
-		}
-	})
-
-	t.Run("error event", func(t *testing.T) {
-		ee := &metadata.ErrorEvent{Cause: metadata.CauseNetworkFailure}
-		e := metadata.Event{Kind: metadata.EventKindError, Error: ee}
-		if e.Kind != metadata.EventKindError {
-			t.Errorf("Event.Kind = %v, want %v", e.Kind, metadata.EventKindError)
-		}
-		if e.Error == nil {
-			t.Error("Event.Error must not be nil for error event")
+		if !pe.Success() {
+			t.Error("PipelineEvent.Success() = false, want true")
 		}
 	})
 
-	t.Run("stats event", func(t *testing.T) {
-		cs := &metadata.CrawlStats{TotalPages: 3}
-		e := metadata.Event{Kind: metadata.EventKindStats, Stats: cs}
-		if e.Kind != metadata.EventKindStats {
-			t.Errorf("Event.Kind = %v, want %v", e.Kind, metadata.EventKindStats)
+	t.Run("skip event getters", func(t *testing.T) {
+		se := metadata.NewSkipEvent("https://example.com/disallowed", metadata.SkipReasonRobotsDisallow, time.Now())
+		if se.Reason() != metadata.SkipReasonRobotsDisallow {
+			t.Errorf("SkipEvent.Reason() = %v, want %v", se.Reason(), metadata.SkipReasonRobotsDisallow)
 		}
-		if e.Stats == nil {
-			t.Error("Event.Stats must not be nil for stats event")
+	})
+
+	t.Run("error event getters", func(t *testing.T) {
+		ee := metadata.NewErrorEvent(time.Now(), "pkg", "action", metadata.CauseNetworkFailure, "details", nil)
+		if ee.Cause() != metadata.CauseNetworkFailure {
+			t.Errorf("ErrorEvent.Cause() = %v, want %v", ee.Cause(), metadata.CauseNetworkFailure)
+		}
+	})
+
+	t.Run("crawl stats getters", func(t *testing.T) {
+		start := time.Now()
+		cs := metadata.NewCrawlStats(start, start.Add(time.Second), 3, 0, 0, 0)
+		if cs.TotalPages() != 3 {
+			t.Errorf("CrawlStats.TotalPages() = %v, want 3", cs.TotalPages())
 		}
 	})
 }
