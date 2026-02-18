@@ -414,16 +414,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
+			// Note: Extraction errors are deterministic (content invalid).
+			// Do NOT record to failure journal - retrying the same content yields the same error.
 			totalErrors++
 			continue
 		}
@@ -434,16 +426,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
+			// Note: Sanitization errors are deterministic (invariant violations).
+			// Do NOT record to failure journal - retrying the same content yields the same error.
 			totalErrors++
 			continue
 		}
@@ -481,16 +465,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
+			// Note: Conversion errors are deterministic (conversion failures).
+			// Do NOT record to failure journal - retrying the same content yields the same error.
 			totalErrors++
 			continue
 		}
@@ -541,16 +517,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
+			// Note: Normalization errors are deterministic (invariant violations).
+			// Do NOT record to failure journal - retrying the same content yields the same error.
 			totalErrors++
 			continue
 		}
