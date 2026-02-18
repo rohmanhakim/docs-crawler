@@ -31,20 +31,28 @@ cmd/
   crawler/
 
 internal/
-  config/
-  scheduler/
-  frontier/
-  fetcher/
-  robots/
-  extractor/
-  sanitizer/
-  mdconvert/
   assets/
-  normalize/
-  storage/
+  build/
+  cli/
+  config/
+  extractor/
+  fetcher/
+  frontier/
+  mdconvert/
   metadata/
+  normalize/
+  robots/
+  sanitizer/
+  scheduler/
+  storage/
+  
 
 pkg/
+  collections/
+  failure/
+  failurejournal/
+  fileutil/
+  timeutil/
   urlutil/
   hashutil/
   retry/
