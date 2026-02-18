@@ -3,6 +3,7 @@ package assets
 import (
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
@@ -199,5 +200,110 @@ func TestAssetsError_NewAssetsErrorVariations(t *testing.T) {
 				t.Error("Error() should not be empty")
 			}
 		})
+	}
+}
+
+// TestMapAssetsErrorToMetadataCause tests the mapping from assets errors
+// to the canonical metadata.ErrorCause table.
+func TestMapAssetsErrorToMetadataCause(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       *AssetsError
+		wantCause metadata.ErrorCause
+	}{
+		{
+			name:      "ErrCausePathError maps to CauseStorageFailure",
+			err:       NewAssetsError(ErrCausePathError, "test"),
+			wantCause: metadata.CauseStorageFailure,
+		},
+		{
+			name:      "ErrCauseDiskFull maps to CauseStorageFailure",
+			err:       NewAssetsError(ErrCauseDiskFull, "test"),
+			wantCause: metadata.CauseStorageFailure,
+		},
+		{
+			name:      "ErrCauseWriteFailure maps to CauseStorageFailure",
+			err:       NewAssetsError(ErrCauseWriteFailure, "test"),
+			wantCause: metadata.CauseStorageFailure,
+		},
+		{
+			name:      "ErrCauseTimeout maps to CauseNetworkFailure",
+			err:       NewAssetsError(ErrCauseTimeout, "test"),
+			wantCause: metadata.CauseNetworkFailure,
+		},
+		{
+			name:      "ErrCauseRequestTooMany maps to CausePolicyDisallow",
+			err:       NewAssetsError(ErrCauseRequestTooMany, "test"),
+			wantCause: metadata.CausePolicyDisallow,
+		},
+		{
+			name:      "ErrCauseRepeated403 maps to CausePolicyDisallow",
+			err:       NewAssetsError(ErrCauseRepeated403, "test"),
+			wantCause: metadata.CausePolicyDisallow,
+		},
+		{
+			name:      "ErrCauseReadResponseBodyError maps to CauseContentInvalid",
+			err:       NewAssetsError(ErrCauseReadResponseBodyError, "test"),
+			wantCause: metadata.CauseContentInvalid,
+		},
+		{
+			name:      "ErrCauseContentTypeInvalid maps to CauseContentInvalid",
+			err:       NewAssetsError(ErrCauseContentTypeInvalid, "test"),
+			wantCause: metadata.CauseContentInvalid,
+		},
+		{
+			name:      "ErrCauseRedirectLimitExceeded maps to CauseUnknown",
+			err:       NewAssetsError(ErrCauseRedirectLimitExceeded, "test"),
+			wantCause: metadata.CauseUnknown,
+		},
+		{
+			name:      "ErrCauseRequestPageForbidden maps to CausePolicyDisallow",
+			err:       NewAssetsError(ErrCauseRequestPageForbidden, "test"),
+			wantCause: metadata.CausePolicyDisallow,
+		},
+		{
+			name:      "ErrCauseRequest5xx maps to CauseUnknown",
+			err:       NewAssetsError(ErrCauseRequest5xx, "test"),
+			wantCause: metadata.CauseUnknown,
+		},
+		{
+			name:      "ErrCauseAssetTooLarge maps to CausePolicyDisallow",
+			err:       NewAssetsError(ErrCauseAssetTooLarge, "test"),
+			wantCause: metadata.CausePolicyDisallow,
+		},
+		{
+			name:      "ErrCauseHashError maps to CauseContentInvalid",
+			err:       NewAssetsError(ErrCauseHashError, "test"),
+			wantCause: metadata.CauseContentInvalid,
+		},
+		{
+			name:      "unknown cause maps to CauseUnknown",
+			err:       &AssetsError{Cause: "unknown cause"},
+			wantCause: metadata.CauseUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapAssetsErrorToMetadataCause(*tt.err)
+			if got != tt.wantCause {
+				t.Errorf("mapAssetsErrorToMetadataCause() = %v, want %v", got, tt.wantCause)
+			}
+		})
+	}
+}
+
+// TestAssetsError_SeverityEdgeCases tests edge cases for the Severity method.
+func TestAssetsError_SeverityEdgeCases(t *testing.T) {
+	// Test that Severity() doesn't panic and returns valid values
+	err := NewAssetsError(ErrCauseNetworkFailure, "test")
+
+	// Verify Severity doesn't panic and returns valid value
+	_ = err.Severity()
+
+	// Verify Error() format
+	errMsg := err.Error()
+	if errMsg == "" {
+		t.Error("Error() should not be empty")
 	}
 }

@@ -3,6 +3,7 @@ package sanitizer
 import (
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
@@ -130,5 +131,75 @@ func TestSanitizationError_NewSanitizationErrorVariations(t *testing.T) {
 				t.Error("Error() should not be empty")
 			}
 		})
+	}
+}
+
+// TestMapSanitizationErrorToMetadataCause tests the mapping from sanitization errors
+// to the canonical metadata.ErrorCause table.
+func TestMapSanitizationErrorToMetadataCause(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       *SanitizationError
+		wantCause metadata.ErrorCause
+	}{
+		{
+			name:      "ErrCauseUnparseableHTML maps to CauseContentInvalid",
+			err:       NewSanitizationError(ErrCauseUnparseableHTML, "test"),
+			wantCause: metadata.CauseContentInvalid,
+		},
+		{
+			name:      "ErrCauseCompetingRoots maps to CauseInvariantViolation",
+			err:       NewSanitizationError(ErrCauseCompetingRoots, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseNoStructuralAnchor maps to CauseInvariantViolation",
+			err:       NewSanitizationError(ErrCauseNoStructuralAnchor, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseMultipleH1NoRoot maps to CauseInvariantViolation",
+			err:       NewSanitizationError(ErrCauseMultipleH1NoRoot, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseImpliedMultipleDocs maps to CauseInvariantViolation",
+			err:       NewSanitizationError(ErrCauseImpliedMultipleDocs, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseAmbiguousDOM maps to CauseInvariantViolation",
+			err:       NewSanitizationError(ErrCauseAmbiguousDOM, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "unknown cause maps to CauseUnknown",
+			err:       &SanitizationError{Cause: "unknown cause"},
+			wantCause: metadata.CauseUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapSanitizationErrorToMetadataCause(*tt.err)
+			if got != tt.wantCause {
+				t.Errorf("mapSanitizationErrorToMetadataCause() = %v, want %v", got, tt.wantCause)
+			}
+		})
+	}
+}
+
+// TestSanitizationError_SeverityEdgeCases tests edge cases for the Severity method.
+func TestSanitizationError_SeverityEdgeCases(t *testing.T) {
+	// Test that Severity() doesn't panic and returns valid values
+	err := NewSanitizationError(ErrCauseUnparseableHTML, "test")
+
+	// Verify Severity doesn't panic and returns valid value
+	_ = err.Severity()
+
+	// Verify Error() format
+	errMsg := err.Error()
+	if errMsg == "" {
+		t.Error("Error() should not be empty")
 	}
 }

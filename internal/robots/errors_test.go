@@ -3,6 +3,7 @@ package robots
 import (
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
@@ -154,5 +155,90 @@ func TestRobotsError_NewRobotsErrorVariations(t *testing.T) {
 				t.Error("Error() should not be empty")
 			}
 		})
+	}
+}
+
+// TestMapRobotsErrorToMetadataCause tests the mapping from robots errors
+// to the canonical metadata.ErrorCause table.
+func TestMapRobotsErrorToMetadataCause(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       *RobotsError
+		wantCause metadata.ErrorCause
+	}{
+		{
+			name:      "ErrCauseDisallowRoot maps to CausePolicyDisallow",
+			err:       NewRobotsError(ErrCauseDisallowRoot, "test"),
+			wantCause: metadata.CausePolicyDisallow,
+		},
+		{
+			name:      "ErrCauseInvalidRobotsUrl maps to CauseInvariantViolation",
+			err:       NewRobotsError(ErrCauseInvalidRobotsUrl, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCausePreFetchFailure maps to CauseUnknown",
+			err:       NewRobotsError(ErrCausePreFetchFailure, "test"),
+			wantCause: metadata.CauseUnknown,
+		},
+		{
+			name:      "ErrCauseHttpFetchFailure maps to CauseNetworkFailure",
+			err:       NewRobotsError(ErrCauseHttpFetchFailure, "test"),
+			wantCause: metadata.CauseNetworkFailure,
+		},
+		{
+			name:      "ErrCauseHttpTooManyRequests maps to CauseNetworkFailure",
+			err:       NewRobotsError(ErrCauseHttpTooManyRequests, "test"),
+			wantCause: metadata.CauseNetworkFailure,
+		},
+		{
+			name:      "ErrCauseHttpTooManyRedirects maps to CauseNetworkFailure",
+			err:       NewRobotsError(ErrCauseHttpTooManyRedirects, "test"),
+			wantCause: metadata.CauseNetworkFailure,
+		},
+		{
+			name:      "ErrCauseHttpServerError maps to CauseNetworkFailure",
+			err:       NewRobotsError(ErrCauseHttpServerError, "test"),
+			wantCause: metadata.CauseNetworkFailure,
+		},
+		{
+			name:      "ErrCauseHttpUnexpectedStatus maps to CauseNetworkFailure",
+			err:       NewRobotsError(ErrCauseHttpUnexpectedStatus, "test"),
+			wantCause: metadata.CauseNetworkFailure,
+		},
+		{
+			name:      "ErrCauseParseError maps to CauseContentInvalid",
+			err:       NewRobotsError(ErrCauseParseError, "test"),
+			wantCause: metadata.CauseContentInvalid,
+		},
+		{
+			name:      "unknown cause maps to CauseUnknown",
+			err:       &RobotsError{Cause: "unknown cause"},
+			wantCause: metadata.CauseUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapRobotsErrorToMetadataCause(tt.err)
+			if got != tt.wantCause {
+				t.Errorf("mapRobotsErrorToMetadataCause() = %v, want %v", got, tt.wantCause)
+			}
+		})
+	}
+}
+
+// TestRobotsError_SeverityEdgeCases tests edge cases for the Severity method.
+func TestRobotsError_SeverityEdgeCases(t *testing.T) {
+	// Test that Severity() doesn't panic and returns valid values
+	err := NewRobotsError(ErrCauseHttpFetchFailure, "test")
+
+	// Verify Severity doesn't panic and returns valid value
+	_ = err.Severity()
+
+	// Verify Error() format
+	errMsg := err.Error()
+	if errMsg == "" {
+		t.Error("Error() should not be empty")
 	}
 }

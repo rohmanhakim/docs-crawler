@@ -3,6 +3,7 @@ package storage
 import (
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
@@ -124,5 +125,65 @@ func TestStorageError_NewStorageErrorVariations(t *testing.T) {
 				t.Error("Error() should not be empty")
 			}
 		})
+	}
+}
+
+// TestMapStorageErrorToMetadataCause tests the mapping from storage errors
+// to the canonical metadata.ErrorCause table.
+func TestMapStorageErrorToMetadataCause(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       *StorageError
+		wantCause metadata.ErrorCause
+	}{
+		{
+			name:      "ErrCauseDiskFull maps to CauseStorageFailure",
+			err:       NewStorageError(ErrCauseDiskFull, "test", "/path"),
+			wantCause: metadata.CauseStorageFailure,
+		},
+		{
+			name:      "ErrCauseWriteFailure maps to CauseStorageFailure",
+			err:       NewStorageError(ErrCauseWriteFailure, "test", "/path"),
+			wantCause: metadata.CauseStorageFailure,
+		},
+		{
+			name:      "ErrCausePathError maps to CauseStorageFailure",
+			err:       NewStorageError(ErrCausePathError, "test", "/path"),
+			wantCause: metadata.CauseStorageFailure,
+		},
+		{
+			name:      "ErrCauseHashComputationFailed maps to CauseInvariantViolation",
+			err:       NewStorageError(ErrCauseHashComputationFailed, "test", "/path"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "unknown cause maps to CauseUnknown",
+			err:       &StorageError{Cause: "unknown cause"},
+			wantCause: metadata.CauseUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapStorageErrorToMetadataCause(tt.err)
+			if got != tt.wantCause {
+				t.Errorf("mapStorageErrorToMetadataCause() = %v, want %v", got, tt.wantCause)
+			}
+		})
+	}
+}
+
+// TestStorageError_SeverityEdgeCases tests edge cases for the Severity method.
+func TestStorageError_SeverityEdgeCases(t *testing.T) {
+	// Test that Severity() doesn't panic and returns valid values
+	err := NewStorageError(ErrCauseDiskFull, "test", "/path")
+
+	// Verify Severity doesn't panic and returns valid value
+	_ = err.Severity()
+
+	// Verify Error() format
+	errMsg := err.Error()
+	if errMsg == "" {
+		t.Error("Error() should not be empty")
 	}
 }

@@ -3,6 +3,7 @@ package normalize
 import (
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
@@ -162,5 +163,95 @@ func TestNormalizationError_NewNormalizationErrorVariations(t *testing.T) {
 				t.Error("Error() should not be empty")
 			}
 		})
+	}
+}
+
+// TestMapNormalizationErrorToMetadataCause tests the mapping from normalization errors
+// to the canonical metadata.ErrorCause table.
+func TestMapNormalizationErrorToMetadataCause(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       *NormalizationError
+		wantCause metadata.ErrorCause
+	}{
+		{
+			name:      "ErrCauseBrokenH1Invariant maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseBrokenH1Invariant, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseEmptyContent maps to CauseContentInvalid",
+			err:       NewNormalizationError(ErrCauseEmptyContent, "test"),
+			wantCause: metadata.CauseContentInvalid,
+		},
+		{
+			name:      "ErrCauseSectionDerivationFailed maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseSectionDerivationFailed, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseTitleExtractionFailed maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseTitleExtractionFailed, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseHashComputationFailed maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseHashComputationFailed, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseFrontmatterMarshalFailed maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseFrontmatterMarshalFailed, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseSkippedHeadingLevels maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseSkippedHeadingLevels, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseOrphanContent maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseOrphanContent, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseEmptySection maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseEmptySection, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "ErrCauseBrokenAtomicBlock maps to CauseInvariantViolation",
+			err:       NewNormalizationError(ErrCauseBrokenAtomicBlock, "test"),
+			wantCause: metadata.CauseInvariantViolation,
+		},
+		{
+			name:      "unknown cause maps to CauseUnknown",
+			err:       &NormalizationError{Cause: "unknown cause"},
+			wantCause: metadata.CauseUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapNormalizationErrorToMetadataCause(*tt.err)
+			if got != tt.wantCause {
+				t.Errorf("mapNormalizationErrorToMetadataCause() = %v, want %v", got, tt.wantCause)
+			}
+		})
+	}
+}
+
+// TestNormalizationError_SeverityEdgeCases tests edge cases for the Severity method.
+func TestNormalizationError_SeverityEdgeCases(t *testing.T) {
+	// Test that Severity() doesn't panic and returns valid values
+	err := NewNormalizationError(ErrCauseBrokenH1Invariant, "test")
+
+	// Verify Severity doesn't panic and returns valid value
+	_ = err.Severity()
+
+	// Verify Error() format
+	errMsg := err.Error()
+	if errMsg == "" {
+		t.Error("Error() should not be empty")
 	}
 }

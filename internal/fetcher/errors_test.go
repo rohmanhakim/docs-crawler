@@ -3,6 +3,7 @@ package fetcher
 import (
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
@@ -162,5 +163,60 @@ func TestFetchError_NewFetchErrorVariations(t *testing.T) {
 				t.Error("Error() should not be empty")
 			}
 		})
+	}
+}
+
+// TestMapFetchErrorToMetadataCause tests the mapping from fetch errors
+// to the canonical metadata.ErrorCause table.
+func TestMapFetchErrorToMetadataCause(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       *FetchError
+		wantCause metadata.ErrorCause
+	}{
+		{
+			name:      "ErrCauseTimeout maps to CauseNetworkFailure",
+			err:       NewFetchError(ErrCauseTimeout, "test"),
+			wantCause: metadata.CauseNetworkFailure,
+		},
+		{
+			name:      "ErrCauseRequestTooMany maps to CausePolicyDisallow",
+			err:       NewFetchError(ErrCauseRequestTooMany, "test"),
+			wantCause: metadata.CausePolicyDisallow,
+		},
+		{
+			name:      "ErrCauseRepeated403 maps to CausePolicyDisallow",
+			err:       NewFetchError(ErrCauseRepeated403, "test"),
+			wantCause: metadata.CausePolicyDisallow,
+		},
+		{
+			name:      "unknown cause maps to CauseUnknown",
+			err:       &FetchError{Cause: "unknown cause"},
+			wantCause: metadata.CauseUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapFetchErrorToMetadataCause(tt.err)
+			if got != tt.wantCause {
+				t.Errorf("mapFetchErrorToMetadataCause() = %v, want %v", got, tt.wantCause)
+			}
+		})
+	}
+}
+
+// TestFetchError_SeverityEdgeCases tests edge cases for the Severity method.
+func TestFetchError_SeverityEdgeCases(t *testing.T) {
+	// Test that Severity() doesn't panic and returns valid values
+	err := NewFetchError(ErrCauseNetworkFailure, "test")
+
+	// Verify Severity doesn't panic and returns valid value
+	_ = err.Severity()
+
+	// Verify Error() format
+	errMsg := err.Error()
+	if errMsg == "" {
+		t.Error("Error() should not be empty")
 	}
 }

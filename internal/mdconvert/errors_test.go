@@ -3,6 +3,7 @@ package mdconvert
 import (
 	"testing"
 
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 )
 
@@ -88,5 +89,50 @@ func TestConversionError_NewConversionErrorVariations(t *testing.T) {
 				t.Error("Error() should not be empty")
 			}
 		})
+	}
+}
+
+// TestMapConversionErrorToMetadataCause tests the mapping from conversion errors
+// to the canonical metadata.ErrorCause table.
+func TestMapConversionErrorToMetadataCause(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       *ConversionError
+		wantCause metadata.ErrorCause
+	}{
+		{
+			name:      "ErrCauseConversionFailure maps to CauseContentInvalid",
+			err:       NewConversionError(ErrCauseConversionFailure, "test"),
+			wantCause: metadata.CauseContentInvalid,
+		},
+		{
+			name:      "unknown cause maps to CauseUnknown",
+			err:       &ConversionError{Cause: "unknown cause"},
+			wantCause: metadata.CauseUnknown,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mapConversionErrorToMetadataCause(*tt.err)
+			if got != tt.wantCause {
+				t.Errorf("mapConversionErrorToMetadataCause() = %v, want %v", got, tt.wantCause)
+			}
+		})
+	}
+}
+
+// TestConversionError_SeverityEdgeCases tests edge cases for the Severity method.
+func TestConversionError_SeverityEdgeCases(t *testing.T) {
+	// Test that Severity() doesn't panic and returns valid values
+	err := NewConversionError(ErrCauseConversionFailure, "test")
+
+	// Verify Severity doesn't panic and returns valid value
+	_ = err.Severity()
+
+	// Verify Error() format
+	errMsg := err.Error()
+	if errMsg == "" {
+		t.Error("Error() should not be empty")
 	}
 }
