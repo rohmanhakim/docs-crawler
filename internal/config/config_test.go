@@ -756,6 +756,66 @@ func TestWithConfigFile_EmptyJSON(t *testing.T) {
 	}
 }
 
+func TestWithConfigFile_MaxAssetSize(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "maxasset.json")
+
+	// Create a config with maxAssetSize set
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"maxAssetSize": 5242880
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify MaxAssetSize was loaded from config
+	expectedMaxAssetSize := int64(5242880) // 5MB
+	if loadedConfig.MaxAssetSize() != expectedMaxAssetSize {
+		t.Errorf("expected MaxAssetSize %d, got %d", expectedMaxAssetSize, loadedConfig.MaxAssetSize())
+	}
+}
+
+func TestWithConfigFile_ReadPermissionError(t *testing.T) {
+	// Skip on Windows as permission handling differs
+	if os.Getuid() == 0 {
+		t.Skip("skipping test when running as root")
+	}
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "unreadable.json")
+
+	// Create a file and make it unreadable
+	err := os.WriteFile(configPath, []byte(`{"seedUrls": [{"Scheme": "https", "Host": "example.com"}]}`), 0644)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	// Remove read permissions
+	err = os.Chmod(configPath, 0000)
+	if err != nil {
+		t.Fatalf("failed to change file permissions: %v", err)
+	}
+	defer os.Chmod(configPath, 0644) // Restore permissions for cleanup
+
+	_, err = config.WithConfigFile(configPath)
+
+	if err == nil {
+		t.Fatal("expected error for unreadable file, got nil")
+	}
+
+	if !errors.Is(err, config.ErrReadConfigFail) {
+		t.Errorf("expected ErrReadConfigFail, got: %v", err)
+	}
+}
+
 // Test extraction parameter builder methods
 func TestWithBodySpecificityBias(t *testing.T) {
 	testBias := 0.90
@@ -910,6 +970,30 @@ func TestWithMaxIdleConns(t *testing.T) {
 	}
 	if cfg.MaxIdleConns() != testMaxIdleConns {
 		t.Errorf("expected MaxIdleConns %d, got %d", testMaxIdleConns, cfg.MaxIdleConns())
+	}
+}
+
+func TestWithMaxAssetSize(t *testing.T) {
+	testMaxAssetSize := int64(1024 * 1024) // 1MB
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithMaxAssetSize(testMaxAssetSize).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %d", err)
+	}
+	if cfg.MaxAssetSize() != testMaxAssetSize {
+		t.Errorf("expected MaxAssetSize %d, got %d", testMaxAssetSize, cfg.MaxAssetSize())
+	}
+}
+
+func TestMaxAssetSize_DefaultValue(t *testing.T) {
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).Build()
+	if err != nil {
+		t.Fatalf("should not have any error, got %v", err)
+	}
+	// Default value should be 0 (unlimited)
+	if cfg.MaxAssetSize() != 0 {
+		t.Errorf("expected default MaxAssetSize 0, got %d", cfg.MaxAssetSize())
 	}
 }
 
