@@ -1079,3 +1079,216 @@ func completeConfigJson() string {
 }
 	`
 }
+
+// Test zero-value overrides - these tests verify that explicit zero values
+// in JSON properly override defaults after the pointer-type fix.
+func TestWithConfigFile_ExplicitZeroMaxDepth(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "zero_max_depth.json")
+
+	// Explicitly set maxDepth to 0 - should override default of 3
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"maxDepth": 0
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify explicit 0 was applied (overriding default 3)
+	if loadedConfig.MaxDepth() != 0 {
+		t.Errorf("expected MaxDepth 0, got %d", loadedConfig.MaxDepth())
+	}
+}
+
+func TestWithConfigFile_ExplicitZeroMaxPages(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "zero_max_pages.json")
+
+	// Explicitly set maxPages to 0 - should override default of 100
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"maxPages": 0
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify explicit 0 was applied (overriding default 100)
+	if loadedConfig.MaxPages() != 0 {
+		t.Errorf("expected MaxPages 0, got %d", loadedConfig.MaxPages())
+	}
+}
+
+func TestWithConfigFile_ExplicitZeroBackoffMultiplier(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "zero_backoff_multiplier.json")
+
+	// Explicitly set backoffMultiplier to 0.0 - should override default of 2.0
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"backoffMultiplier": 0.0
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify explicit 0.0 was applied (overriding default 2.0)
+	if loadedConfig.BackoffMultiplier() != 0.0 {
+		t.Errorf("expected BackoffMultiplier 0.0, got %f", loadedConfig.BackoffMultiplier())
+	}
+}
+
+func TestWithConfigFile_ExplicitZeroThresholdMinHeadings(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "zero_threshold_min_headings.json")
+
+	// Explicitly set thresholdMinHeadings to 0 - should override default of 0
+	// (this was already working but let's verify the pointer fix maintains it)
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"thresholdMinHeadings": 0
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify explicit 0 was applied (default is also 0, but explicit 0 should work)
+	if loadedConfig.ThresholdMinHeadings() != 0 {
+		t.Errorf("expected ThresholdMinHeadings 0, got %d", loadedConfig.ThresholdMinHeadings())
+	}
+}
+
+func TestWithConfigFile_ExplicitZeroThresholdMinNonWhitespace(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "zero_threshold_min_nonwhitespace.json")
+
+	// Explicitly set thresholdMinNonWhitespace to 0 - should override default of 50
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"thresholdMinNonWhitespace": 0
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify explicit 0 was applied (overriding default 50)
+	if loadedConfig.ThresholdMinNonWhitespace() != 0 {
+		t.Errorf("expected ThresholdMinNonWhitespace 0, got %d", loadedConfig.ThresholdMinNonWhitespace())
+	}
+}
+
+func TestWithConfigFile_ExplicitZeroThresholdMinParagraphsOrCode(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "zero_threshold_min_paragraphs.json")
+
+	// Explicitly set thresholdMinParagraphsOrCode to 0 - should override default of 1
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"thresholdMinParagraphsOrCode": 0
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify explicit 0 was applied (overriding default 1)
+	if loadedConfig.ThresholdMinParagraphsOrCode() != 0 {
+		t.Errorf("expected ThresholdMinParagraphsOrCode 0, got %d", loadedConfig.ThresholdMinParagraphsOrCode())
+	}
+}
+
+func TestWithConfigFile_ExplicitFalseDryRun(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "false_dryrun.json")
+
+	// Explicitly set dryRun to false - should override default of false
+	// (this tests that we can explicitly set a boolean to its zero value)
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"dryRun": false
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify explicit false was applied (default is also false, but explicit should work)
+	if loadedConfig.DryRun() != false {
+		t.Errorf("expected DryRun false, got %v", loadedConfig.DryRun())
+	}
+}
+
+func TestWithConfigFile_ExplicitZeroMaxAssetSize(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "zero_max_assetsize.json")
+
+	// Explicitly set maxAssetSize to 0 (unlimited) - should override default of 0
+	// This is the same as the default, but verifies explicit setting works
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"maxAssetSize": 0
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	// Verify explicit 0 was applied (default is also 0)
+	if loadedConfig.MaxAssetSize() != 0 {
+		t.Errorf("expected MaxAssetSize 0, got %d", loadedConfig.MaxAssetSize())
+	}
+}

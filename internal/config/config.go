@@ -130,37 +130,37 @@ type configDTO struct {
 	SeedURLs               []url.URL           `json:"seedUrls"`
 	AllowedHosts           map[string]struct{} `json:"allowedHosts,omitempty"`
 	AllowedPathPrefix      []string            `json:"allowedPathPrefix,omitempty"`
-	MaxDepth               int                 `json:"maxDepth,omitempty"`
-	MaxPages               int                 `json:"maxPages,omitempty"`
-	Concurrency            int                 `json:"concurrency,omitempty"`
-	BaseDelay              time.Duration       `json:"baseDelay,omitempty"`
-	Jitter                 time.Duration       `json:"jitter,omitempty"`
-	RandomSeed             int64               `json:"randomSeed,omitempty"`
-	MaxAttempt             int                 `json:"maxAttempt,omitempty"`
-	BackoffInitialDuration time.Duration       `json:"backoffInitialDuration,omitempty"`
-	BackoffMultiplier      float64             `json:"backoffMultiplier,omitempty"`
-	BackoffMaxDuration     time.Duration       `json:"backoffMaxDuration,omitempty"`
-	Timeout                time.Duration       `json:"timeout,omitempty"`
-	MaxIdleConns           int                 `json:"maxIdleConns,omitempty"`
-	MaxIdleConnsPerHost    int                 `json:"maxIdleConnsPerHost,omitempty"`
-	IdleConnTimeout        time.Duration       `json:"idleConnTimeout,omitempty"`
-	UserAgent              string              `json:"userAgent,omitempty"`
-	MaxAssetSize           int64               `json:"maxAssetSize,omitempty"`
-	OutputDir              string              `json:"outputDir,omitempty"`
-	DryRun                 bool                `json:"dryRun,omitempty"`
+	MaxDepth               *int                `json:"maxDepth,omitempty"`
+	MaxPages               *int                `json:"maxPages,omitempty"`
+	Concurrency            *int                `json:"concurrency,omitempty"`
+	BaseDelay              *time.Duration      `json:"baseDelay,omitempty"`
+	Jitter                 *time.Duration      `json:"jitter,omitempty"`
+	RandomSeed             *int64              `json:"randomSeed,omitempty"`
+	MaxAttempt             *int                `json:"maxAttempt,omitempty"`
+	BackoffInitialDuration *time.Duration      `json:"backoffInitialDuration,omitempty"`
+	BackoffMultiplier      *float64            `json:"backoffMultiplier,omitempty"`
+	BackoffMaxDuration     *time.Duration      `json:"backoffMaxDuration,omitempty"`
+	Timeout                *time.Duration      `json:"timeout,omitempty"`
+	MaxIdleConns           *int                `json:"maxIdleConns,omitempty"`
+	MaxIdleConnsPerHost    *int                `json:"maxIdleConnsPerHost,omitempty"`
+	IdleConnTimeout        *time.Duration      `json:"idleConnTimeout,omitempty"`
+	UserAgent              *string             `json:"userAgent,omitempty"`
+	MaxAssetSize           *int64              `json:"maxAssetSize,omitempty"`
+	OutputDir              *string             `json:"outputDir,omitempty"`
+	DryRun                 *bool               `json:"dryRun,omitempty"`
 	// Extraction parameters
-	BodySpecificityBias                 float64 `json:"bodySpecificityBias,omitempty"`
-	LinkDensityThreshold                float64 `json:"linkDensityThreshold,omitempty"`
-	ScoreMultiplierNonWhitespaceDivisor float64 `json:"scoreMultiplierNonWhitespaceDivisor,omitempty"`
-	ScoreMultiplierParagraphs           float64 `json:"scoreMultiplierParagraphs,omitempty"`
-	ScoreMultiplierHeadings             float64 `json:"scoreMultiplierHeadings,omitempty"`
-	ScoreMultiplierCodeBlocks           float64 `json:"scoreMultiplierCodeBlocks,omitempty"`
-	ScoreMultiplierListItems            float64 `json:"scoreMultiplierListItems,omitempty"`
-	ThresholdMinNonWhitespace           int     `json:"thresholdMinNonWhitespace,omitempty"`
-	ThresholdMinHeadings                int     `json:"thresholdMinHeadings,omitempty"`
-	ThresholdMinParagraphsOrCode        int     `json:"thresholdMinParagraphsOrCode,omitempty"`
-	ThresholdMaxLinkDensity             float64 `json:"thresholdMaxLinkDensity,omitempty"`
-	HashAlgo                            string  `json:"hashAlgo,omitempty"`
+	BodySpecificityBias                 *float64 `json:"bodySpecificityBias,omitempty"`
+	LinkDensityThreshold                *float64 `json:"linkDensityThreshold,omitempty"`
+	ScoreMultiplierNonWhitespaceDivisor *float64 `json:"scoreMultiplierNonWhitespaceDivisor,omitempty"`
+	ScoreMultiplierParagraphs           *float64 `json:"scoreMultiplierParagraphs,omitempty"`
+	ScoreMultiplierHeadings             *float64 `json:"scoreMultiplierHeadings,omitempty"`
+	ScoreMultiplierCodeBlocks           *float64 `json:"scoreMultiplierCodeBlocks,omitempty"`
+	ScoreMultiplierListItems            *float64 `json:"scoreMultiplierListItems,omitempty"`
+	ThresholdMinNonWhitespace           *int     `json:"thresholdMinNonWhitespace,omitempty"`
+	ThresholdMinHeadings                *int     `json:"thresholdMinHeadings,omitempty"`
+	ThresholdMinParagraphsOrCode        *int     `json:"thresholdMinParagraphsOrCode,omitempty"`
+	ThresholdMaxLinkDensity             *float64 `json:"thresholdMaxLinkDensity,omitempty"`
+	HashAlgo                            *string  `json:"hashAlgo,omitempty"`
 }
 
 func newConfigFromDTO(dto configDTO) (Config, error) {
@@ -179,101 +179,104 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	// AllowedPathPrefix can be empty - always use DTO values
 	cfg.allowedPathPrefix = dto.AllowedPathPrefix
 
-	// For other fields, only override if non-zero value is provided
-	if dto.MaxDepth != 0 {
-		cfg.maxDepth = dto.MaxDepth
+	// For pointer fields, check if nil (not provided) before overriding defaults
+	if dto.MaxDepth != nil {
+		cfg.maxDepth = *dto.MaxDepth
 	}
-	if dto.MaxPages != 0 {
-		cfg.maxPages = dto.MaxPages
+	if dto.MaxPages != nil {
+		cfg.maxPages = *dto.MaxPages
 	}
-	if dto.Concurrency != 0 {
-		cfg.concurrency = dto.Concurrency
+	if dto.Concurrency != nil {
+		cfg.concurrency = *dto.Concurrency
 	}
-	if dto.BaseDelay != 0 {
-		cfg.baseDelay = dto.BaseDelay
+	if dto.BaseDelay != nil {
+		cfg.baseDelay = *dto.BaseDelay
 	}
-	if dto.Jitter != 0 {
-		cfg.jitter = dto.Jitter
+	if dto.Jitter != nil {
+		cfg.jitter = *dto.Jitter
 	}
-	if dto.RandomSeed != 0 {
-		cfg.randomSeed = dto.RandomSeed
+	if dto.RandomSeed != nil {
+		cfg.randomSeed = *dto.RandomSeed
 	}
-	if dto.MaxAttempt != 0 {
-		cfg.maxAttempt = dto.MaxAttempt
+	if dto.MaxAttempt != nil {
+		cfg.maxAttempt = *dto.MaxAttempt
 	}
-	if dto.BackoffInitialDuration != 0 {
-		cfg.backoffInitialDuration = dto.BackoffInitialDuration
+	if dto.BackoffInitialDuration != nil {
+		cfg.backoffInitialDuration = *dto.BackoffInitialDuration
 	}
-	if dto.BackoffMultiplier != 0 {
-		cfg.backoffMultiplier = dto.BackoffMultiplier
+	if dto.BackoffMultiplier != nil {
+		cfg.backoffMultiplier = *dto.BackoffMultiplier
 	}
-	if dto.BackoffMaxDuration != 0 {
-		cfg.backoffMaxDuration = dto.BackoffMaxDuration
-	}
-
-	if dto.Timeout != 0 {
-		cfg.timeout = dto.Timeout
-	}
-	if dto.UserAgent != "" {
-		cfg.userAgent = dto.UserAgent
-	}
-	if dto.MaxAssetSize != 0 {
-		cfg.maxAssetSize = dto.MaxAssetSize
-	}
-	if dto.OutputDir != "" {
-		cfg.outputDir = dto.OutputDir
-	}
-	// DryRun is a boolean, check if explicitly set (we use the DTO value as-is since bool zero value is false)
-	cfg.dryRun = dto.DryRun
-
-	// HTTP client parameters - only override if non-zero value is provided
-	if dto.MaxIdleConns != 0 {
-		cfg.maxIdleConns = dto.MaxIdleConns
-	}
-	if dto.MaxIdleConnsPerHost != 0 {
-		cfg.maxIdleConnsPerHost = dto.MaxIdleConnsPerHost
-	}
-	if dto.IdleConnTimeout != 0 {
-		cfg.idleConnTimeout = dto.IdleConnTimeout
+	if dto.BackoffMaxDuration != nil {
+		cfg.backoffMaxDuration = *dto.BackoffMaxDuration
 	}
 
-	// Extraction parameters - only override if non-zero value is provided
-	// For float64, we check if value is not 0 (which is also the zero value)
-	if dto.BodySpecificityBias != 0 {
-		cfg.bodySpecificityBias = dto.BodySpecificityBias
+	if dto.Timeout != nil {
+		cfg.timeout = *dto.Timeout
 	}
-	if dto.LinkDensityThreshold != 0 {
-		cfg.linkDensityThreshold = dto.LinkDensityThreshold
+	if dto.UserAgent != nil {
+		cfg.userAgent = *dto.UserAgent
 	}
-	if dto.ScoreMultiplierNonWhitespaceDivisor != 0 {
-		cfg.scoreMultiplierNonWhitespaceDivisor = dto.ScoreMultiplierNonWhitespaceDivisor
+	if dto.MaxAssetSize != nil {
+		cfg.maxAssetSize = *dto.MaxAssetSize
 	}
-	if dto.ScoreMultiplierParagraphs != 0 {
-		cfg.scoreMultiplierParagraphs = dto.ScoreMultiplierParagraphs
+	if dto.OutputDir != nil {
+		cfg.outputDir = *dto.OutputDir
 	}
-	if dto.ScoreMultiplierHeadings != 0 {
-		cfg.scoreMultiplierHeadings = dto.ScoreMultiplierHeadings
+	// DryRun is a boolean - check if explicitly set (nil means use default false)
+	if dto.DryRun != nil {
+		cfg.dryRun = *dto.DryRun
 	}
-	if dto.ScoreMultiplierCodeBlocks != 0 {
-		cfg.scoreMultiplierCodeBlocks = dto.ScoreMultiplierCodeBlocks
+
+	// HTTP client parameters - check if pointer is not nil
+	if dto.MaxIdleConns != nil {
+		cfg.maxIdleConns = *dto.MaxIdleConns
 	}
-	if dto.ScoreMultiplierListItems != 0 {
-		cfg.scoreMultiplierListItems = dto.ScoreMultiplierListItems
+	if dto.MaxIdleConnsPerHost != nil {
+		cfg.maxIdleConnsPerHost = *dto.MaxIdleConnsPerHost
 	}
-	if dto.ThresholdMinNonWhitespace != 0 {
-		cfg.thresholdMinNonWhitespace = dto.ThresholdMinNonWhitespace
+	if dto.IdleConnTimeout != nil {
+		cfg.idleConnTimeout = *dto.IdleConnTimeout
 	}
-	// Note: ThresholdMinHeadings can be 0 (which is a valid value), so we don't check for non-zero
-	cfg.thresholdMinHeadings = dto.ThresholdMinHeadings
-	if dto.ThresholdMinParagraphsOrCode != 0 {
-		cfg.thresholdMinParagraphsOrCode = dto.ThresholdMinParagraphsOrCode
+
+	// Extraction parameters - check if pointer is not nil
+	if dto.BodySpecificityBias != nil {
+		cfg.bodySpecificityBias = *dto.BodySpecificityBias
 	}
-	if dto.ThresholdMaxLinkDensity != 0 {
-		cfg.thresholdMaxLinkDensity = dto.ThresholdMaxLinkDensity
+	if dto.LinkDensityThreshold != nil {
+		cfg.linkDensityThreshold = *dto.LinkDensityThreshold
 	}
-	// HashAlgo - override if provided (non-empty string)
-	if dto.HashAlgo != "" {
-		cfg.hashAlgo = dto.HashAlgo
+	if dto.ScoreMultiplierNonWhitespaceDivisor != nil {
+		cfg.scoreMultiplierNonWhitespaceDivisor = *dto.ScoreMultiplierNonWhitespaceDivisor
+	}
+	if dto.ScoreMultiplierParagraphs != nil {
+		cfg.scoreMultiplierParagraphs = *dto.ScoreMultiplierParagraphs
+	}
+	if dto.ScoreMultiplierHeadings != nil {
+		cfg.scoreMultiplierHeadings = *dto.ScoreMultiplierHeadings
+	}
+	if dto.ScoreMultiplierCodeBlocks != nil {
+		cfg.scoreMultiplierCodeBlocks = *dto.ScoreMultiplierCodeBlocks
+	}
+	if dto.ScoreMultiplierListItems != nil {
+		cfg.scoreMultiplierListItems = *dto.ScoreMultiplierListItems
+	}
+	if dto.ThresholdMinNonWhitespace != nil {
+		cfg.thresholdMinNonWhitespace = *dto.ThresholdMinNonWhitespace
+	}
+	// Note: ThresholdMinHeadings can be 0 (which is a valid value)
+	if dto.ThresholdMinHeadings != nil {
+		cfg.thresholdMinHeadings = *dto.ThresholdMinHeadings
+	}
+	if dto.ThresholdMinParagraphsOrCode != nil {
+		cfg.thresholdMinParagraphsOrCode = *dto.ThresholdMinParagraphsOrCode
+	}
+	if dto.ThresholdMaxLinkDensity != nil {
+		cfg.thresholdMaxLinkDensity = *dto.ThresholdMaxLinkDensity
+	}
+	// HashAlgo - override if provided (pointer not nil)
+	if dto.HashAlgo != nil {
+		cfg.hashAlgo = *dto.HashAlgo
 	}
 
 	return cfg, nil
