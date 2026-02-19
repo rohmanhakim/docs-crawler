@@ -68,7 +68,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 
 	// Setup convert to return a specific conversion result
 	conversionResult := createConversionResultForTest("# Test Markdown\n\nContent", nil)
-	mockConvert.On("Convert", sanitizedDoc).Return(conversionResult, nil)
+	mockConvert.On("Convert", sanitizedDoc, mock.Anything).Return(conversionResult, nil)
 
 	// Setup resolver to return a specific assetful markdown doc
 	assetfulDoc := createAssetfulMarkdownDocForTest("# Test Markdown\n\nContent", []string{"image.png"})

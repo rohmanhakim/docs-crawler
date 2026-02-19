@@ -190,14 +190,18 @@ func (s *Scheduler) SubmitUrlForAdmission(
 		s.rateLimiter.SetCrawlDelay(s.currentHost, robotsDecision.CrawlDelay)
 	}
 
-	// Robots explicitly disallowed → normal, terminal outcome
+	// Robots explicitly disallowed -> normal, terminal outcome
 	if !robotsDecision.Allowed {
 		// Important:
 		// - metadata already emitted by robots
 		// - NO retry
 		// - NO abort
 		// - NO frontier submission
-		// TODO: record to metadataSink that robots explcitly disallowed the URL
+		s.metadataSink.RecordSkip(metadata.NewSkipEvent(
+			canonicalURL.String(),
+			metadata.SkipReasonRobotsDisallow,
+			time.Now(),
+		))
 		return nil
 	}
 
@@ -236,20 +240,21 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 		if err != nil && s.crawlFinalizer != nil {
 			// Only record stats on failure - this captures init duration
 			// when initialization fails before execution begins
-			s.crawlFinalizer.RecordFinalCrawlStats(
+			s.crawlFinalizer.RecordFinalCrawlStats(metadata.NewCrawlStats(
+				initStartTime,
+				time.Now(),
 				0, // No pages processed during init
 				0, // No errors during init (would need to count specific init errors)
 				0, // No assets during init
-				time.Since(initStartTime),
 				0, // No retry queue during init (no failures yet)
-			)
+			))
 		}
 	}()
 
 	// 1. Prepare config File
 	cfg, err := config.WithConfigFile(configPath)
 	if err != nil {
-		s.metadataSink.RecordError(
+		s.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"config",
 			"config.WithConfigFile",
@@ -258,7 +263,7 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 			[]metadata.Attribute{
 				metadata.NewAttr(metadata.AttrField, fmt.Sprintf("field: %v", "theFieldError")),
 			},
-		)
+		))
 		return nil, err
 	}
 
@@ -278,14 +283,14 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 	// Validate that at least one seed URL exists
 	if len(cfg.SeedURLs()) == 0 {
 		err = fmt.Errorf("no seed URLs configured")
-		s.metadataSink.RecordError(
+		s.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"config",
 			"config validation",
 			metadata.CauseContentInvalid,
 			err.Error(),
 			[]metadata.Attribute{},
-		)
+		))
 		return nil, err
 	}
 
@@ -382,16 +387,14 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	// Ensure final stats are recorded even if errors occur
 	// This defer captures the execution phase duration only
 	defer func() {
-		execDuration := time.Since(execStartTime)
-		totalPages := s.frontier.VisitedCount()
-		retryQueueCount := s.failureJournal.Count()
-		s.crawlFinalizer.RecordFinalCrawlStats(
-			totalPages,
+		s.crawlFinalizer.RecordFinalCrawlStats(metadata.NewCrawlStats(
+			execStartTime,
+			time.Now(),
+			s.frontier.VisitedCount(),
 			totalErrors,
 			totalAssets,
-			execDuration,
-			retryQueueCount,
-		)
+			s.failureJournal.Count(),
+		))
 	}()
 
 	cfg := init.config
@@ -477,7 +480,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		}
 
 		// 6. HTML → Markdown Conversion
-		markdownDoc, err := s.markdownConversionRule.Convert(sanitizedHtml)
+		markdownDoc, err := s.markdownConversionRule.Convert(sanitizedHtml, getURLString(fetchResult.URL()))
 		if err != nil {
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
@@ -603,7 +606,7 @@ func (s *Scheduler) recordRobotsErrorAndBackoff(robotsErr *robots.RobotsError, t
 	// Only record and backoff for specific HTTP error causes
 	if robotsErr.Cause == robots.ErrCauseHttpTooManyRequests ||
 		robotsErr.Cause == robots.ErrCauseHttpServerError {
-		s.metadataSink.RecordError(
+		s.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"scheduler",
 			"SubmitUrlForAdmission",
@@ -614,7 +617,7 @@ func (s *Scheduler) recordRobotsErrorAndBackoff(robotsErr *robots.RobotsError, t
 				metadata.NewAttr(metadata.AttrHost, targetURL.Host),
 				metadata.NewAttr(metadata.AttrPath, targetURL.Path),
 			},
-		)
+		))
 		if s.rateLimiter != nil {
 			s.rateLimiter.Backoff(targetURL.Host)
 		}

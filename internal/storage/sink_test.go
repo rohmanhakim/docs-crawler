@@ -93,31 +93,37 @@ func TestLocalSink_Write_Success(t *testing.T) {
 			}
 
 			// Verify metadata recording
-			if mockSink.recordErrorCalled {
+			if mockSink.RecordErrorCalled {
 				t.Error("expected RecordError not to be called for successful write")
 			}
 
-			if !mockSink.recordArtifactCalled {
+			if !mockSink.RecordArtifactCalled {
 				t.Error("expected RecordArtifact to be called")
 			}
 
-			if mockSink.recordArtifactKind != metadata.ArtifactMarkdown {
-				t.Errorf("expected artifact kind %s, got %s", metadata.ArtifactMarkdown, mockSink.recordArtifactKind)
+			ar := mockSink.LastArtifact()
+			if ar.Kind() != metadata.ArtifactMarkdown {
+				t.Errorf("expected artifact kind %s, got %s", metadata.ArtifactMarkdown, ar.Kind())
 			}
 
-			if mockSink.recordArtifactPath != expectedPath {
-				t.Errorf("expected artifact path %s, got %s", expectedPath, mockSink.recordArtifactPath)
+			if ar.WritePath() != expectedPath {
+				t.Errorf("expected artifact WritePath %s, got %s", expectedPath, ar.WritePath())
 			}
 
-			// Verify metadata attributes
-			writePathValue := findAttrValue(mockSink.recordArtifactAttrs, metadata.AttrWritePath)
-			if writePathValue != expectedPath {
-				t.Errorf("expected AttrWritePath %s, got %s", expectedPath, writePathValue)
+			if ar.SourceURL() != tt.sourceURL {
+				t.Errorf("expected artifact SourceURL %s, got %s", tt.sourceURL, ar.SourceURL())
 			}
 
-			urlValue := findAttrValue(mockSink.recordArtifactAttrs, metadata.AttrURL)
-			if urlValue != tt.sourceURL {
-				t.Errorf("expected AttrURL %s, got %s", tt.sourceURL, urlValue)
+			if ar.ContentHash() != tt.contentHash {
+				t.Errorf("expected artifact ContentHash %s, got %s", tt.contentHash, ar.ContentHash())
+			}
+
+			if ar.Bytes() != int64(len(tt.content)) {
+				t.Errorf("expected artifact Bytes %d, got %d", int64(len(tt.content)), ar.Bytes())
+			}
+
+			if ar.RecordedAt().IsZero() {
+				t.Error("expected artifact RecordedAt to be non-zero")
 			}
 		})
 	}
@@ -242,48 +248,57 @@ func TestLocalSink_Write_ErrorHandling(t *testing.T) {
 			}
 
 			if tt.expectMetadata {
-				if !mockSink.recordErrorCalled {
+				if !mockSink.RecordErrorCalled {
 					t.Error("expected RecordError to be called on failure")
 				}
 
+				er := mockSink.LastError()
+
 				// Verify RecordError parameters
-				if mockSink.recordErrorPackageName != "storage" {
-					t.Errorf("expected packageName 'storage', got: %s", mockSink.recordErrorPackageName)
+				if er.PackageName() != "storage" {
+					t.Errorf("expected packageName 'storage', got: %s", er.PackageName())
 				}
 
-				if mockSink.recordErrorAction != "LocalSink.Write" {
-					t.Errorf("expected action 'LocalSink.Write', got: %s", mockSink.recordErrorAction)
+				if er.Action() != "LocalSink.Write" {
+					t.Errorf("expected action 'LocalSink.Write', got: %s", er.Action())
 				}
 
 				// Cause should be StorageFailure for write failures
-				if mockSink.recordErrorCause != metadata.CauseStorageFailure {
-					t.Errorf("expected cause CauseStorageFailure (%d), got: %d", metadata.CauseStorageFailure, mockSink.recordErrorCause)
+				if er.Cause() != metadata.CauseStorageFailure {
+					t.Errorf("expected cause CauseStorageFailure (%d), got: %d", metadata.CauseStorageFailure, er.Cause())
 				}
 
 				// Assert against actual error details value
-				if !strings.Contains(mockSink.recordErrorDetails, tt.expectedErrorDetails) {
-					t.Errorf("expected error details to contain %q, got: %s", tt.expectedErrorDetails, mockSink.recordErrorDetails)
+				if !strings.Contains(er.ErrorString(), tt.expectedErrorDetails) {
+					t.Errorf("expected error details to contain %q, got: %s", tt.expectedErrorDetails, er.ErrorString())
 				}
 
 				// ObservedAt should be a recent timestamp (within last minute)
-				timeDiff := time.Since(mockSink.recordErrorObservedAt)
+				timeDiff := time.Since(er.ObservedAt())
 				if timeDiff > time.Minute {
 					t.Errorf("expected observedAt to be recent, but was %v ago", timeDiff)
 				}
 
 				// Verify error metadata attributes
-				urlValue := findAttrValue(mockSink.recordErrorAttrs, metadata.AttrURL)
+				var urlValue, writePathValue string
+				for _, attr := range er.Attrs() {
+					switch attr.Key() {
+					case metadata.AttrURL:
+						urlValue = attr.Value()
+					case metadata.AttrWritePath:
+						writePathValue = attr.Value()
+					}
+				}
 				if urlValue != "https://example.com/page" {
 					t.Errorf("expected AttrURL in error metadata, got: %s", urlValue)
 				}
 
-				writePathValue := findAttrValue(mockSink.recordErrorAttrs, metadata.AttrWritePath)
 				if writePathValue == "" {
 					t.Error("expected AttrWritePath in error metadata")
 				}
 			}
 
-			if mockSink.recordArtifactCalled {
+			if mockSink.RecordArtifactCalled {
 				t.Error("expected RecordArtifact not to be called on failure")
 			}
 		})

@@ -21,7 +21,6 @@ import (
 // compile-time interface checks
 var _ metadata.CrawlFinalizer = (*mockFinalizer)(nil)
 var _ metadata.MetadataSink = (*metadata.NoopSink)(nil)
-var _ metadata.MetadataSink = (*errorRecordingSink)(nil)
 
 // TestScheduler_ConfigurationImmutability verifies that the scheduler
 // uses the configuration as provided and doesn't modify it.
@@ -186,7 +185,7 @@ func TestScheduler_GracefulShutdown_InvalidSeedURL(t *testing.T) {
 
 	// If stats were recorded, verify they're valid
 	if mockFinalizer.recordedStats != nil {
-		if mockFinalizer.recordedStats.duration < 0 {
+		if mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()) < 0 {
 			t.Error("duration should be non-negative")
 		}
 	}
@@ -297,8 +296,8 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	}
 
 	// Each execution should have its own stats
-	t.Logf("First execution: pages=%d, duration=%v", firstStats.totalPages, firstStats.duration)
-	t.Logf("Second execution: pages=%d, duration=%v", secondStats.totalPages, secondStats.duration)
+	t.Logf("First execution: pages=%d, duration=%v", firstStats.TotalPages(), firstStats.FinishedAt().Sub(firstStats.StartedAt()))
+	t.Logf("Second execution: pages=%d, duration=%v", secondStats.TotalPages(), secondStats.FinishedAt().Sub(secondStats.StartedAt()))
 }
 
 // Verify interface implementations at compile time
@@ -306,7 +305,6 @@ func TestInterfaceCompliance(t *testing.T) {
 	// This test ensures our mocks implement the required interfaces
 	var _ metadata.CrawlFinalizer = (*mockFinalizer)(nil)
 	var _ metadata.MetadataSink = (*metadata.NoopSink)(nil)
-	var _ metadata.MetadataSink = (*errorRecordingSink)(nil)
 }
 
 // mustParseURL is a test helper that parses a URL or panics

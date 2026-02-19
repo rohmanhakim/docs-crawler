@@ -36,7 +36,7 @@ Inline styles and raw HTML are avoided.
 // ConvertRule defines the interface for converting sanitized HTML to Markdown.
 // Implementations must ensure semantic fidelity and deterministic output.
 type ConvertRule interface {
-	Convert(sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc) (ConversionResult, failure.ClassifiedError)
+	Convert(sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc, pageURL string) (ConversionResult, failure.ClassifiedError)
 }
 
 // Compile-time interface check
@@ -54,22 +54,33 @@ func NewRule(metadataSink metadata.MetadataSink) *StrictConversionRule {
 
 func (s *StrictConversionRule) Convert(
 	sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc,
+	pageURL string,
 ) (ConversionResult, failure.ClassifiedError) {
 	consversionResult, err := convert(sanitizedHTMLDoc.GetContentNode())
 	if err != nil {
 		var conversionError *ConversionError
 		errors.As(err, &conversionError)
 
-		s.metadataSink.RecordError(
+		s.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"mdconvert",
 			"StrictConversionRule.Convert",
 			mapConversionErrorToMetadataCause(*conversionError),
 			err.Error(),
-			[]metadata.Attribute{},
-		)
+			[]metadata.Attribute{
+				metadata.NewAttr(metadata.AttrURL, pageURL),
+			},
+		))
 		return ConversionResult{}, conversionError
 	}
+
+	s.metadataSink.RecordPipelineStage(metadata.NewPipelineEvent(
+		metadata.StageConvert,
+		pageURL,
+		true,
+		time.Now(),
+		0,
+	))
 	return consversionResult, nil
 }
 

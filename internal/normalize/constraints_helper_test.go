@@ -4,9 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 )
 
 // fixtureDir returns the path to the fixture directory
@@ -26,56 +25,6 @@ func loadFixture(t *testing.T, filename string) []byte {
 	return data
 }
 
-// metadataSinkMock is a mock for metadata.MetadataSink
-type metadataSinkMock struct {
-	recordErrorCalled      bool
-	recordErrorAttrs       []metadata.Attribute
-	recordFetchCalled      bool
-	recordAssetFetchCalled bool
-	recordArtifactCalled   bool
-}
-
-func (m *metadataSinkMock) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	details string,
-	attrs []metadata.Attribute,
-) {
-	m.recordErrorCalled = true
-	m.recordErrorAttrs = attrs
-}
-
-func (m *metadataSinkMock) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-	m.recordFetchCalled = true
-}
-
-func (m *metadataSinkMock) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-	m.recordAssetFetchCalled = true
-}
-
-func (m *metadataSinkMock) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-	m.recordArtifactCalled = true
-}
-
-// Reset clears all recorded state
-func (m *metadataSinkMock) Reset() {
-	m.recordErrorCalled = false
-	m.recordErrorAttrs = nil
-	m.recordFetchCalled = false
-	m.recordAssetFetchCalled = false
-	m.recordArtifactCalled = false
-}
+// metadataSinkMock is an alias to the shared mock for backward compatibility
+// with existing test code. New tests should use metadatatest.SinkMock directly.
+type metadataSinkMock = metadatatest.SinkMock

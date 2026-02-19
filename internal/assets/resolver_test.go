@@ -12,9 +12,13 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/stretchr/testify/assert"
 )
+
+// metadataSinkMock is an alias to the shared mock for backward compatibility
+type metadataSinkMock = metadatatest.SinkMock
 
 // Tests for exported Resolve() method - deriving assertions from Resolve() output
 
@@ -46,30 +50,28 @@ func TestResolve_Success_WithAssets(t *testing.T) {
 	// Assert - no error should be returned when fetching succeeds
 	assert.NoError(t, err)
 
-	// Assert - RecordAssetFetch should be called with correct parameters
-	assert.True(t, mockSink.recordAssetFetchCalled, "RecordAssetFetch should be called")
-	records := mockSink.GetAssetFetchRecords()
-	assert.Len(t, records, 1, "Should have 1 asset fetch record")
-	assert.Equal(t, imageURL, records[0].FetchUrl)
-	assert.Equal(t, http.StatusOK, records[0].HTTPStatus)
-	assert.Equal(t, 0, records[0].RetryCount, "Retry count should be 0 for successful first attempt")
-	assert.Greater(t, records[0].Duration, time.Duration(0), "Duration should be greater than 0")
+	// Assert - RecordFetch should be called with correct parameters
+	assert.True(t, mockSink.RecordFetchCalled, "RecordFetch should be called")
+	records := mockSink.GetFetchRecords()
+	assert.Len(t, records, 1, "Should have 1 fetch record")
+	assert.Equal(t, imageURL, records[0].FetchURL())
+	assert.Equal(t, http.StatusOK, records[0].HTTPStatus())
+	assert.Equal(t, 0, records[0].RetryCount(), "Retry count should be 0 for successful first attempt")
+	assert.Greater(t, records[0].Duration(), time.Duration(0), "Duration should be greater than 0")
 
 	// Assert - RecordArtifact should be called for successful asset
-	assert.True(t, mockSink.recordArtifactCalled, "RecordArtifact should be called")
+	assert.True(t, mockSink.RecordArtifactCalled, "RecordArtifact should be called")
 	artifactRecords := mockSink.GetArtifactRecords()
 	assert.Len(t, artifactRecords, 1, "Should have 1 artifact record")
-	assert.Equal(t, metadata.ArtifactAsset, artifactRecords[0].Kind)
+	assert.Equal(t, metadata.ArtifactAsset, artifactRecords[0].Kind())
 	expectedHash := "28d81db19370f98fdc1d3e43fb1ef83a7cee62f3be86fed923d5f734da41319c"
 	expectedLocalPath := buildExpectedPath("image", "28d81db19370f98fdc1d3e43fb1ef83a7cee62f3be86fed923d5f734da41319c", "png")
-	assert.Equal(t, expectedLocalPath, artifactRecords[0].Path)
-	// Verify attrs contain page URL
-	assert.Len(t, artifactRecords[0].Attrs, 1)
-	assert.Equal(t, metadata.AttrURL, artifactRecords[0].Attrs[0].Key)
-	assert.Equal(t, pageUrl.String(), artifactRecords[0].Attrs[0].Value)
+	assert.Equal(t, expectedLocalPath, artifactRecords[0].WritePath())
+	// Verify SourceURL is the remote asset URL
+	assert.Equal(t, imageURL, artifactRecords[0].SourceURL())
 
 	// Assert - No RecordError should be called for successful asset
-	assert.False(t, mockSink.recordErrorCalled, "RecordError should not be called for successful asset")
+	assert.False(t, mockSink.RecordErrorCalled, "RecordError should not be called for successful asset")
 
 	// Assert - writtenAssets should contain URL -> contentHash mapping
 	writtenAssets := resolver.WrittenAssets()
@@ -100,14 +102,14 @@ func TestResolve_Success_NoAssets(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "# Test", string(doc.Content()))
 
-	// Assert - RecordAssetFetch should NOT be called when there are no assets
-	assert.False(t, mockSink.recordAssetFetchCalled, "RecordAssetFetch should not be called when no assets")
+	// Assert - RecordFetch should NOT be called when there are no assets
+	assert.False(t, mockSink.RecordFetchCalled, "RecordFetch should not be called when no assets")
 
 	// Assert - RecordArtifact should NOT be called when there are no assets
-	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called when no assets")
+	assert.False(t, mockSink.RecordArtifactCalled, "RecordArtifact should not be called when no assets")
 
 	// Assert - RecordError should NOT be called when there are no assets
-	assert.False(t, mockSink.recordErrorCalled, "RecordError should not be called when no assets")
+	assert.False(t, mockSink.RecordErrorCalled, "RecordError should not be called when no assets")
 }
 
 func TestResolve_Error_CreateAssetDirFails(t *testing.T) {
@@ -132,24 +134,24 @@ func TestResolve_Error_CreateAssetDirFails(t *testing.T) {
 	assert.Error(t, err)
 
 	// Assert - RecordError should be called for write failure
-	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for write failure")
+	assert.True(t, mockSink.RecordErrorCalled, "RecordError should be called for write failure")
 	errorRecords := mockSink.GetErrorRecords()
 	assert.Len(t, errorRecords, 1, "Should have 1 error record")
-	assert.Equal(t, "assets", errorRecords[0].PackageName)
-	assert.Equal(t, "Resolver.Resolve", errorRecords[0].Action)
-	assert.EqualValues(t, metadata.CauseStorageFailure, errorRecords[0].Cause)
+	assert.Equal(t, "assets", errorRecords[0].PackageName())
+	assert.Equal(t, "Resolver.Resolve", errorRecords[0].Action())
+	assert.EqualValues(t, metadata.CauseStorageFailure, errorRecords[0].Cause())
 
 	// Verify attrs contain write path and page URL
-	assert.Len(t, errorRecords[0].Attrs, 2)
+	assert.Len(t, errorRecords[0].Attrs(), 2)
 	attrMap := make(map[string]string)
-	for _, attr := range errorRecords[0].Attrs {
-		attrMap[string(attr.Key)] = attr.Value
+	for _, attr := range errorRecords[0].Attrs() {
+		attrMap[string(attr.Key())] = attr.Value()
 	}
 	assert.Equal(t, invalidDir, attrMap["write_path"])
 	assert.Equal(t, pageUrl.String(), attrMap["url"])
 
 	// Assert - RecordArtifact should NOT be called when there's a write error
-	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called when write fails")
+	assert.False(t, mockSink.RecordArtifactCalled, "RecordArtifact should not be called when write fails")
 }
 
 func TestResolve_AssetFetchFails_PreservesOriginalURL(t *testing.T) {
@@ -179,28 +181,28 @@ func TestResolve_AssetFetchFails_PreservesOriginalURL(t *testing.T) {
 	// Assert - no error should be returned from Resolve (missing assets are reported, not fatal)
 	assert.NoError(t, err)
 
-	// Assert - RecordAssetFetch should still be called even on failure
-	assert.True(t, mockSink.recordAssetFetchCalled, "RecordAssetFetch should be called even on failure")
-	records := mockSink.GetAssetFetchRecords()
-	assert.Len(t, records, 1, "Should have 1 asset fetch record even for failed fetch")
+	// Assert - RecordFetch should still be called even on failure
+	assert.True(t, mockSink.RecordFetchCalled, "RecordFetch should be called even on failure")
+	records := mockSink.GetFetchRecords()
+	assert.Len(t, records, 1, "Should have 1 fetch record even for failed fetch")
 
 	// Assert - RecordError should be called for missing URL
-	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for missing URL")
+	assert.True(t, mockSink.RecordErrorCalled, "RecordError should be called for missing URL")
 	errorRecords := mockSink.GetErrorRecords()
 	assert.Len(t, errorRecords, 1, "Should have 1 error record for missing URL")
-	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
-	assert.Contains(t, errorRecords[0].Details, "missing asset")
+	assert.True(t, errorRecords[0].Cause() == metadata.CausePolicyDisallow || errorRecords[0].Cause() == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause())
+	assert.Contains(t, errorRecords[0].ErrorString(), "missing asset")
 
 	// Verify attrs contain missing URL and page URL
 	attrMap := make(map[string]string)
-	for _, attr := range errorRecords[0].Attrs {
-		attrMap[string(attr.Key)] = attr.Value
+	for _, attr := range errorRecords[0].Attrs() {
+		attrMap[string(attr.Key())] = attr.Value()
 	}
-	assert.Equal(t, imageURL, attrMap["message"])
+	assert.Equal(t, imageURL, attrMap["asset_url"])
 	assert.Equal(t, pageUrl.String(), attrMap["url"])
 
 	// Assert - RecordArtifact should NOT be called for failed asset
-	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for failed asset")
+	assert.False(t, mockSink.RecordArtifactCalled, "RecordArtifact should not be called for failed asset")
 
 	// Assert - writtenAssets should NOT contain the failed asset URL
 	writtenAssets := resolver.WrittenAssets()
@@ -260,23 +262,23 @@ func TestResolve_MixedSuccessAndFailure(t *testing.T) {
 	assert.Contains(t, output, failedURL, "Failed asset should preserve original URL")
 
 	// Assert - RecordArtifact should be called for successful asset only
-	assert.True(t, mockSink.recordArtifactCalled, "RecordArtifact should be called")
+	assert.True(t, mockSink.RecordArtifactCalled, "RecordArtifact should be called")
 	artifactRecords := mockSink.GetArtifactRecords()
 	assert.Len(t, artifactRecords, 1, "Should have 1 artifact record for successful asset")
-	assert.Equal(t, expectedLocalPath, artifactRecords[0].Path)
+	assert.Equal(t, expectedLocalPath, artifactRecords[0].WritePath())
 
 	// Assert - RecordError should be called for missing URL
-	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for missing URL")
+	assert.True(t, mockSink.RecordErrorCalled, "RecordError should be called for missing URL")
 	errorRecords := mockSink.GetErrorRecords()
 	assert.Len(t, errorRecords, 1, "Should have 1 error record for missing URL")
-	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
+	assert.True(t, errorRecords[0].Cause() == metadata.CausePolicyDisallow || errorRecords[0].Cause() == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause())
 
 	// Verify attrs contain failed URL
 	attrMap := make(map[string]string)
-	for _, attr := range errorRecords[0].Attrs {
-		attrMap[string(attr.Key)] = attr.Value
+	for _, attr := range errorRecords[0].Attrs() {
+		attrMap[string(attr.Key())] = attr.Value()
 	}
-	assert.Equal(t, failedURL, attrMap["message"])
+	assert.Equal(t, failedURL, attrMap["asset_url"])
 }
 
 func TestResolve_MechanicalDeduplication_SinglePage(t *testing.T) {
@@ -310,7 +312,7 @@ func TestResolve_MechanicalDeduplication_SinglePage(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert - Only 1 fetch should be recorded (mechanical deduplication)
-	records := mockSink.GetAssetFetchRecords()
+	records := mockSink.GetFetchRecords()
 	assert.Len(t, records, 1, "Duplicate URLs should be mechanically deduplicated to single fetch")
 
 	// Assert - All occurrences in document should be rewritten
@@ -323,7 +325,7 @@ func TestResolve_MechanicalDeduplication_SinglePage(t *testing.T) {
 	assert.Len(t, artifactRecords, 1, "Should have 1 artifact record")
 
 	// Assert - No RecordError should be called
-	assert.False(t, mockSink.recordErrorCalled, "RecordError should not be called for successful assets")
+	assert.False(t, mockSink.RecordErrorCalled, "RecordError should not be called for successful assets")
 }
 
 func TestResolve_CrossCallDeduplication(t *testing.T) {
@@ -354,7 +356,7 @@ func TestResolve_CrossCallDeduplication(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert first call has artifact record
-	assert.True(t, mockSink.recordArtifactCalled, "RecordArtifact should be called on first call")
+	assert.True(t, mockSink.RecordArtifactCalled, "RecordArtifact should be called on first call")
 	assert.Len(t, mockSink.GetArtifactRecords(), 1, "Should have 1 artifact record after first call")
 
 	// Reset mock to track second call separately
@@ -375,11 +377,11 @@ func TestResolve_CrossCallDeduplication(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert - No fetch should be recorded for second call (asset already in writtenAssets)
-	records := mockSink.GetAssetFetchRecords()
+	records := mockSink.GetFetchRecords()
 	assert.Len(t, records, 0, "Second call should not fetch already-written asset")
 
 	// Assert - RecordArtifact should NOT be called for second page (asset already exists)
-	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called on second call (asset already exists)")
+	assert.False(t, mockSink.RecordArtifactCalled, "RecordArtifact should not be called on second call (asset already exists)")
 	artifactRecords := mockSink.GetArtifactRecords()
 	assert.Len(t, artifactRecords, 0, "Should have 0 artifact records for second call (no new write)")
 
@@ -425,9 +427,9 @@ func TestResolve_NonImageLinksIgnored(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert - Only 1 fetch should be recorded (only image, not navigation link)
-	records := mockSink.GetAssetFetchRecords()
+	records := mockSink.GetFetchRecords()
 	assert.Len(t, records, 1, "Only image links should be fetched")
-	assert.True(t, strings.HasSuffix(records[0].FetchUrl, "/image.png"))
+	assert.True(t, strings.HasSuffix(records[0].FetchURL(), "/image.png"))
 
 	// Assert - Only 1 artifact should be recorded
 	artifactRecords := mockSink.GetArtifactRecords()
@@ -479,7 +481,7 @@ func TestResolve_ContentHashDeduplication_DifferentURLs(t *testing.T) {
 	assert.Equal(t, sharedContentHash, writtenAssets[url2], "Second URL should map to same content hash")
 
 	// Both fetch events should be recorded (mechanical dedup doesn't apply to different URLs)
-	records := mockSink.GetAssetFetchRecords()
+	records := mockSink.GetFetchRecords()
 	assert.Len(t, records, 2, "Both assets should be fetched")
 
 	// Only 1 artifact should be recorded (content-hash dedup - second URL uses existing file)
@@ -522,12 +524,12 @@ func TestResolve_RelativeURLsResolved(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert - fetch should be recorded with resolved absolute URL
-	records := mockSink.GetAssetFetchRecords()
+	records := mockSink.GetFetchRecords()
 	assert.Len(t, records, 1)
-	assert.Equal(t, server.URL+"/images/logo.png", records[0].FetchUrl)
+	assert.Equal(t, server.URL+"/images/logo.png", records[0].FetchURL())
 
 	// Assert - RecordArtifact should be called
-	assert.True(t, mockSink.recordArtifactCalled, "RecordArtifact should be called")
+	assert.True(t, mockSink.RecordArtifactCalled, "RecordArtifact should be called")
 	artifactRecords := mockSink.GetArtifactRecords()
 	assert.Len(t, artifactRecords, 1)
 
@@ -632,13 +634,13 @@ func TestResolve_AssetTooLarge_ContentLengthHeader(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert - RecordError should be called for oversized asset
-	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for oversized asset")
+	assert.True(t, mockSink.RecordErrorCalled, "RecordError should be called for oversized asset")
 	errorRecords := mockSink.GetErrorRecords()
 	assert.Len(t, errorRecords, 1, "Should have 1 error record for oversized asset")
-	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
+	assert.True(t, errorRecords[0].Cause() == metadata.CausePolicyDisallow || errorRecords[0].Cause() == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause())
 
 	// Assert - RecordArtifact should NOT be called for oversized asset
-	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for oversized asset")
+	assert.False(t, mockSink.RecordArtifactCalled, "RecordArtifact should not be called for oversized asset")
 
 	// Assert - writtenAssets should NOT contain the oversized asset URL
 	writtenAssets := resolver.WrittenAssets()
@@ -682,13 +684,13 @@ func TestResolve_AssetTooLarge_UnknownContentLength(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assert - RecordError should be called for oversized asset
-	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for oversized asset")
+	assert.True(t, mockSink.RecordErrorCalled, "RecordError should be called for oversized asset")
 	errorRecords := mockSink.GetErrorRecords()
 	assert.Len(t, errorRecords, 1, "Should have 1 error record for oversized asset")
-	assert.True(t, errorRecords[0].Cause == metadata.CausePolicyDisallow || errorRecords[0].Cause == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause)
+	assert.True(t, errorRecords[0].Cause() == metadata.CausePolicyDisallow || errorRecords[0].Cause() == metadata.CauseUnknown, "Expected CausePolicyDisallow or CauseUnknown, got %v", errorRecords[0].Cause())
 
 	// Assert - RecordArtifact should NOT be called for oversized asset
-	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for oversized asset")
+	assert.False(t, mockSink.RecordArtifactCalled, "RecordArtifact should not be called for oversized asset")
 
 	// Assert - writtenAssets should NOT contain the oversized asset URL
 	writtenAssets := resolver.WrittenAssets()
@@ -738,17 +740,17 @@ func TestResolve_AssetTooLarge_LyingContentLength(t *testing.T) {
 	// - CauseRetryFailure (read error retried and exhausted, when Go's HTTP transport
 	//   reports an error reading beyond Content-Length)
 	// - CauseUnknown (other error paths)
-	assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for oversized asset")
+	assert.True(t, mockSink.RecordErrorCalled, "RecordError should be called for oversized asset")
 	errorRecords := mockSink.GetErrorRecords()
 	assert.Len(t, errorRecords, 1, "Should have 1 error record for oversized asset")
-	validCause := errorRecords[0].Cause == metadata.CausePolicyDisallow ||
-		errorRecords[0].Cause == metadata.CauseUnknown ||
-		errorRecords[0].Cause == metadata.CauseRetryFailure ||
-		errorRecords[0].Cause == metadata.CauseContentInvalid
-	assert.True(t, validCause, "Expected CausePolicyDisallow, CauseUnknown, CauseRetryFailure, or CauseContentInvalid, got %v", errorRecords[0].Cause)
+	validCause := errorRecords[0].Cause() == metadata.CausePolicyDisallow ||
+		errorRecords[0].Cause() == metadata.CauseUnknown ||
+		errorRecords[0].Cause() == metadata.CauseRetryFailure ||
+		errorRecords[0].Cause() == metadata.CauseContentInvalid
+	assert.True(t, validCause, "Expected CausePolicyDisallow, CauseUnknown, CauseRetryFailure, or CauseContentInvalid, got %v", errorRecords[0].Cause())
 
 	// Assert - RecordArtifact should NOT be called for oversized asset
-	assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for oversized asset")
+	assert.False(t, mockSink.RecordArtifactCalled, "RecordArtifact should not be called for oversized asset")
 
 	// Assert - writtenAssets should NOT contain the oversized asset URL
 	writtenAssets := resolver.WrittenAssets()
@@ -815,16 +817,16 @@ func TestResolve_AssetAtSizeBoundary(t *testing.T) {
 
 			if tc.shouldSucceed {
 				// Asset should be successfully downloaded
-				assert.True(t, mockSink.recordArtifactCalled, "RecordArtifact should be called for asset at boundary")
-				assert.False(t, mockSink.recordErrorCalled, "RecordError should not be called for asset at boundary")
+				assert.True(t, mockSink.RecordArtifactCalled, "RecordArtifact should be called for asset at boundary")
+				assert.False(t, mockSink.RecordErrorCalled, "RecordError should not be called for asset at boundary")
 				writtenAssets := resolver.WrittenAssets()
 				assert.Equal(t, 1, len(writtenAssets), "Asset at boundary should be in writtenAssets")
 				output := string(doc.Content())
 				assert.NotContains(t, output, imageURL, "Document should have rewritten URL for asset at boundary")
 			} else {
 				// Asset should be rejected
-				assert.False(t, mockSink.recordArtifactCalled, "RecordArtifact should not be called for oversized asset")
-				assert.True(t, mockSink.recordErrorCalled, "RecordError should be called for oversized asset")
+				assert.False(t, mockSink.RecordArtifactCalled, "RecordArtifact should not be called for oversized asset")
+				assert.True(t, mockSink.RecordErrorCalled, "RecordError should be called for oversized asset")
 				writtenAssets := resolver.WrittenAssets()
 				assert.Equal(t, 0, len(writtenAssets), "Oversized asset should not be in writtenAssets")
 				output := string(doc.Content())

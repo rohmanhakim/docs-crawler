@@ -2,63 +2,13 @@ package sanitizer_test
 
 import (
 	"strings"
-	"time"
 
-	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"golang.org/x/net/html"
 )
 
-// mockMetadataSink is a test double for metadata.MetadataSink
-type mockMetadataSink struct {
-	errors []recordedError
-}
-
-type recordedError struct {
-	timestamp   time.Time
-	packageName string
-	action      string
-	cause       metadata.ErrorCause
-	details     string
-	attrs       []metadata.Attribute
-}
-
-func (m *mockMetadataSink) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	details string,
-	attrs []metadata.Attribute,
-) {
-	m.errors = append(m.errors, recordedError{
-		timestamp:   observedAt,
-		packageName: packageName,
-		action:      action,
-		cause:       cause,
-		details:     details,
-		attrs:       attrs,
-	})
-}
-
-func (m *mockMetadataSink) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-}
-
-func (m *mockMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-}
-func (m *mockMetadataSink) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-}
+// mockMetadataSink is an alias to the shared mock in metadatatest package.
+type mockMetadataSink = metadatatest.SinkMock
 
 // renderHtmlForTest serializes an html.Node to its HTML string representation.
 // This is used to compare sanitized output against expected fixtures.

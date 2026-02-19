@@ -46,15 +46,30 @@ func (h *HtmlSanitizer) Sanitize(
 		attrs := buildErrorAttributes(sanitizationError)
 
 		h.metadataSink.RecordError(
-			time.Now(),
-			"sanitizer",
-			"HtmlSanitizer.Sanitize",
-			mapSanitizationErrorToMetadataCause(*sanitizationError),
-			err.Error(),
-			attrs,
+			metadata.NewErrorRecord(
+				time.Now(),
+				"sanitizer",
+				"HtmlSanitizer.Sanitize",
+				mapSanitizationErrorToMetadataCause(*sanitizationError),
+				err.Error(),
+				attrs,
+			),
 		)
 		return SanitizedHTMLDoc{}, sanitizationError
 	}
+
+	// TODO: PageURL is empty because Sanitize does not currently receive the page URL.
+	// As a future improvement, extend the Sanitize interface method to accept a pageURL string
+	// parameter so this event can carry full page context for per-page pipeline progress views.
+	h.metadataSink.RecordPipelineStage(
+		metadata.NewPipelineEvent(
+			metadata.StageSanitize,
+			"", // pageURL not available at this stage
+			true,
+			time.Now(),
+			0, // linksFound is not applicable for the sanitize stage
+		),
+	)
 	return sanitizedHtmlDoc, nil
 }
 

@@ -97,7 +97,7 @@ func TestPipeline_MethodCallOrder(t *testing.T) {
 		}).Return(createSanitizedHTMLDocForTest(nil), nil)
 
 	// Setup convert
-	mockConvert.On("Convert", mock.Anything).
+	mockConvert.On("Convert", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			callOrder = append(callOrder, "Convert")
 		}).Return(createConversionResultForTest("# Test", nil), nil)
@@ -372,7 +372,7 @@ func TestPipeline_AllStagesCalled(t *testing.T) {
 
 	// Verify all stages were called
 	mockSanitizer.AssertCalled(t, "Sanitize", mock.Anything)
-	mockConvert.AssertCalled(t, "Convert", mock.Anything)
+	mockConvert.AssertCalled(t, "Convert", mock.Anything, mock.Anything)
 	mockResolver.AssertCalled(t, "Resolve", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	mockNormalize.AssertCalled(t, "Normalize", mock.Anything, mock.Anything, mock.Anything)
 	mockStorage.AssertCalled(t, "Write", mock.Anything, mock.Anything, mock.Anything)

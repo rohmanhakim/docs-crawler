@@ -1,7 +1,7 @@
 package metadata
 
 import (
-	"time"
+	"sync"
 )
 
 /*
@@ -38,19 +38,42 @@ No component may read metadata to influence crawl decisions.
 */
 
 /*
-Recorder captures structured crawl events.
+Recorder captures structured crawl events in an in-memory, append-only log.
+
 It must not:
 - perform I/O decisions
 - affect control flow
 - impose a logging backend
+
 Ordering guarantees:
 - Events are recorded synchronously in the order they are received by a single worker.
 - No global ordering across workers is guaranteed.
 - Consumers MUST NOT assume total ordering across the crawl.
 - Ordering is provided for debuggability, not causality.
+
+Concurrency:
+- All public methods are safe for concurrent use.
+- The event log is protected by a read/write mutex.
+- Reading via Events() never blocks recording.
 */
+
+type MetadataSink interface {
+	RecordFetch(event FetchEvent)
+	RecordArtifact(record ArtifactRecord)
+	RecordPipelineStage(event PipelineEvent)
+	RecordSkip(event SkipEvent)
+	RecordError(record ErrorRecord)
+}
+
+type CrawlFinalizer interface {
+	RecordFinalCrawlStats(stats CrawlStats)
+}
+
 type Recorder struct {
 	workerId string
+	mu       sync.RWMutex
+	events   []Event
+	subs     []chan Event // streaming subscribers; forwarded on every append
 }
 
 func NewRecorder(workerId string) Recorder {
@@ -59,34 +82,87 @@ func NewRecorder(workerId string) Recorder {
 	}
 }
 
-func (r *Recorder) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause ErrorCause,
-	errorString string,
-	attrs []Attribute,
-) {
+// Subscribe creates a new subscriber channel and returns it along with an
+// unsubscribe function. After this call returns, every subsequent event
+// appended to the log is forwarded to the channel in a non-blocking send.
+// Events recorded before Subscribe was called are NOT delivered — subscribers
+// receive only future events (forward-only).
+//
+// The returned channel is owned by the Recorder. Calling the unsubscribe
+// function closes the channel and removes it from the subscriber list.
+// Unsubscribe is idempotent and safe to call multiple times.
+func (r *Recorder) Subscribe() (<-chan Event, func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
+	ch := make(chan Event, 64)
+	r.subs = append(r.subs, ch)
+	idx := len(r.subs) - 1
+
+	var once sync.Once
+	unsub := func() {
+		once.Do(func() {
+			r.mu.Lock()
+			defer r.mu.Unlock()
+			if idx < len(r.subs) && r.subs[idx] == ch {
+				close(ch)
+				r.subs[idx] = nil
+			}
+		})
+	}
+
+	return ch, unsub
 }
 
-func (r *Recorder) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
+// append is the single internal write path. It acquires the write lock,
+// appends the event to the log, then forwards the event to each registered
+// subscriber in a non-blocking select. A slow or full subscriber channel
+// causes the event to be dropped for that subscriber; the crawl is never
+// blocked. Nil channels (unsubscribed) are skipped.
+func (r *Recorder) append(e Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, e)
+	for _, ch := range r.subs {
+		if ch == nil {
+			continue // skip unsubscribed channels
+		}
+		select {
+		case ch <- e:
+		default: // slow consumer: event dropped, crawl not blocked
+		}
+	}
 }
 
-func (r *Recorder) RecordArtifact(kind ArtifactKind, path string, attrs []Attribute) {}
-func (r *Recorder) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
+// Events returns a snapshot copy of the event log.
+// The returned slice is independent of the recorder's internal state;
+// mutations to it do not affect the recorder.
+func (r *Recorder) Events() []Event {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]Event, len(r.events))
+	copy(result, r.events)
+	return result
+}
+
+func (r *Recorder) RecordFetch(event FetchEvent) {
+	r.append(Event{kind: EventKindFetch, fetch: &event})
+}
+
+func (r *Recorder) RecordArtifact(record ArtifactRecord) {
+	r.append(Event{kind: EventKindArtifact, artifact: &record})
+}
+
+func (r *Recorder) RecordPipelineStage(event PipelineEvent) {
+	r.append(Event{kind: EventKindPipeline, pipeline: &event})
+}
+
+func (r *Recorder) RecordSkip(event SkipEvent) {
+	r.append(Event{kind: EventKindSkip, skip: &event})
+}
+
+func (r *Recorder) RecordError(record ErrorRecord) {
+	r.append(Event{kind: EventKindError, error: &record})
 }
 
 /*
@@ -101,96 +177,6 @@ Contract:
     not accumulated incrementally via the recorder.
   - Recorded stats MUST NOT influence control flow or scheduling.
 */
-func (r *Recorder) RecordFinalCrawlStats(
-	totalPages int,
-	totalErrors int,
-	totalAssets int,
-	duration time.Duration,
-	manualRetryQueueCount int,
-) {
-	stats := crawlStats{
-		totalPages:            totalPages,
-		totalErrors:           totalErrors,
-		totalAssets:           totalAssets,
-		durationMs:            duration.Milliseconds(),
-		manualRetryQueueCount: manualRetryQueueCount,
-	}
-
-	r.append(stats)
-}
-
-func (r *Recorder) append(crawlStats) {}
-
-type MetadataSink interface {
-	RecordError(
-		observedAt time.Time,
-		packageName string,
-		action string,
-		cause ErrorCause,
-		details string,
-		attrs []Attribute,
-	)
-
-	RecordFetch(
-		fetchUrl string,
-		httpStatus int,
-		duration time.Duration,
-		contentType string,
-		retryCount int,
-		crawlDepth int,
-	)
-	RecordArtifact(kind ArtifactKind, path string, attrs []Attribute)
-
-	RecordAssetFetch(
-		fetchUrl string,
-		httpStatus int,
-		duration time.Duration,
-		retryCount int,
-	)
-}
-
-type CrawlFinalizer interface {
-	RecordFinalCrawlStats(
-		totalPages int,
-		totalErrors int,
-		totalAssets int,
-		duration time.Duration,
-		manualRetryQueueCount int,
-	)
-}
-
-// NoopSink, struct that implements metadata.Sink but does nothing
-// Scheduler (or Test) can decide whether to inject Recorder or NoopSink
-// Purpose is to make metadata orthogonal
-
-type NoopSink struct{}
-
-func (n *NoopSink) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause ErrorCause,
-	errorString string,
-	attrs []Attribute,
-) {
-
-}
-
-func (n *NoopSink) RecordFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-}
-
-func (n *NoopSink) RecordArtifact(kind ArtifactKind, path string, attrs []Attribute) {}
-func (n *NoopSink) RecordAssetFetch(
-	fetchUrl string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
+func (r *Recorder) RecordFinalCrawlStats(stats CrawlStats) {
+	r.append(Event{kind: EventKindStats, stats: &stats})
 }

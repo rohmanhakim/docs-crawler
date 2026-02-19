@@ -533,7 +533,7 @@ func TestScheduler_Write_MethodCallOrder(t *testing.T) {
 		}).Return(createSanitizedHTMLDocForTest(nil), nil)
 
 	// Setup convert
-	mockConvert.On("Convert", mock.Anything).
+	mockConvert.On("Convert", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			callOrder = append(callOrder, "Convert")
 		}).Return(createConversionResultForTest("# Test", nil), nil)

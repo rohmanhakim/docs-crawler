@@ -11,6 +11,7 @@ type AssetFetchResult struct {
 	fetchUrl   url.URL
 	httpStatus int
 	duration   time.Duration
+	fetchedAt  time.Time
 	data       []byte
 }
 
@@ -18,12 +19,14 @@ func NewAssetFetchResult(
 	fetchUrl url.URL,
 	httpStatus int,
 	duration time.Duration,
+	fetchedAt time.Time,
 	data []byte,
 ) AssetFetchResult {
 	return AssetFetchResult{
 		fetchUrl:   fetchUrl,
 		httpStatus: httpStatus,
 		duration:   duration,
+		fetchedAt:  fetchedAt,
 		data:       data,
 	}
 }
@@ -42,6 +45,10 @@ func (a *AssetFetchResult) Status() int {
 
 func (a *AssetFetchResult) Duration() time.Duration {
 	return a.duration
+}
+
+func (a *AssetFetchResult) FetchedAt() time.Time {
+	return a.fetchedAt
 }
 
 type ResolveParam struct {

@@ -67,17 +67,28 @@ func (m *MarkdownConstraint) Normalize(
 		var normalizationError *NormalizationError
 		errors.As(err, &normalizationError)
 		m.metadataSink.RecordError(
-			time.Now(),
-			"normalize",
-			"MarkdownConstraint.Normalize",
-			mapNormalizationErrorToMetadataCause(*normalizationError),
-			err.Error(),
-			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
-			},
+			metadata.NewErrorRecord(
+				time.Now(),
+				"normalize",
+				"MarkdownConstraint.Normalize",
+				mapNormalizationErrorToMetadataCause(*normalizationError),
+				err.Error(),
+				[]metadata.Attribute{
+					metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
+				},
+			),
 		)
 		return NormalizedMarkdownDoc{}, normalizationError
 	}
+	m.metadataSink.RecordPipelineStage(
+		metadata.NewPipelineEvent(
+			metadata.StageNormalize,
+			fetchUrl.String(),
+			true,
+			time.Now(),
+			0,
+		),
+	)
 	return normalizedMarkdown, nil
 }
 

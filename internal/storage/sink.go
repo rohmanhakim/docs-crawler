@@ -55,7 +55,7 @@ func (s *LocalSink) Write(
 	if err != nil {
 		var storageError *StorageError
 		errors.As(err, &storageError)
-		s.metadataSink.RecordError(
+		s.metadataSink.RecordError(metadata.NewErrorRecord(
 			time.Now(),
 			"storage",
 			"LocalSink.Write",
@@ -65,19 +65,18 @@ func (s *LocalSink) Write(
 				metadata.NewAttr(metadata.AttrURL, normalizedDoc.Frontmatter().SourceURL()),
 				metadata.NewAttr(metadata.AttrWritePath, storageError.Path),
 			},
-		)
+		))
 		return WriteResult{}, storageError
 	}
-	s.metadataSink.RecordArtifact(
+	s.metadataSink.RecordArtifact(metadata.NewArtifactRecord(
 		metadata.ArtifactMarkdown,
 		writeResult.Path(),
-		[]metadata.Attribute{
-			metadata.NewAttr(metadata.AttrWritePath, writeResult.Path()),
-			metadata.NewAttr(metadata.AttrURL, normalizedDoc.Frontmatter().SourceURL()),
-			metadata.NewAttr(metadata.AttrField, writeResult.URLHash()),
-			metadata.NewAttr(metadata.AttrField, writeResult.ContentHash()),
-		},
-	)
+		normalizedDoc.Frontmatter().SourceURL(),
+		writeResult.ContentHash(),
+		false,
+		int64(len(normalizedDoc.Content())),
+		time.Now(),
+	))
 	return writeResult, nil
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
@@ -212,11 +213,11 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 
 	// Verify totalAssets matches the number of local assets from the resolver
 	expectedAssets := 2
-	if mockFinalizer.recordedStats.totalAssets != expectedAssets {
-		t.Errorf("expected totalAssets to be %d, got %d", expectedAssets, mockFinalizer.recordedStats.totalAssets)
+	if mockFinalizer.recordedStats.TotalAssets() != expectedAssets {
+		t.Errorf("expected totalAssets to be %d, got %d", expectedAssets, mockFinalizer.recordedStats.TotalAssets())
 	}
 
-	t.Logf("Total assets recorded: %d", mockFinalizer.recordedStats.totalAssets)
+	t.Logf("Total assets recorded: %d", mockFinalizer.recordedStats.TotalAssets())
 }
 
 // TestScheduler_FinalStatsContract_CalledAfterTermination verifies the contract
@@ -306,7 +307,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	}
 
 	// Duration should be set (indicating the crawl ran and completed)
-	if mockFinalizer.recordedStats.duration == 0 {
+	if mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()) == 0 {
 		t.Log("Warning: duration is zero, crawl may have completed too quickly or not run")
 	}
 }
@@ -392,8 +393,8 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 	}
 
 	t.Logf("Stats recorded despite potential errors: pages=%d, errors=%d",
-		mockFinalizer.recordedStats.totalPages,
-		mockFinalizer.recordedStats.totalErrors)
+		mockFinalizer.recordedStats.TotalPages(),
+		mockFinalizer.recordedStats.TotalErrors())
 }
 
 // TestScheduler_StatsConsistency_AllFieldsNonNegative verifies that all
@@ -480,17 +481,17 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	}
 
 	// All count fields should be non-negative
-	if mockFinalizer.recordedStats.totalPages < 0 {
-		t.Errorf("totalPages should be non-negative, got %d", mockFinalizer.recordedStats.totalPages)
+	if mockFinalizer.recordedStats.TotalPages() < 0 {
+		t.Errorf("totalPages should be non-negative, got %d", mockFinalizer.recordedStats.TotalPages())
 	}
-	if mockFinalizer.recordedStats.totalErrors < 0 {
-		t.Errorf("totalErrors should be non-negative, got %d", mockFinalizer.recordedStats.totalErrors)
+	if mockFinalizer.recordedStats.TotalErrors() < 0 {
+		t.Errorf("totalErrors should be non-negative, got %d", mockFinalizer.recordedStats.TotalErrors())
 	}
-	if mockFinalizer.recordedStats.totalAssets < 0 {
-		t.Errorf("totalAssets should be non-negative, got %d", mockFinalizer.recordedStats.totalAssets)
+	if mockFinalizer.recordedStats.TotalAssets() < 0 {
+		t.Errorf("totalAssets should be non-negative, got %d", mockFinalizer.recordedStats.TotalAssets())
 	}
-	if mockFinalizer.recordedStats.duration < 0 {
-		t.Errorf("duration should be non-negative, got %v", mockFinalizer.recordedStats.duration)
+	if mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()) < 0 {
+		t.Errorf("duration should be non-negative, got %v", mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()))
 	}
 }
 
@@ -499,7 +500,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -580,5 +581,5 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	// Note: This is a weak check because the actual error counts depend on
 	// the specific behavior of the pipeline components
 	t.Logf("Final error count: %d, Sink error count: %d",
-		mockFinalizer.recordedStats.totalErrors, errorSink.errorCount)
+		mockFinalizer.recordedStats.TotalErrors(), len(errorSink.ErrorRecords))
 }

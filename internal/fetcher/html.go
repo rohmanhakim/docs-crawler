@@ -93,14 +93,16 @@ func (h *HtmlFetcher) Fetch(
 		retryCount = retryResult.Attempts()
 	}
 
-	h.metadataSink.RecordFetch(
+	h.metadataSink.RecordFetch(metadata.NewFetchEvent(
+		startTime,
 		fetchUrl.String(),
 		statusCode,
 		duration,
 		contentType,
 		retryCount,
 		crawlDepth,
-	)
+		metadata.KindPage,
+	))
 
 	if err != nil {
 		// Use errors.Is to decide between FetchError or RetryError
@@ -130,14 +132,16 @@ func (h *HtmlFetcher) recordFetchError(callerMethod string, fetchUrl url.URL, er
 	if errors.As(err, &fetchError) {
 		// record fetch error event
 		h.metadataSink.RecordError(
-			time.Now(),
-			"fetcher",
-			callerMethod,
-			mapFetchErrorToMetadataCause(fetchError),
-			err.Error(),
-			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
-			},
+			metadata.NewErrorRecord(
+				time.Now(),
+				"fetcher",
+				callerMethod,
+				mapFetchErrorToMetadataCause(fetchError),
+				err.Error(),
+				[]metadata.Attribute{
+					metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
+				},
+			),
 		)
 	}
 }
@@ -147,15 +151,17 @@ func (h *HtmlFetcher) recordRetryError(callerMethod string, fetchUrl url.URL, er
 	if errors.As(err, &retryError) {
 		// record retry error event
 		h.metadataSink.RecordError(
-			time.Now(),
-			"fetcher",
-			callerMethod,
-			metadata.CauseRetryFailure,
-			err.Error(),
-			[]metadata.Attribute{
-				metadata.NewAttr(metadata.AttrMessage, retryError.Error()),
-				metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
-			},
+			metadata.NewErrorRecord(
+				time.Now(),
+				"fetcher",
+				callerMethod,
+				metadata.CauseRetryFailure,
+				err.Error(),
+				[]metadata.Attribute{
+					metadata.NewAttr(metadata.AttrMessage, retryError.Error()),
+					metadata.NewAttr(metadata.AttrURL, fetchUrl.String()),
+				},
+			),
 		)
 	}
 }

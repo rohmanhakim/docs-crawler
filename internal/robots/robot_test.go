@@ -8,109 +8,15 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/robots/cache"
 )
 
-// robotTestMetadataSink is a test double for metadata.MetadataSink
-type robotTestMetadataSink struct {
-	fetchEvents  []robotTestFetchEvent
-	errorRecords []robotTestErrorRecord
-	crawlStats   []robotTestCrawlStats
-}
+// robotTestMetadataSink is an alias to the shared mock in metadatatest package.
+type robotTestMetadataSink = metadatatest.SinkMock
 
-type robotTestFetchEvent struct {
-	fetchURL    string
-	httpStatus  int
-	duration    time.Duration
-	contentType string
-	retryCount  int
-	crawlDepth  int
-}
-
-type robotTestErrorRecord struct {
-	packageName string
-	action      string
-	cause       int
-	errorString string
-	observedAt  time.Time
-	attrs       []metadata.Attribute
-}
-
-type robotTestCrawlStats struct {
-	totalPages  int
-	totalErrors int
-	totalAssets int
-	durationMs  int64
-}
-
-func (m *robotTestMetadataSink) RecordFetch(
-	fetchURL string,
-	httpStatus int,
-	duration time.Duration,
-	contentType string,
-	retryCount int,
-	crawlDepth int,
-) {
-	m.fetchEvents = append(m.fetchEvents, robotTestFetchEvent{
-		fetchURL:    fetchURL,
-		httpStatus:  httpStatus,
-		duration:    duration,
-		contentType: contentType,
-		retryCount:  retryCount,
-		crawlDepth:  crawlDepth,
-	})
-}
-
-func (m *robotTestMetadataSink) RecordAssetFetch(
-	fetchURL string,
-	httpStatus int,
-	duration time.Duration,
-	retryCount int,
-) {
-	m.fetchEvents = append(m.fetchEvents, robotTestFetchEvent{
-		fetchURL:   fetchURL,
-		httpStatus: httpStatus,
-		duration:   duration,
-		retryCount: retryCount,
-	})
-}
-
-func (m *robotTestMetadataSink) RecordError(
-	observedAt time.Time,
-	packageName string,
-	action string,
-	cause metadata.ErrorCause,
-	errorString string,
-	attrs []metadata.Attribute,
-) {
-	m.errorRecords = append(m.errorRecords, robotTestErrorRecord{
-		packageName: packageName,
-		action:      action,
-		cause:       int(cause),
-		errorString: errorString,
-		observedAt:  observedAt,
-		attrs:       attrs,
-	})
-}
-
-func (m *robotTestMetadataSink) RecordArtifact(kind metadata.ArtifactKind, path string, attrs []metadata.Attribute) {
-	// No-op for testing
-}
-
-func (m *robotTestMetadataSink) RecordFinalCrawlStats(
-	totalPages int,
-	totalErrors int,
-	totalAssets int,
-	duration time.Duration,
-) {
-	m.crawlStats = append(m.crawlStats, robotTestCrawlStats{
-		totalPages:  totalPages,
-		totalErrors: totalErrors,
-		totalAssets: totalAssets,
-		durationMs:  duration.Milliseconds(),
-	})
-}
+var _ metadata.MetadataSink = (*robotTestMetadataSink)(nil)
 
 // setupTestServer creates a test HTTP server that serves robots.txt content
 func setupTestServer(robotsContent string) *httptest.Server {
@@ -587,6 +493,43 @@ Allow: /`
 	}
 }
 
+// TestRobot_Decide_EmitsFetchEventWithKindRobots verifies that a successful
+// robots.txt fetch produces exactly one FetchEvent with Kind == KindRobots
+// and a non-zero FetchedAt timestamp.
+func TestRobot_Decide_EmitsFetchEventWithKindRobots(t *testing.T) {
+	robotsContent := `User-agent: *
+Allow: /`
+
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	sink := &robotTestMetadataSink{}
+	robot := robots.NewCachedRobot(sink)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
+
+	serverURL, _ := url.Parse(server.URL + "/page.html")
+	_, err := robot.Decide(*serverURL)
+
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("Expected exactly 1 FetchEvent, got %d", len(sink.FetchEvents))
+	}
+
+	event := sink.FetchEvents[0]
+
+	if event.Kind() != metadata.KindRobots {
+		t.Errorf("Expected FetchEvent.Kind == KindRobots, got %q", event.Kind())
+	}
+
+	if event.FetchedAt().IsZero() {
+		t.Error("Expected FetchEvent.FetchedAt to be non-zero")
+	}
+}
+
 func TestRobot_Decide_ServerError(t *testing.T) {
 	// Server that returns 500 for robots.txt
 	server := setupTestServerWithStatus(http.StatusInternalServerError, "")
@@ -606,7 +549,56 @@ func TestRobot_Decide_ServerError(t *testing.T) {
 	}
 
 	// Verify error was recorded
-	if len(sink.errorRecords) == 0 {
+	if len(sink.ErrorRecords) == 0 {
 		t.Error("Expected error to be recorded in metadata sink")
+	}
+}
+
+// TestRobot_Decide_RecordsFetchOnlyOncePerHost verifies that RecordFetch
+// is called exactly once per host, not on cache hits. This prevents
+// inflating fetch metrics when multiple URLs share the same host.
+func TestRobot_Decide_RecordsFetchOnlyOncePerHost(t *testing.T) {
+	robotsContent := `User-agent: *
+Allow: /`
+
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	sink := &robotTestMetadataSink{}
+	robot := robots.NewCachedRobot(sink)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
+
+	// First Decide — should record fetch
+	url1, _ := url.Parse(server.URL + "/page1.html")
+	_, err := robot.Decide(*url1)
+	if err != nil {
+		t.Fatalf("First Decide failed: %v", err)
+	}
+
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("Expected 1 FetchEvent after first Decide, got %d", len(sink.FetchEvents))
+	}
+
+	// Second Decide for same host: should NOT record fetch (cache hit)
+	url2, _ := url.Parse(server.URL + "/page2.html")
+	_, err = robot.Decide(*url2)
+	if err != nil {
+		t.Fatalf("Second Decide failed: %v", err)
+	}
+
+	if len(sink.FetchEvents) != 1 {
+		t.Errorf("Expected still 1 FetchEvent after second Decide (cache hit), got %d", len(sink.FetchEvents))
+	}
+
+	// Third Decide for same host: should still not record fetch
+	url3, _ := url.Parse(server.URL + "/page3.html")
+	_, err = robot.Decide(*url3)
+	if err != nil {
+		t.Fatalf("Third Decide failed: %v", err)
+	}
+
+	if len(sink.FetchEvents) != 1 {
+		t.Errorf("Expected still 1 FetchEvent after third Decide (cache hit), got %d", len(sink.FetchEvents))
 	}
 }
