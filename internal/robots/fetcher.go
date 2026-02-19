@@ -43,6 +43,7 @@ type RobotsFetchResult struct {
 	SourceURL   string
 	HTTPStatus  int
 	ContentType string
+	FromCache   bool // true if result came from cache, false if from network fetch
 }
 
 // cachedResult is a serializable representation of RobotsFetchResult for cache storage.
@@ -53,6 +54,7 @@ type cachedResult struct {
 	SourceURL   string         `json:"source_url"`
 	HTTPStatus  int            `json:"http_status"`
 	ContentType string         `json:"content_type"`
+	FromCache   bool           `json:"from_cache"`
 }
 
 // NewRobotsFetcher creates a new RobotsFetcher with the given dependencies.
@@ -106,6 +108,7 @@ func deserializeResult(data string) (RobotsFetchResult, error) {
 		SourceURL:   cached.SourceURL,
 		HTTPStatus:  cached.HTTPStatus,
 		ContentType: cached.ContentType,
+		FromCache:   true, // always true when deserializing from cache
 	}, nil
 }
 

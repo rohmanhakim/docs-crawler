@@ -12,6 +12,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	robotscache "github.com/rohmanhakim/docs-crawler/internal/robots/cache"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
@@ -685,3 +686,74 @@ func TestRobotsFetcher_Fetch_WithRedirects(t *testing.T) {
 		t.Fatalf("Fetch should follow redirects: %v", err)
 	}
 }
+
+func TestRobotsFetcher_Fetch_FromCacheField(t *testing.T) {
+	robotsContent := "User-agent: *\nDisallow: /private/\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(robotsContent))
+	}))
+	defer server.Close()
+
+	sink := &mockMetadataSink{}
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	// Create fetcher with cache
+	memCache := robotscache.NewMemoryCache()
+	fetcher := robots.NewRobotsFetcher(httpClient, sink, "TestBot/1.0", memCache)
+
+	serverURL := server.URL
+	parts := strings.Split(serverURL, "://")
+	scheme := parts[0]
+	host := parts[1]
+
+	ctx := context.Background()
+
+	// First fetch: network request, FromCache should be false
+	result1, err := fetcher.Fetch(ctx, scheme, host)
+	if err != nil {
+		t.Fatalf("first fetch returned error: %v", err)
+	}
+
+	if result1.FromCache {
+		t.Error("expected FromCache to be false on first fetch (network request)")
+	}
+
+	// Second fetch: cache hit, FromCache should be true
+	result2, err := fetcher.Fetch(ctx, scheme, host)
+	if err != nil {
+		t.Fatalf("second fetch returned error: %v", err)
+	}
+
+	if !result2.FromCache {
+		t.Error("expected FromCache to be true on second fetch (cache hit)")
+	}
+
+	// Both results should have the same core data
+	if result1.HTTPStatus != result2.HTTPStatus {
+		t.Errorf("HTTPStatus mismatch: %d vs %d", result1.HTTPStatus, result2.HTTPStatus)
+	}
+
+	if result1.SourceURL != result2.SourceURL {
+		t.Errorf("SourceURL mismatch: %s vs %s", result1.SourceURL, result2.SourceURL)
+	}
+}
+
+// countingMetadataSink counts RecordFetch calls for testing
+type countingMetadataSink struct {
+	fetchCount int
+	fetches    []metadata.FetchEvent
+}
+
+var _ metadata.MetadataSink = (*countingMetadataSink)(nil)
+
+func (m *countingMetadataSink) RecordFetch(event metadata.FetchEvent) {
+	m.fetchCount++
+	m.fetches = append(m.fetches, event)
+}
+func (m *countingMetadataSink) RecordArtifact(record metadata.ArtifactRecord)    {}
+func (m *countingMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {}
+func (m *countingMetadataSink) RecordSkip(event metadata.SkipEvent)              {}
+func (m *countingMetadataSink) RecordError(record metadata.ErrorRecord)          {}

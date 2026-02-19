@@ -553,3 +553,52 @@ func TestRobot_Decide_ServerError(t *testing.T) {
 		t.Error("Expected error to be recorded in metadata sink")
 	}
 }
+
+// TestRobot_Decide_RecordsFetchOnlyOncePerHost verifies that RecordFetch
+// is called exactly once per host, not on cache hits. This prevents
+// inflating fetch metrics when multiple URLs share the same host.
+func TestRobot_Decide_RecordsFetchOnlyOncePerHost(t *testing.T) {
+	robotsContent := `User-agent: *
+Allow: /`
+
+	server := setupTestServer(robotsContent)
+	defer server.Close()
+
+	sink := &robotTestMetadataSink{}
+	robot := robots.NewCachedRobot(sink)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	robot.Init("test-agent/1.0", httpClient)
+
+	// First Decide — should record fetch
+	url1, _ := url.Parse(server.URL + "/page1.html")
+	_, err := robot.Decide(*url1)
+	if err != nil {
+		t.Fatalf("First Decide failed: %v", err)
+	}
+
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("Expected 1 FetchEvent after first Decide, got %d", len(sink.FetchEvents))
+	}
+
+	// Second Decide for same host: should NOT record fetch (cache hit)
+	url2, _ := url.Parse(server.URL + "/page2.html")
+	_, err = robot.Decide(*url2)
+	if err != nil {
+		t.Fatalf("Second Decide failed: %v", err)
+	}
+
+	if len(sink.FetchEvents) != 1 {
+		t.Errorf("Expected still 1 FetchEvent after second Decide (cache hit), got %d", len(sink.FetchEvents))
+	}
+
+	// Third Decide for same host: should still not record fetch
+	url3, _ := url.Parse(server.URL + "/page3.html")
+	_, err = robot.Decide(*url3)
+	if err != nil {
+		t.Fatalf("Third Decide failed: %v", err)
+	}
+
+	if len(sink.FetchEvents) != 1 {
+		t.Errorf("Expected still 1 FetchEvent after third Decide (cache hit), got %d", len(sink.FetchEvents))
+	}
+}

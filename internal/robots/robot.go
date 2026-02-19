@@ -91,17 +91,20 @@ func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 		return Decision{}, err
 	}
 
-	// Emit a fetch event for the successful robots.txt retrieval.
-	r.metadataSink.RecordFetch(metadata.NewFetchEvent(
-		fetchResult.FetchedAt,
-		fetchResult.SourceURL,
-		fetchResult.HTTPStatus,
-		fetchResult.Duration,
-		fetchResult.ContentType,
-		0, // retryCount — not tracked for robots.txt fetches
-		0, // crawlDepth — not applicable for robots.txt fetches
-		metadata.KindRobots,
-	))
+	// Emit a fetch event only for actual network fetches, not cache hits.
+	// This prevents inflating fetch metrics when multiple URLs share the same host.
+	if !fetchResult.FromCache {
+		r.metadataSink.RecordFetch(metadata.NewFetchEvent(
+			fetchResult.FetchedAt,
+			fetchResult.SourceURL,
+			fetchResult.HTTPStatus,
+			fetchResult.Duration,
+			fetchResult.ContentType,
+			0, // retryCount — not tracked for robots.txt fetches
+			0, // crawlDepth — not applicable for robots.txt fetches
+			metadata.KindRobots,
+		))
+	}
 
 	// Map the fetch result to a ruleSet for decision making
 	rs := MapResponseToRuleSet(fetchResult.Response, r.userAgent, fetchResult.FetchedAt)
