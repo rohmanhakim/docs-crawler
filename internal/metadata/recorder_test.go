@@ -293,8 +293,7 @@ func TestRecorder_Subscribe_ReceivesEvents(t *testing.T) {
 	now := time.Now()
 	r := newTestRecorder(t)
 
-	ch := make(chan metadata.Event, 4)
-	r.Subscribe(ch)
+	ch, _ := r.Subscribe()
 
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
 	r.RecordSkip(metadata.NewSkipEvent("https://example.com/skip", metadata.SkipReasonRobotsDisallow, now))
@@ -315,41 +314,27 @@ func TestRecorder_Subscribe_ReceivesEvents(t *testing.T) {
 }
 
 // TestRecorder_Subscribe_SlowConsumerDoesNotBlock verifies that a subscriber
-// with a full (zero-capacity) channel does not block the append path.
+// with a full channel does not block the append path.
 // The event must still appear in the recorder's own log.
 func TestRecorder_Subscribe_SlowConsumerDoesNotBlock(t *testing.T) {
 	now := time.Now()
 	r := newTestRecorder(t)
 
-	// Unbuffered channel — every send would block if not handled with select/default.
-	ch := make(chan metadata.Event)
-	r.Subscribe(ch)
+	// Subscribe creates a buffered channel (capacity 64)
+	_, unsub := r.Subscribe()
 
-	done := make(chan struct{})
-	go func() {
+	// Record 65 events rapidly - if the channel were unbuffered or blocking,
+	// this would hang. The internal log must still receive all events.
+	for i := 0; i < 65; i++ {
 		r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// RecordFetch returned without blocking — correct.
-	case <-time.After(time.Second):
-		t.Fatal("RecordFetch blocked on a slow subscriber channel; expected non-blocking behaviour")
 	}
 
-	// Event must still be in the internal log even though the subscriber dropped it.
-	if len(r.Events()) != 1 {
-		t.Errorf("Events() len = %v, want 1 (log must be intact even when subscriber drops)", len(r.Events()))
+	// All 65 events must be in the internal log
+	if len(r.Events()) != 65 {
+		t.Errorf("Events() len = %v, want 65 (log must be intact even when subscriber drops)", len(r.Events()))
 	}
 
-	// The unbuffered channel must have nothing in it (the send was dropped).
-	select {
-	case <-ch:
-		t.Error("slow subscriber channel received an event; expected drop via select/default")
-	default:
-		// Correct — nothing was sent.
-	}
+	unsub() // cleanup
 }
 
 // TestRecorder_Subscribe_ForwardOnly verifies that a subscriber registered
@@ -362,8 +347,7 @@ func TestRecorder_Subscribe_ForwardOnly(t *testing.T) {
 	// Record one event BEFORE subscribing.
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com/before", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
 
-	ch := make(chan metadata.Event, 4)
-	r.Subscribe(ch)
+	ch, _ := r.Subscribe()
 
 	// Record a second event AFTER subscribing.
 	r.RecordSkip(metadata.NewSkipEvent("https://example.com/after", metadata.SkipReasonRobotsDisallow, now))
@@ -390,14 +374,12 @@ func TestRecorder_Subscribe_MultipleSubscribers(t *testing.T) {
 	now := time.Now()
 	r := newTestRecorder(t)
 
-	ch1 := make(chan metadata.Event, 4)
-	ch2 := make(chan metadata.Event, 4)
-	r.Subscribe(ch1)
-	r.Subscribe(ch2)
+	ch1, _ := r.Subscribe()
+	ch2, _ := r.Subscribe()
 
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
 
-	for i, ch := range []chan metadata.Event{ch1, ch2} {
+	for i, ch := range []<-chan metadata.Event{ch1, ch2} {
 		if len(ch) != 1 {
 			t.Errorf("subscriber %d channel len = %v, want 1", i+1, len(ch))
 			continue
@@ -406,5 +388,133 @@ func TestRecorder_Subscribe_MultipleSubscribers(t *testing.T) {
 		if e.Kind() != metadata.EventKindFetch {
 			t.Errorf("subscriber %d received Kind = %v, want %v", i+1, e.Kind(), metadata.EventKindFetch)
 		}
+	}
+}
+
+// TestRecorder_Subscribe_UnsubscribeClosesChannel verifies that calling
+// the unsubscribe function closes the subscriber channel.
+func TestRecorder_Subscribe_UnsubscribeClosesChannel(t *testing.T) {
+	r := newTestRecorder(t)
+
+	ch, unsub := r.Subscribe()
+
+	// Use a non-blocking select to verify channel is open without blocking
+	select {
+	case <-ch:
+		// Channel has data (unexpected for new subscription)
+	default:
+		// Channel is open but empty - expected
+	}
+
+	unsub()
+
+	// After unsubscribe: channel closed, receives return zero value immediately
+	_, ok := <-ch
+	if ok {
+		t.Error("channel should be closed after unsubscribe")
+	}
+}
+
+// TestRecorder_Subscribe_UnsubscribeStopsEvents verifies that events
+// recorded after unsubscribe are not sent to the channel.
+func TestRecorder_Subscribe_UnsubscribeStopsEvents(t *testing.T) {
+	now := time.Now()
+	r := newTestRecorder(t)
+
+	ch, unsub := r.Subscribe()
+
+	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com/first", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
+
+	unsub()
+
+	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com/second", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
+
+	// Should only receive the first event (channel is now closed)
+	receivedCount := 0
+	for {
+		_, ok := <-ch
+		if !ok {
+			break // channel closed
+		}
+		receivedCount++
+	}
+
+	if receivedCount != 1 {
+		t.Errorf("received %d events, want 1 (events after unsubscribe should not be received)", receivedCount)
+	}
+}
+
+// TestRecorder_Subscribe_UnsubscribeIdempotent verifies that calling
+// unsubscribe multiple times does not panic.
+func TestRecorder_Subscribe_UnsubscribeIdempotent(t *testing.T) {
+	r := newTestRecorder(t)
+
+	_, unsub := r.Subscribe()
+
+	// Call unsubscribe multiple times - should not panic
+	unsub()
+	unsub()
+	unsub()
+}
+
+// TestRecorder_Subscribe_RecordAfterAllUnsubscribed verifies that recording
+// events after all subscribers have unsubscribed does not panic.
+func TestRecorder_Subscribe_RecordAfterAllUnsubscribed(t *testing.T) {
+	now := time.Now()
+	r := newTestRecorder(t)
+
+	_, unsub1 := r.Subscribe()
+	_, unsub2 := r.Subscribe()
+
+	unsub1()
+	unsub2()
+
+	// Recording after all subscribers unsubscribed should not panic
+	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
+
+	if len(r.Events()) != 1 {
+		t.Errorf("Events() len = %v, want 1", len(r.Events()))
+	}
+}
+
+// TestRecorder_Subscribe_ConcurrentUnsubscribe tests concurrent safety
+// of subscribe/unsubscribe operations with recording.
+func TestRecorder_Subscribe_ConcurrentUnsubscribe(t *testing.T) {
+	now := time.Now()
+	r := newTestRecorder(t)
+
+	const goroutines = 20
+	var wg sync.WaitGroup
+	wg.Add(goroutines * 2)
+
+	for i := 0; i < goroutines; i++ {
+		ch, unsub := r.Subscribe()
+
+		// Consumer goroutine
+		go func() {
+			defer wg.Done()
+			for range ch {
+				// drain channel
+			}
+		}()
+
+		// Unsubscribe goroutine
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Microsecond * 10)
+			unsub()
+		}()
+	}
+
+	// Record events concurrently
+	for i := 0; i < 100; i++ {
+		r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
+	}
+
+	wg.Wait()
+
+	// All events must be recorded (no panic = success)
+	if len(r.Events()) != 100 {
+		t.Errorf("Events() len = %v, want 100", len(r.Events()))
 	}
 }
