@@ -108,3 +108,34 @@ func collectFetchKinds(events []metadata.Event) map[metadata.FetchKind][]metadat
 	}
 	return result
 }
+
+// collectSkipEvents filters EventKindSkip events and returns them as a slice.
+func collectSkipEvents(events []metadata.Event) []metadata.SkipEvent {
+	result := make([]metadata.SkipEvent, 0)
+	for _, e := range events {
+		if e.Kind() == metadata.EventKindSkip && e.Skip() != nil {
+			result = append(result, *e.Skip())
+		}
+	}
+	return result
+}
+
+// setupRobotsDisallowServer creates a test HTTP server that serves:
+// - GET /robots.txt -> disallows /private/ path
+// - GET /private/secret.html -> valid HTML (but disallowed by robots.txt)
+// - GET /* (other paths) -> valid HTML (allowed)
+func setupRobotsDisallowServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/robots.txt":
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("User-agent: *\nDisallow: /private/\n"))
+		default:
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(validHTMLForEventStream))
+		}
+	}))
+}

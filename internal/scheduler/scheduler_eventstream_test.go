@@ -2,6 +2,7 @@ package scheduler_test
 
 import (
 	"context"
+	"net/url"
 	"testing"
 	"time"
 
@@ -281,4 +282,115 @@ func TestEventStream_FullPipelineExecution(t *testing.T) {
 		"normalize should occur before artifact")
 	assert.Less(t, artifactIdx, statsIdx,
 		"artifact should occur before stats")
+}
+
+// TestEventStream_RobotsDisallowed_EmitsSkipEvent verifies that when a URL
+// is disallowed by robots.txt, exactly one SkipEvent is emitted with the
+// correct reason and URL.
+//
+// This test uses a real Recorder to capture events and verifies:
+// 1. Exactly one EventKindSkip is recorded
+// 2. The skip reason is SkipReasonRobotsDisallow
+// 3. The skipped URL matches the disallowed URL in canonical form
+// 4. The RecordedAt timestamp is non-zero
+func TestEventStream_RobotsDisallowed_EmitsSkipEvent(t *testing.T) {
+	// Setup test server with robots.txt that disallows /private/
+	server := setupRobotsDisallowServer(t)
+	defer server.Close()
+
+	// Parse server URL
+	parsedURL, err := url.Parse(server.URL)
+	require.NoError(t, err, "failed to parse server URL")
+
+	// Create a real Recorder
+	rec := metadata.NewRecorder("skip-test-worker")
+
+	// Create real robots implementation with the recorder
+	cachedRobot := robots.NewCachedRobot(&rec)
+
+	// Initialize the robot with HTTP client from test server
+	httpClient := server.Client()
+	cachedRobot.Init("test-user-agent", httpClient)
+
+	// Create minimal mocks for other dependencies (not used in this test)
+	mockFrontier := newFrontierMockForTest(t)
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+
+	rateLimiter := newRateLimiterMockForTest(t)
+	rateLimiter.On("ResolveDelay", mock.AnythingOfType("string")).Return(time.Duration(0)).Maybe()
+	rateLimiter.On("ResetBackoff", mock.AnythingOfType("string")).Return().Maybe()
+
+	sleeper := newSleeperMock(t)
+	sleeper.On("Sleep", mock.AnythingOfType("time.Duration")).Return()
+
+	failureJournal := newFailureJournalMockForTest(t)
+
+	// Build scheduler with real robots
+	ctx := context.Background()
+	s := scheduler.NewSchedulerWithDeps(
+		ctx,
+		&rec, // CrawlFinalizer
+		&rec, // MetadataSink
+		rateLimiter,
+		mockFrontier,
+		nil, // fetcher - not used
+		&cachedRobot,
+		nil, // extractor - not used
+		nil, // sanitizer - not used
+		nil, // convertRule - not used
+		nil, // assetResolver - not used
+		nil, // markdownConstraint - not used
+		nil, // storageSink - not used
+		sleeper,
+		failureJournal,
+	)
+
+	// Set current host
+	s.SetCurrentHost(parsedURL.Host)
+
+	// Construct the disallowed URL
+	disallowedPath := "/private/secret.html"
+	disallowedURL, err := url.Parse(server.URL + disallowedPath)
+	require.NoError(t, err, "failed to construct disallowed URL")
+
+	// WHEN: submitting the disallowed URL for admission
+	submitErr := s.SubmitUrlForAdmission(*disallowedURL, frontier.SourceSeed, 0)
+	require.NoError(t, submitErr, "SubmitUrlForAdmission should return nil for disallowed URL")
+
+	// Collect events
+	events := rec.Events()
+	t.Logf("Total events recorded: %d", len(events))
+
+	// Log all events for debugging
+	for i, e := range events {
+		t.Logf("  [%d] Kind=%s", i, e.Kind())
+	}
+
+	// Collect skip events
+	skipEvents := collectSkipEvents(events)
+
+	// ========================================
+	// Assertions: Exactly one SkipEvent
+	// ========================================
+	require.Len(t, skipEvents, 1, "should have exactly one skip event")
+
+	skipEvent := skipEvents[0]
+
+	// Assert reason is robots_disallow
+	assert.Equal(t, metadata.SkipReasonRobotsDisallow, skipEvent.Reason(),
+		"skip reason should be robots_disallow")
+
+	// Assert URL is in canonical form (no trailing slash for path, no query/fragment)
+	expectedCanonicalURL := server.URL + disallowedPath
+	assert.Equal(t, expectedCanonicalURL, skipEvent.SkippedURL(),
+		"skipped URL should be in canonical form")
+
+	// Assert timestamp is non-zero
+	assert.False(t, skipEvent.RecordedAt().IsZero(),
+		"RecordedAt should have non-zero timestamp")
+
+	// Verify the URL was NOT submitted to frontier
+	assert.Equal(t, 0, s.FrontierVisitedCount(),
+		"disallowed URL should not be in frontier")
 }
