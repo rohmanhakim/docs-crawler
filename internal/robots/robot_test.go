@@ -8,31 +8,15 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/robots/cache"
 )
 
-// robotTestMetadataSink is a test double for metadata.MetadataSink.
-type robotTestMetadataSink struct {
-	fetchEvents  []metadata.FetchEvent
-	errorRecords []metadata.ErrorRecord
-}
+// robotTestMetadataSink is an alias to the shared mock in metadatatest package.
+type robotTestMetadataSink = metadatatest.SinkMock
 
 var _ metadata.MetadataSink = (*robotTestMetadataSink)(nil)
-
-func (m *robotTestMetadataSink) RecordFetch(event metadata.FetchEvent) {
-	m.fetchEvents = append(m.fetchEvents, event)
-}
-
-func (m *robotTestMetadataSink) RecordError(record metadata.ErrorRecord) {
-	m.errorRecords = append(m.errorRecords, record)
-}
-
-func (m *robotTestMetadataSink) RecordArtifact(record metadata.ArtifactRecord) {}
-
-func (m *robotTestMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {}
-
-func (m *robotTestMetadataSink) RecordSkip(event metadata.SkipEvent) {}
 
 // setupTestServer creates a test HTTP server that serves robots.txt content
 func setupTestServer(robotsContent string) *httptest.Server {
@@ -531,11 +515,11 @@ Allow: /`
 		t.Fatalf("Expected no error, got: %v", err)
 	}
 
-	if len(sink.fetchEvents) != 1 {
-		t.Fatalf("Expected exactly 1 FetchEvent, got %d", len(sink.fetchEvents))
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("Expected exactly 1 FetchEvent, got %d", len(sink.FetchEvents))
 	}
 
-	event := sink.fetchEvents[0]
+	event := sink.FetchEvents[0]
 
 	if event.Kind() != metadata.KindRobots {
 		t.Errorf("Expected FetchEvent.Kind == KindRobots, got %q", event.Kind())
@@ -565,7 +549,7 @@ func TestRobot_Decide_ServerError(t *testing.T) {
 	}
 
 	// Verify error was recorded
-	if len(sink.errorRecords) == 0 {
+	if len(sink.ErrorRecords) == 0 {
 		t.Error("Expected error to be recorded in metadata sink")
 	}
 }

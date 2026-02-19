@@ -12,33 +12,16 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
-// mockMetadataSink is a test double for metadata.MetadataSink.
-// Compile-time check that it satisfies the full interface.
+// mockMetadataSink is an alias to the shared mock in metadatatest package.
+type mockMetadataSink = metadatatest.SinkMock
+
 var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
-
-type mockMetadataSink struct {
-	fetchEvents []metadata.FetchEvent
-	errorEvents []metadata.ErrorRecord
-}
-
-func (m *mockMetadataSink) RecordFetch(event metadata.FetchEvent) {
-	m.fetchEvents = append(m.fetchEvents, event)
-}
-
-func (m *mockMetadataSink) RecordArtifact(record metadata.ArtifactRecord) {}
-
-func (m *mockMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {}
-
-func (m *mockMetadataSink) RecordSkip(event metadata.SkipEvent) {}
-
-func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord) {
-	m.errorEvents = append(m.errorEvents, record)
-}
 
 // createTestRetryParam creates retry parameters for testing
 func createTestRetryParam(maxAttempts int) retry.RetryParam {
@@ -86,11 +69,11 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 	}
 
 	// Verify fetch event was recorded
-	if len(sink.fetchEvents) != 1 {
-		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("expected 1 fetch event, got %d", len(sink.FetchEvents))
 	}
 
-	fetchEvt := sink.fetchEvents[0]
+	fetchEvt := sink.FetchEvents[0]
 	if fetchEvt.FetchURL() != server.URL {
 		t.Errorf("expected URL %s, got %s", server.URL, fetchEvt.FetchURL())
 	}
@@ -113,8 +96,8 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 	}
 
 	// Verify no error events were recorded
-	if len(sink.errorEvents) != 0 {
-		t.Errorf("expected 0 error events, got %d", len(sink.errorEvents))
+	if len(sink.ErrorRecords) != 0 {
+		t.Errorf("expected 0 error events, got %d", len(sink.ErrorRecords))
 	}
 }
 
@@ -152,16 +135,16 @@ func TestHtmlFetcher_Fetch_NonHTMLContent(t *testing.T) {
 	}
 
 	// Verify fetch event was recorded with status 0 (error case)
-	if len(sink.fetchEvents) != 1 {
-		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("expected 1 fetch event, got %d", len(sink.FetchEvents))
 	}
 
 	// Verify error event was recorded
-	if len(sink.errorEvents) != 1 {
-		t.Fatalf("expected 1 error event, got %d", len(sink.errorEvents))
+	if len(sink.ErrorRecords) != 1 {
+		t.Fatalf("expected 1 error event, got %d", len(sink.ErrorRecords))
 	}
 
-	errorEvt := sink.errorEvents[0]
+	errorEvt := sink.ErrorRecords[0]
 	if errorEvt.PackageName() != "fetcher" {
 		t.Errorf("expected package name 'fetcher', got %s", errorEvt.PackageName())
 	}
@@ -265,20 +248,20 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 	}
 
 	// Verify error event was recorded as retry failure
-	if len(sink.errorEvents) != 1 {
-		t.Fatalf("expected 1 error event, got %d", len(sink.errorEvents))
+	if len(sink.ErrorRecords) != 1 {
+		t.Fatalf("expected 1 error event, got %d", len(sink.ErrorRecords))
 	}
 
-	errorEvt := sink.errorEvents[0]
+	errorEvt := sink.ErrorRecords[0]
 	if errorEvt.Cause() != metadata.CauseRetryFailure {
 		t.Errorf("expected cause CauseRetryFailure, got %v", errorEvt.Cause())
 	}
 
 	// Verify retry count records actual attempts (2), not MaxAttempts
-	if len(sink.fetchEvents) != 1 {
-		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("expected 1 fetch event, got %d", len(sink.FetchEvents))
 	}
-	fetchEvt := sink.fetchEvents[0]
+	fetchEvt := sink.FetchEvents[0]
 	if fetchEvt.RetryCount() != 2 {
 		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.RetryCount())
 	}
@@ -356,17 +339,17 @@ func TestHtmlFetcher_Fetch_SuccessAfterRetry(t *testing.T) {
 	}
 
 	// Verify retry count records actual attempts (2), not MaxAttempts (3)
-	if len(sink.fetchEvents) != 1 {
-		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("expected 1 fetch event, got %d", len(sink.FetchEvents))
 	}
-	fetchEvt := sink.fetchEvents[0]
+	fetchEvt := sink.FetchEvents[0]
 	if fetchEvt.RetryCount() != 2 {
 		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.RetryCount())
 	}
 
 	// Verify no error events were recorded (success case)
-	if len(sink.errorEvents) != 0 {
-		t.Errorf("expected 0 error events, got %d", len(sink.errorEvents))
+	if len(sink.ErrorRecords) != 0 {
+		t.Errorf("expected 0 error events, got %d", len(sink.ErrorRecords))
 	}
 }
 
@@ -628,16 +611,16 @@ func TestHtmlFetcher_Fetch_ReadResponseBodyError(t *testing.T) {
 	}
 
 	// Verify fetch event was recorded
-	if len(sink.fetchEvents) != 1 {
-		t.Fatalf("expected 1 fetch event, got %d", len(sink.fetchEvents))
+	if len(sink.FetchEvents) != 1 {
+		t.Fatalf("expected 1 fetch event, got %d", len(sink.FetchEvents))
 	}
 
 	// Verify error event was recorded as retry failure
-	if len(sink.errorEvents) != 1 {
-		t.Fatalf("expected 1 error event, got %d", len(sink.errorEvents))
+	if len(sink.ErrorRecords) != 1 {
+		t.Fatalf("expected 1 error event, got %d", len(sink.ErrorRecords))
 	}
 
-	errorEvt := sink.errorEvents[0]
+	errorEvt := sink.ErrorRecords[0]
 	if errorEvt.PackageName() != "fetcher" {
 		t.Errorf("expected package name 'fetcher', got %s", errorEvt.PackageName())
 	}

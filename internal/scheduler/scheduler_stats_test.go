@@ -10,6 +10,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
@@ -499,7 +500,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -580,5 +581,5 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	// Note: This is a weak check because the actual error counts depend on
 	// the specific behavior of the pipeline components
 	t.Logf("Final error count: %d, Sink error count: %d",
-		mockFinalizer.recordedStats.TotalErrors(), errorSink.errorCount)
+		mockFinalizer.recordedStats.TotalErrors(), len(errorSink.ErrorRecords))
 }

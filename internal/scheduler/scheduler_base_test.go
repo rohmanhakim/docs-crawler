@@ -21,7 +21,6 @@ import (
 // compile-time interface checks
 var _ metadata.CrawlFinalizer = (*mockFinalizer)(nil)
 var _ metadata.MetadataSink = (*metadata.NoopSink)(nil)
-var _ metadata.MetadataSink = (*errorRecordingSink)(nil)
 
 // TestScheduler_ConfigurationImmutability verifies that the scheduler
 // uses the configuration as provided and doesn't modify it.
@@ -306,7 +305,6 @@ func TestInterfaceCompliance(t *testing.T) {
 	// This test ensures our mocks implement the required interfaces
 	var _ metadata.CrawlFinalizer = (*mockFinalizer)(nil)
 	var _ metadata.MetadataSink = (*metadata.NoopSink)(nil)
-	var _ metadata.MetadataSink = (*errorRecordingSink)(nil)
 }
 
 // mustParseURL is a test helper that parses a URL or panics

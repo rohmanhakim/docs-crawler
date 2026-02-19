@@ -3,31 +3,12 @@ package sanitizer_test
 import (
 	"strings"
 
-	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"golang.org/x/net/html"
 )
 
-// mockMetadataSink is a test double for metadata.MetadataSink.
-type mockMetadataSink struct {
-	errors         []metadata.ErrorRecord
-	pipelineEvents []metadata.PipelineEvent
-}
-
-var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
-
-func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord) {
-	m.errors = append(m.errors, record)
-}
-
-func (m *mockMetadataSink) RecordFetch(event metadata.FetchEvent) {}
-
-func (m *mockMetadataSink) RecordArtifact(record metadata.ArtifactRecord) {}
-
-func (m *mockMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {
-	m.pipelineEvents = append(m.pipelineEvents, event)
-}
-
-func (m *mockMetadataSink) RecordSkip(event metadata.SkipEvent) {}
+// mockMetadataSink is an alias to the shared mock in metadatatest package.
+type mockMetadataSink = metadatatest.SinkMock
 
 // renderHtmlForTest serializes an html.Node to its HTML string representation.
 // This is used to compare sanitized output against expected fixtures.

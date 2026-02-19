@@ -39,9 +39,9 @@ func TestSanitize_SuccessCases(t *testing.T) {
 			assert.NotNil(t, result.GetContentNode(), "Result should have a non-nil content node")
 
 			// A successful sanitization must emit exactly one PipelineEvent for StageSanitize.
-			require.Len(t, mockSink.pipelineEvents, 1, "Successful sanitization should emit one PipelineEvent")
-			assert.Equal(t, metadata.StageSanitize, mockSink.pipelineEvents[0].Stage())
-			assert.True(t, mockSink.pipelineEvents[0].Success())
+			require.Len(t, mockSink.PipelineEvents, 1, "Successful sanitization should emit one PipelineEvent")
+			assert.Equal(t, metadata.StageSanitize, mockSink.PipelineEvents[0].Stage())
+			assert.True(t, mockSink.PipelineEvents[0].Success())
 		})
 	}
 }
@@ -160,7 +160,7 @@ func TestSanitize_NilNode(t *testing.T) {
 	// Assert
 	assert.Error(t, err, "Sanitize should return error for nil node")
 	assert.Nil(t, result.GetContentNode(), "Result should have nil content node")
-	assert.NotEmpty(t, mockSink.errors, "Error should be recorded in metadata sink")
+	assert.NotEmpty(t, mockSink.ErrorRecords, "Error should be recorded in metadata sink")
 }
 
 func TestSanitize_EmptyNode(t *testing.T) {
@@ -180,7 +180,7 @@ func TestSanitize_EmptyNode(t *testing.T) {
 	// Assert
 	assert.Error(t, err, "Sanitize should return error for empty node (no children)")
 	assert.Nil(t, result.GetContentNode(), "Result should have nil content node")
-	assert.NotEmpty(t, mockSink.errors, "Error should be recorded in metadata sink")
+	assert.NotEmpty(t, mockSink.ErrorRecords, "Error should be recorded in metadata sink")
 }
 
 func TestSanitize_ReturnsSanitizationErrorType(t *testing.T) {

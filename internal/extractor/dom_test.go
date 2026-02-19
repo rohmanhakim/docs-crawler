@@ -12,26 +12,14 @@ import (
 	"golang.org/x/net/html"
 )
 
-// mockMetadataSink is a test spy that captures recorded errors
+// mockMetadataSink is a test spy that embeds NoopSink and captures recorded errors.
 type mockMetadataSink struct {
 	metadata.NoopSink
-	errors []recordedError
-}
-
-type recordedError struct {
-	PackageName string
-	Action      string
-	Cause       metadata.ErrorCause
-	ErrorString string
+	errors []metadata.ErrorRecord
 }
 
 func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord) {
-	m.errors = append(m.errors, recordedError{
-		PackageName: record.PackageName(),
-		Action:      record.Action(),
-		Cause:       record.Cause(),
-		ErrorString: record.ErrorString(),
-	})
+	m.errors = append(m.errors, record)
 }
 
 func setupExtractor(customSelectors ...string) (*extractor.DomExtractor, *mockMetadataSink) {
@@ -91,7 +79,7 @@ func TestExtract_Case_B_MainEmpty(t *testing.T) {
 
 	// Verify metadata sink received the error
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
-	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+	assert.Equal(t, metadata.ErrorCause(metadata.CauseContentInvalid), sink.errors[0].Cause())
 }
 
 // TestExtract_Case_C_MainNavOnly tests: <main> contains only navigation
@@ -109,7 +97,7 @@ func TestExtract_Case_C_MainNavOnly(t *testing.T) {
 	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
-	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+	assert.Equal(t, metadata.ErrorCause(metadata.CauseContentInvalid), sink.errors[0].Cause())
 }
 
 // TestExtract_Case_D_ArticleFallback tests: <main> invalid, <article> valid
@@ -157,7 +145,7 @@ func TestExtract_Case_G_NoContent(t *testing.T) {
 	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
-	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+	assert.Equal(t, metadata.ErrorCause(metadata.CauseContentInvalid), sink.errors[0].Cause())
 }
 
 // TestExtract_Case_H_NotHTML_XML tests non-HTML XML content
@@ -175,7 +163,7 @@ func TestExtract_Case_H_NotHTML_XML(t *testing.T) {
 	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
-	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+	assert.Equal(t, metadata.ErrorCause(metadata.CauseContentInvalid), sink.errors[0].Cause())
 }
 
 // TestExtract_Case_I_NotHTML_Text tests plain text content
@@ -193,7 +181,7 @@ func TestExtract_Case_I_NotHTML_Text(t *testing.T) {
 	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
-	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+	assert.Equal(t, metadata.ErrorCause(metadata.CauseContentInvalid), sink.errors[0].Cause())
 }
 
 // TestExtract_Case_E_KnownDocContainer tests: No semantic containers, known doc container present
@@ -286,7 +274,7 @@ func TestExtract_Case_Layer2Empty(t *testing.T) {
 	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
-	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+	assert.Equal(t, metadata.ErrorCause(metadata.CauseContentInvalid), sink.errors[0].Cause())
 }
 
 // TestExtract_Case_Layer2NavOnly tests: Semantic container nav-only, known doc container also nav-only
@@ -304,7 +292,7 @@ func TestExtract_Case_Layer2NavOnly(t *testing.T) {
 	assert.Equal(t, string(failure.SeverityRecoverable), string(err.Severity()))
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
-	assert.Equal(t, int(metadata.CauseContentInvalid), int(sink.errors[0].Cause))
+	assert.Equal(t, metadata.ErrorCause(metadata.CauseContentInvalid), sink.errors[0].Cause())
 }
 
 // TestExtract_CustomSelector tests: Using custom selector provided via constructor

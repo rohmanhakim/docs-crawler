@@ -93,15 +93,15 @@ func TestLocalSink_Write_Success(t *testing.T) {
 			}
 
 			// Verify metadata recording
-			if mockSink.recordErrorCalled {
+			if mockSink.RecordErrorCalled {
 				t.Error("expected RecordError not to be called for successful write")
 			}
 
-			if !mockSink.recordArtifactCalled {
+			if !mockSink.RecordArtifactCalled {
 				t.Error("expected RecordArtifact to be called")
 			}
 
-			ar := mockSink.recordArtifactRecord
+			ar := mockSink.LastArtifact()
 			if ar.Kind() != metadata.ArtifactMarkdown {
 				t.Errorf("expected artifact kind %s, got %s", metadata.ArtifactMarkdown, ar.Kind())
 			}
@@ -248,11 +248,11 @@ func TestLocalSink_Write_ErrorHandling(t *testing.T) {
 			}
 
 			if tt.expectMetadata {
-				if !mockSink.recordErrorCalled {
+				if !mockSink.RecordErrorCalled {
 					t.Error("expected RecordError to be called on failure")
 				}
 
-				er := mockSink.recordErrorRecord
+				er := mockSink.LastError()
 
 				// Verify RecordError parameters
 				if er.PackageName() != "storage" {
@@ -298,7 +298,7 @@ func TestLocalSink_Write_ErrorHandling(t *testing.T) {
 				}
 			}
 
-			if mockSink.recordArtifactCalled {
+			if mockSink.RecordArtifactCalled {
 				t.Error("expected RecordArtifact not to be called on failure")
 			}
 		})

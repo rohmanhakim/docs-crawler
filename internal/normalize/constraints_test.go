@@ -91,23 +91,24 @@ func TestNormalize_SuccessfulFrontmatterGeneration(t *testing.T) {
 	}
 
 	// Verify pipeline stage event is emitted on success
-	if !metadataSink.recordPipelineStageCalled {
+	if !metadataSink.RecordPipelineCalled {
 		t.Error("expected RecordPipelineStage to be called on successful normalization")
 	}
-	if metadataSink.recordPipelineEvent == nil {
-		t.Fatal("expected recordPipelineEvent to be set")
+	pipelineEvent := metadataSink.LastPipelineEvent()
+	if pipelineEvent == nil {
+		t.Fatal("expected PipelineEvent to be set")
 	}
-	if metadataSink.recordPipelineEvent.Stage() != metadata.StageNormalize {
-		t.Errorf("expected Stage == StageNormalize, got: %s", metadataSink.recordPipelineEvent.Stage())
+	if pipelineEvent.Stage() != metadata.StageNormalize {
+		t.Errorf("expected Stage == StageNormalize, got: %s", pipelineEvent.Stage())
 	}
-	if !metadataSink.recordPipelineEvent.Success() {
+	if !pipelineEvent.Success() {
 		t.Error("expected PipelineEvent.Success == true")
 	}
-	if metadataSink.recordPipelineEvent.PageURL() == "" {
+	if pipelineEvent.PageURL() == "" {
 		t.Error("expected PipelineEvent.PageURL to be non-empty")
 	}
-	if metadataSink.recordPipelineEvent.PageURL() != fetchURL.String() {
-		t.Errorf("expected PipelineEvent.PageURL to be '%s', got: '%s'", fetchURL.String(), metadataSink.recordPipelineEvent.PageURL())
+	if pipelineEvent.PageURL() != fetchURL.String() {
+		t.Errorf("expected PipelineEvent.PageURL to be '%s', got: '%s'", fetchURL.String(), pipelineEvent.PageURL())
 	}
 }
 
@@ -269,16 +270,17 @@ func TestNormalize_ConstraintViolations(t *testing.T) {
 				t.Fatalf("expected error for %s (%s), got nil", tc.name, tc.invariant)
 			}
 
-			if !metadataSink.recordErrorCalled {
+			if !metadataSink.RecordErrorCalled {
 				t.Error("expected metadata sink RecordError to be called")
 			}
 
 			// Verify the attrs contain the URL attribute with correct value
-			if len(metadataSink.recordErrorAttrs) == 0 {
+			lastError := metadataSink.LastError()
+			if lastError == nil || len(lastError.Attrs()) == 0 {
 				t.Error("expected RecordError attrs to contain at least one attribute")
 			} else {
 				foundURL := false
-				for _, attr := range metadataSink.recordErrorAttrs {
+				for _, attr := range lastError.Attrs() {
 					if attr.Key() == metadata.AttrURL {
 						foundURL = true
 						if attr.Value() != fetchURL.String() {
@@ -491,7 +493,7 @@ func TestNormalize_SectionDerivation(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error, got nil")
 				}
-				if !metadataSink.recordErrorCalled {
+				if !metadataSink.RecordErrorCalled {
 					t.Error("expected metadata sink RecordError to be called")
 				}
 				return

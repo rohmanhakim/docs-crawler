@@ -5,6 +5,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -221,22 +222,8 @@ func TestConvert_LinkRefCombinations_MarkdownContent(t *testing.T) {
 	assert.Equal(t, string(expected), string(result.GetMarkdownContent()))
 }
 
-// mockMetadataSink is a test helper that captures recorded ErrorRecords.
-type mockMetadataSink struct {
-	errors         []metadata.ErrorRecord
-	pipelineEvents []metadata.PipelineEvent
-}
-
-func (m *mockMetadataSink) RecordError(record metadata.ErrorRecord) {
-	m.errors = append(m.errors, record)
-}
-
-func (m *mockMetadataSink) RecordFetch(event metadata.FetchEvent)         {}
-func (m *mockMetadataSink) RecordArtifact(record metadata.ArtifactRecord) {}
-func (m *mockMetadataSink) RecordPipelineStage(event metadata.PipelineEvent) {
-	m.pipelineEvents = append(m.pipelineEvents, event)
-}
-func (m *mockMetadataSink) RecordSkip(event metadata.SkipEvent) {}
+// mockMetadataSink is an alias to the shared mock in metadatatest package.
+type mockMetadataSink = metadatatest.SinkMock
 
 var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
 
@@ -254,7 +241,7 @@ func TestConvert_ErrorMetadataRecording(t *testing.T) {
 	// Let's use a valid conversion and verify no error was recorded.
 	_, err := rule.Convert(emptyDoc, "https://example.com/page")
 	require.NoError(t, err)
-	assert.Empty(t, mockSink.errors, "No errors should be recorded for valid conversion")
+	assert.Empty(t, mockSink.ErrorRecords, "No errors should be recorded for valid conversion")
 }
 
 // TestConvert_SuccessEmitsPipelineEvent verifies that a successful conversion emits one
@@ -271,8 +258,8 @@ func TestConvert_SuccessEmitsPipelineEvent(t *testing.T) {
 	_, err := rule.Convert(doc, pageURL)
 	require.NoError(t, err)
 
-	require.Len(t, mockSink.pipelineEvents, 1, "Expected exactly one PipelineEvent on success")
-	evt := mockSink.pipelineEvents[0]
+	require.Len(t, mockSink.PipelineEvents, 1, "Expected exactly one PipelineEvent on success")
+	evt := mockSink.PipelineEvents[0]
 	assert.Equal(t, metadata.StageConvert, evt.Stage(), "Stage must be StageConvert")
 	assert.True(t, evt.Success(), "Success must be true")
 	assert.Equal(t, pageURL, evt.PageURL(), "PageURL must match the provided URL")
@@ -294,8 +281,8 @@ func TestConvert_ErrorEmitsAttrURL(t *testing.T) {
 	_, convErr := rule.Convert(nilDoc, pageURL)
 	require.Error(t, convErr, "Expected a conversion error for nil content node")
 
-	require.Len(t, mockSink.errors, 1, "Expected exactly one ErrorRecord on failure")
-	errRecord := mockSink.errors[0]
+	require.Len(t, mockSink.ErrorRecords, 1, "Expected exactly one ErrorRecord on failure")
+	errRecord := mockSink.ErrorRecords[0]
 
 	var foundURL bool
 	for _, attr := range errRecord.Attrs() {

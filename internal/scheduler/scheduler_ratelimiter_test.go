@@ -10,6 +10,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/mock"
@@ -308,7 +309,7 @@ func TestBackoff_TriggersOnTooManyRequests(t *testing.T) {
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -374,7 +375,7 @@ func TestBackoff_TriggersOnServerError(t *testing.T) {
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -435,7 +436,7 @@ func TestBackoff_DoesNotTriggerOnOtherErrors(t *testing.T) {
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -497,7 +498,7 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -562,8 +563,8 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 	mockLimiter.AssertCalled(t, "Backoff", host)
 
 	// AND: Error should have been recorded (1 error from scheduler)
-	if errorSink.errorCount != 1 {
-		t.Errorf("Expected 1 error to be recorded, got %d", errorSink.errorCount)
+	if len(errorSink.ErrorRecords) != 1 {
+		t.Errorf("Expected 1 error to be recorded, got %d", len(errorSink.ErrorRecords))
 	}
 }
 
@@ -578,7 +579,7 @@ func TestResetBackoff_CalledOnSuccessfulRobotsRequest(t *testing.T) {
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -642,7 +643,7 @@ func TestResetBackoff_NotCalledOnFailedRobotsRequest(t *testing.T) {
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -704,7 +705,7 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
-	errorSink := &errorRecordingSink{}
+	errorSink := &metadatatest.SinkMock{}
 	mockLimiter := newRateLimiterMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
@@ -769,8 +770,8 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 	mockLimiter.AssertCalled(t, "Backoff", host)
 
 	// AND: Error should have been recorded (1 error from scheduler)
-	if errorSink.errorCount != 1 {
-		t.Errorf("Expected 1 error to be recorded, got %d", errorSink.errorCount)
+	if len(errorSink.ErrorRecords) != 1 {
+		t.Errorf("Expected 1 error to be recorded, got %d", len(errorSink.ErrorRecords))
 	}
 }
 
