@@ -274,8 +274,10 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 		s.failureJournal = failurejournal.NewFileJournal(journalPath)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout())
-	defer cancel()
+	// Note: We intentionally don't store the cancel function here.
+	// The context should remain valid throughout the crawl operation.
+	// Cancellation is handled by the HTTP client's timeout or explicit cancellation.
+	ctx, _ := context.WithTimeout(context.Background(), cfg.Timeout())
 	if s.ctx == nil {
 		s.ctx = ctx
 	}
