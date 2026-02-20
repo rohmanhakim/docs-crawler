@@ -139,7 +139,7 @@ func (r *LocalResolver) Resolve(
 			"assets",
 			"Resolver.Resolve",
 			mapAssetsErrorToMetadataCause(AssetsError{Cause: cause}),
-			fmt.Sprintf("missing asset: %s", urlStr),
+			fmt.Sprintf("missing asset: %s, cause: %v", urlStr, cause),
 			[]metadata.Attribute{
 				metadata.NewAttr(metadata.AttrAssetURL, urlStr),
 				metadata.NewAttr(metadata.AttrURL, pageUrl.String()),
@@ -239,6 +239,11 @@ func (r *LocalResolver) resolve(
 
 		// Fetch each asset with retry
 		for _, assetURL := range deduplicatedAssetsUrls {
+			// Compute canonical URL (without query params) for storage key
+			// This is the same key used in mechanicalDeduplicate for deduplication
+			canonicalAssetURL := urlutil.Canonicalize(assetURL)
+			canonicalKey := canonicalAssetURL.String()
+
 			result := r.fetchAssetWithRetry(ctx, assetURL, r.userAgent, retryParam, resolveParam.MaxAssetSize())
 
 			// Calculate retry count (attempts - 1, since first try is not a retry)
@@ -277,7 +282,8 @@ func (r *LocalResolver) resolve(
 			if existingPath := r.findPathByHash(contentHash); existingPath != "" {
 				// Content already written from different URL, add new URL entry with same hash
 				// DON'T call assetCallback - no new write happened
-				r.writtenAssets[assetURL.String()] = contentHash
+				// Store using canonical key (without query params) for consistent lookup
+				r.writtenAssets[canonicalKey] = contentHash
 				continue
 			}
 
@@ -294,8 +300,9 @@ func (r *LocalResolver) resolve(
 				continue
 			}
 
-			// Record successfully written asset: URL -> contentHash
-			r.writtenAssets[assetURL.String()] = contentHash
+			// Record successfully written asset using canonical key (without query params)
+			// This ensures consistent lookups in constructLocalPaths
+			r.writtenAssets[canonicalKey] = contentHash
 
 			// Store hash -> path mapping for content-hash deduplication lookups
 			r.hashToPath[contentHash] = localPath
@@ -338,7 +345,11 @@ func (r *LocalResolver) mechanicalDeduplicate(urls []url.URL, host string, schem
 		// Step 1: Resolve relative to absolute
 		resolved := urlutil.Resolve(u, scheme, host)
 
-		// Step 2: Normalize/Canonicalize
+		// Step 2: Normalize/Canonicalize for deduplication key only
+		// Note: We use canonical (stripped query params) for deduplication,
+		// but return the original resolved URL (with query params) for fetching.
+		// This allows same image with different params to be deduplicated,
+		// while still fetching the correct URL (e.g., with signature).
 		canonical := urlutil.Canonicalize(resolved)
 		canonicalKey := canonical.String()
 
@@ -352,8 +363,10 @@ func (r *LocalResolver) mechanicalDeduplicate(urls []url.URL, host string, schem
 		}
 
 		// Mark as seen and add to result
+		// IMPORTANT: Return resolved (with query params), not canonical
+		// This ensures the fetch uses the correct URL with signature/params
 		seenInThisCall[canonicalKey] = true
-		deduplicated = append(deduplicated, canonical)
+		deduplicated = append(deduplicated, resolved)
 	}
 
 	return deduplicated
@@ -463,7 +476,8 @@ func (r *LocalResolver) constructLocalPaths(imageUrls []url.URL, host string, sc
 		canonical := urlutil.Canonicalize(resolved)
 		canonicalURLStr := canonical.String()
 
-		// Look up content hash in writtenAssets using canonical URL
+		// Look up content hash in writtenAssets using canonical URL (without query params)
+		// This matches how we store in writtenAssets - the key is canonical (without params)
 		if contentHash, exists := r.writtenAssets[canonicalURLStr]; exists {
 			// First try to find existing path for this content hash (content-hash dedup)
 			localPath := r.findPathByHash(contentHash)

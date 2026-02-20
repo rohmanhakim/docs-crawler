@@ -835,3 +835,130 @@ func TestResolve_AssetAtSizeBoundary(t *testing.T) {
 		})
 	}
 }
+
+// TestResolve_QueryParamsPreserved tests that query parameters (like CDN signatures)
+// are preserved during fetching while still allowing deduplication via canonical URL.
+// This is a regression test for the bug where query params were stripped from the
+// fetch URL, causing CDN-signed URLs to fail with 403 errors.
+func TestResolve_QueryParamsPreserved(t *testing.T) {
+	// Arrange - server expects the full URL with query params
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify that the request URL contains the query parameters
+		query := r.URL.RawQuery
+		if query == "" {
+			t.Error("Expected query parameters in request URL, but got none")
+		}
+		// Check for expected query params (signature and resize params)
+		if !strings.Contains(query, "s=") && !strings.Contains(query, "signature") {
+			t.Errorf("Expected signature parameter in query, got: %s", query)
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("signed-image-data"))
+	}))
+	defer server.Close()
+
+	mockSink := &metadataSinkMock{}
+	resolver := newTestResolver(mockSink)
+
+	tempDir := t.TempDir()
+	// Image URL with CDN signature and other query params
+	imageURL := server.URL + "/image.png?fit=max&auto=format&q=85&s=35268aa0ad50b8c385913810e7604550"
+	linkRefs := []mdconvert.LinkRef{
+		mdconvert.NewLinkRef(imageURL, mdconvert.KindImage),
+	}
+	inputMarkdown := "![Signed image](" + imageURL + ")"
+	conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+	pageUrl, _ := url.Parse(server.URL + "/page")
+
+	// Act
+	ctx := context.Background()
+	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+
+	// Assert - no error
+	assert.NoError(t, err)
+
+	// Assert - fetch was called (the test server verifies query params are present)
+	records := mockSink.GetFetchRecords()
+	assert.Len(t, records, 1, "Should have 1 fetch record")
+
+	// Verify the fetch URL contains the query parameters (this is the key fix!)
+	assert.Contains(t, records[0].FetchURL(), "s=35268aa0ad50b8c385913810e7604550",
+		"Fetch URL should contain signature parameter")
+
+	// Assert - RecordArtifact should be called (successful fetch with params)
+	assert.True(t, mockSink.RecordArtifactCalled, "RecordArtifact should be called for successful fetch")
+
+	// Assert - writtenAssets should contain the CANONICAL URL (without query params)
+	// This is the correct behavior: we store using canonical key for consistent lookups
+	writtenAssets := resolver.WrittenAssets()
+	assert.Equal(t, 1, len(writtenAssets), "Should have 1 written asset")
+	// The key should be the canonical URL (without query params)
+	assert.Contains(t, writtenAssets, server.URL+"/image.png",
+		"writtenAssets should contain canonical URL (without query params)")
+
+	// Assert - document should have rewritten URL
+	output := string(doc.Content())
+	assert.NotContains(t, output, "s=35268aa0ad50b8c385913810e7604550", "Document should have local path, not original URL")
+	assert.Contains(t, output, "assets/images/", "Document should contain local asset path")
+}
+
+// TestResolve_QueryParamsDeduplication tests that URLs with different query params
+// but same base path are deduplicated (mechanical dedup), while still fetching
+// the correct URL for each.
+func TestResolve_QueryParamsDeduplication(t *testing.T) {
+	// Track which URLs were requested
+	var requestedURLs []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestedURLs = append(requestedURLs, r.URL.String())
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("image-data"))
+	}))
+	defer server.Close()
+
+	mockSink := &metadataSinkMock{}
+	resolver := newTestResolver(mockSink)
+
+	tempDir := t.TempDir()
+	// Same base image, different resize params (should be deduplicated)
+	url1 := server.URL + "/image.png?w=100"
+	url2 := server.URL + "/image.png?w=200"
+	linkRefs := []mdconvert.LinkRef{
+		mdconvert.NewLinkRef(url1, mdconvert.KindImage),
+		mdconvert.NewLinkRef(url2, mdconvert.KindImage),
+	}
+	inputMarkdown := "![Img1](" + url1 + ")\n\n![Img2](" + url2 + ")"
+	conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+	pageUrl, _ := url.Parse(server.URL + "/page")
+
+	// Act
+	ctx := context.Background()
+	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+
+	// Assert - no error
+	assert.NoError(t, err)
+
+	// Assert - only ONE fetch should be recorded (mechanical deduplication by canonical URL)
+	records := mockSink.GetFetchRecords()
+	assert.Len(t, records, 1, "Different query params should be mechanically deduplicated to single fetch")
+
+	// Assert - the fetch URL should be one of the original URLs (with params)
+	// Note: Due to map iteration order, either could be fetched
+	assert.True(t, records[0].FetchURL() == url1 || records[0].FetchURL() == url2,
+		"Fetch URL should be one of the input URLs with params, got: %s", records[0].FetchURL())
+
+	// Assert - only ONE entry in writtenAssets (both URLs map to same canonical key)
+	writtenAssets := resolver.WrittenAssets()
+	assert.Equal(t, 1, len(writtenAssets), "Different query params should map to same canonical key")
+
+	// Assert - the key should be the canonical URL (without query params)
+	assert.Contains(t, writtenAssets, server.URL+"/image.png",
+		"writtenAssets should contain canonical URL")
+
+	// Assert - document should have both rewritten to same local path
+	output := string(doc.Content())
+	// Both should use the same local path (first one written)
+	assert.Equal(t, 2, strings.Count(output, "assets/images/"),
+		"Both images should be rewritten to local paths")
+}
