@@ -408,8 +408,9 @@ func (r *LocalResolver) performFetch(ctx context.Context, fetchUrl url.URL, user
 	}
 	defer resp.Body.Close()
 
-	// Check Content-Length before downloading
-	if resp.ContentLength > maxAssetSize {
+	// Check Content-Length before downloading (only if maxAssetSize is set > 0)
+	// maxAssetSize = 0 means unlimited
+	if maxAssetSize > 0 && resp.ContentLength > maxAssetSize {
 		return AssetFetchResult{}, NewAssetsError(ErrCauseAssetTooLarge, fmt.Sprintf("asset too large: %d bytes (max %d)", resp.ContentLength, maxAssetSize))
 	}
 
@@ -431,19 +432,30 @@ func (r *LocalResolver) performFetch(ctx context.Context, fetchUrl url.URL, user
 		return AssetFetchResult{}, NewAssetsError(ErrCauseRedirectLimitExceeded, fmt.Sprintf("redirect error: %d", resp.StatusCode))
 	}
 
-	// Read with hard limit to protect against:
-	// - Content-Length = -1 (unknown/omitted)
-	// - Incorrect/malicious Content-Length values
-	// - Streaming responses that exceed maxAssetSize
-	limitedReader := io.LimitReader(resp.Body, maxAssetSize+1) // +1 to detect overflow
-	body, err := io.ReadAll(limitedReader)
-	if err != nil {
-		return AssetFetchResult{}, NewAssetsError(ErrCauseReadResponseBodyError, fmt.Sprintf("failed to read response body: %v", err))
-	}
+	// Read body - with or without limit based on maxAssetSize
+	// maxAssetSize = 0 means unlimited
+	var body []byte
+	if maxAssetSize > 0 {
+		// Read with hard limit to protect against:
+		// - Content-Length = -1 (unknown/omitted)
+		// - Incorrect/malicious Content-Length values
+		// - Streaming responses that exceed maxAssetSize
+		limitedReader := io.LimitReader(resp.Body, maxAssetSize+1) // +1 to detect overflow
+		body, err = io.ReadAll(limitedReader)
+		if err != nil {
+			return AssetFetchResult{}, NewAssetsError(ErrCauseReadResponseBodyError, fmt.Sprintf("failed to read response body: %v", err))
+		}
 
-	// Check if we hit the limit (body exceeds maxAssetSize)
-	if int64(len(body)) > maxAssetSize {
-		return AssetFetchResult{}, NewAssetsError(ErrCauseAssetTooLarge, fmt.Sprintf("asset too large: exceeded max %d bytes", maxAssetSize))
+		// Check if we hit the limit (body exceeds maxAssetSize)
+		if int64(len(body)) > maxAssetSize {
+			return AssetFetchResult{}, NewAssetsError(ErrCauseAssetTooLarge, fmt.Sprintf("asset too large: exceeded max %d bytes", maxAssetSize))
+		}
+	} else {
+		// No limit - read entire body
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return AssetFetchResult{}, NewAssetsError(ErrCauseReadResponseBodyError, fmt.Sprintf("failed to read response body: %v", err))
+		}
 	}
 
 	return NewAssetFetchResult(fetchUrl, resp.StatusCode, duration, startTime, body), nil

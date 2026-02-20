@@ -2,6 +2,7 @@ package assets_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -831,6 +832,100 @@ func TestResolve_AssetAtSizeBoundary(t *testing.T) {
 				assert.Equal(t, 0, len(writtenAssets), "Oversized asset should not be in writtenAssets")
 				output := string(doc.Content())
 				assert.Contains(t, output, imageURL, "Document should preserve original URL for oversized asset")
+			}
+		})
+	}
+}
+
+// TestResolve_MaxAssetSizeZero_Unlimited tests that when maxAssetSize is 0,
+// assets are downloaded without any size limit (unlimited).
+// This is a regression test for the bug where maxAssetSize=0 was treated as
+// a 0-byte limit, causing all assets to be rejected.
+func TestResolve_MaxAssetSizeZero_Unlimited(t *testing.T) {
+	// Test cases for maxAssetSize = 0 (unlimited)
+	testCases := []struct {
+		name          string
+		bodySize      int64
+		maxAssetSize  int64
+		shouldSucceed bool
+	}{
+		{
+			name:          "zero means unlimited - small asset",
+			bodySize:      100,
+			maxAssetSize:  0,
+			shouldSucceed: true,
+		},
+		{
+			name:          "zero means unlimited - large asset",
+			bodySize:      1024,
+			maxAssetSize:  0,
+			shouldSucceed: true,
+		},
+		{
+			name:          "zero means unlimited - very large asset",
+			bodySize:      10 * 1024 * 1024, // 10MB
+			maxAssetSize:  0,
+			shouldSucceed: true,
+		},
+		{
+			name:          "zero means unlimited - with Content-Length header",
+			bodySize:      512,
+			maxAssetSize:  0,
+			shouldSucceed: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange - server returns a body of the specified size
+			bodyData := make([]byte, tc.bodySize)
+			for i := range bodyData {
+				bodyData[i] = byte(i % 256)
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Set Content-Length header to verify it's ignored when maxAssetSize=0
+				w.Header().Set("Content-Length", fmt.Sprintf("%d", tc.bodySize))
+				w.WriteHeader(http.StatusOK)
+				w.Write(bodyData)
+			}))
+			defer server.Close()
+
+			mockSink := &metadataSinkMock{}
+			resolver := newTestResolver(mockSink)
+
+			tempDir := t.TempDir()
+			imageURL := server.URL + "/large-image.png"
+			linkRefs := []mdconvert.LinkRef{
+				mdconvert.NewLinkRef(imageURL, mdconvert.KindImage),
+			}
+			inputMarkdown := "![Large image](" + imageURL + ")"
+			conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+			pageUrl, _ := url.Parse(server.URL + "/page")
+
+			// Act - use maxAssetSize of 0 (should mean unlimited)
+			ctx := context.Background()
+			resolveParam := assets.NewResolveParam(tempDir, tc.maxAssetSize, hashutil.HashAlgoSHA256)
+			doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+
+			// Assert - no error from Resolve
+			assert.NoError(t, err)
+
+			if tc.shouldSucceed {
+				// Asset should be successfully downloaded (no size limit)
+				assert.True(t, mockSink.RecordArtifactCalled, "RecordArtifact should be called for unlimited size")
+				assert.False(t, mockSink.RecordErrorCalled, "RecordError should not be called for unlimited size")
+				writtenAssets := resolver.WrittenAssets()
+				assert.Equal(t, 1, len(writtenAssets), "Asset should be in writtenAssets")
+
+				// Verify the entire body was read correctly
+				artifactRecords := mockSink.GetArtifactRecords()
+				assert.Len(t, artifactRecords, 1)
+				assert.Equal(t, tc.bodySize, artifactRecords[0].Bytes(), "All bytes should be downloaded")
+
+				// Document should have rewritten URL
+				output := string(doc.Content())
+				assert.NotContains(t, output, imageURL, "Document should have rewritten URL")
+				assert.Contains(t, output, "assets/images/", "Document should contain local asset path")
 			}
 		})
 	}
