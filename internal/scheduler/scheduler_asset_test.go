@@ -16,6 +16,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/internal/stagedump"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/stretchr/testify/assert"
@@ -645,6 +646,7 @@ func createSchedulerWithAllMocks(
 		mockStorage,
 		mockSleeper,
 		mockFailureJournal,
+		stagedump.NewNoOpDumper(),
 	)
 	return &s
 }

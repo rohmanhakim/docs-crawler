@@ -22,6 +22,7 @@ var (
 	concurrency       int
 	outputDir         string
 	dryRun            bool
+	dumpStageOutput   string
 	maxPages          int
 	userAgent         string
 	timeout           time.Duration
@@ -119,7 +120,7 @@ producing high-quality Markdown suitable for embedding and retrieval.`,
 		fmt.Printf("User Agent: %s\n", cfg.UserAgent())
 		fmt.Printf("Output Directory: %s\n", cfg.OutputDir())
 		fmt.Printf("Dry Run: %t\n", cfg.DryRun())
-
+		fmt.Printf("Dump Stage Output: %s\n", cfg.DumpStageOutput())
 		// Create scheduler with config-based dependency injection
 		sched := scheduler.NewSchedulerWithConfig(cfg)
 
@@ -205,6 +206,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 3, "number of concurrent fetch workers")
 	rootCmd.PersistentFlags().StringVar(&outputDir, "output-dir", "output", "root output directory for crawled content")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "crawl without writing output")
+	rootCmd.PersistentFlags().StringVar(&dumpStageOutput, "dump-stage-output", "", "directory to dump intermediate stage outputs (for debugging)")
 	rootCmd.PersistentFlags().IntVar(&maxPages, "max-pages", 0, "maximum number of pages to fetch (0 for unlimited)")
 	rootCmd.PersistentFlags().StringVar(&userAgent, "user-agent", "", "user agent string for HTTP requests")
 	rootCmd.PersistentFlags().DurationVar(&timeout, "timeout", 0, "timeout for HTTP requests")
@@ -266,6 +268,10 @@ func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
 		configBuilder = configBuilder.WithDryRun(dryRun)
 	}
 
+	if dumpStageOutput != "" {
+		configBuilder = configBuilder.WithDumpStageOutput(dumpStageOutput)
+	}
+
 	if maxPages > 0 {
 		configBuilder = configBuilder.WithMaxPages(maxPages)
 	}
@@ -312,6 +318,7 @@ func ResetFlags() {
 	concurrency = 0
 	outputDir = ""
 	dryRun = false
+	dumpStageOutput = ""
 	maxPages = 0
 	userAgent = ""
 	timeout = 0
@@ -382,4 +389,8 @@ func SetAllowedPathPrefixForTest(prefixes []string) {
 
 func SetVersionFlagForTest(v bool) {
 	versionFlag = v
+}
+
+func SetDumpStageOutputForTest(dir string) {
+	dumpStageOutput = dir
 }

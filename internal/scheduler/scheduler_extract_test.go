@@ -16,6 +16,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/internal/stagedump"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -490,6 +491,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 		mockStorage,
 		mockSleeper,
 		mockFailureJournal,
+		stagedump.NewNoOpDumper(),
 	)
 
 	tmpDir := t.TempDir()
@@ -593,6 +595,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 		mockStorage,
 		mockSleeper,
 		mockFailureJournal,
+		stagedump.NewNoOpDumper(),
 	)
 
 	tmpDir := t.TempDir()

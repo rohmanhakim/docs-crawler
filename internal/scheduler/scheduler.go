@@ -6,9 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
@@ -22,6 +20,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/normalize"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
+	"github.com/rohmanhakim/docs-crawler/internal/stagedump"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
@@ -82,6 +81,7 @@ type Scheduler struct {
 	currentHost            string
 	rateLimiter            limiter.RateLimiter
 	sleeper                timeutil.Sleeper
+	stageDumper            stagedump.Dumper
 }
 
 func NewScheduler() Scheduler {
@@ -134,6 +134,7 @@ func NewSchedulerWithDeps(
 	storageSink storage.Sink,
 	sleeper timeutil.Sleeper,
 	failureJournal failurejournal.Journal,
+	stageDumper stagedump.Dumper,
 ) Scheduler {
 	return Scheduler{
 		ctx:                    ctx,
@@ -151,6 +152,7 @@ func NewSchedulerWithDeps(
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
 		sleeper:                sleeper,
+		stageDumper:            stageDumper,
 	}
 }
 
@@ -415,6 +417,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 
 		// 3. Fetch Page URL
 		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryParam(cfg))
+		urlStr := getURLString(nextCrawlToken.URL())
 		if err != nil {
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
@@ -434,6 +437,9 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			continue
 		}
 
+		// Dump fetched HTML
+		s.stageDumper.DumpFetcherOutput(urlStr, fetchResult.Body())
+
 		// 4. Extract HTML DOM
 		extractionResult, err := s.domExtractor.Extract(fetchResult.URL(), fetchResult.Body())
 		if err != nil {
@@ -446,13 +452,10 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			continue
 		}
 
-		// 5. Sanitize extracted HTML
-		// DEBUG: Dump input HTML before sanitization
-		// urlPrefix := sanitizeFilename(getURLString(nextCrawlToken.URL()))
-		// if dumpErr := dumpHTMLNode(extractionResult.ContentNode, fmt.Sprintf("/tmp/%s_sanitizer_input.html", urlPrefix)); dumpErr != nil {
-		// 	log.Printf("DEBUG: failed to dump input HTML: %v", dumpErr)
-		// }
+		// Dump extraction result
+		s.stageDumper.DumpExtractorOutput(urlStr, extractionResult.ContentNode)
 
+		// 5. Sanitize extracted HTML
 		sanitizedHtml, err := s.htmlSanitizer.Sanitize(extractionResult.ContentNode)
 		if err != nil {
 			if err.Impact() == failure.ImpactLevelAbort {
@@ -464,10 +467,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			continue
 		}
 
-		// DEBUG: Dump output HTML after sanitization
-		// if dumpErr := dumpHTMLNode(sanitizedHtml.GetContentNode(), fmt.Sprintf("/tmp/%s_sanitizer_output.html", urlPrefix)); dumpErr != nil {
-		// 	log.Printf("DEBUG: failed to dump output HTML: %v", dumpErr)
-		// }
+		// Dump sanitization result
+		s.stageDumper.DumpSanitizerOutput(urlStr, sanitizedHtml.GetContentNode())
 
 		// 5.2 Resolve relative URLs to absolute URLs and filter by host
 		discoveredURLs := sanitizedHtml.GetDiscoveredURLs()
@@ -508,6 +509,9 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			continue
 		}
 
+		// Dump markdown conversion result
+		s.stageDumper.DumpMDConvertOutput(urlStr, markdownDoc.GetMarkdownContent())
+
 		// 7. Assets Resolution
 		resolveParam := assets.NewResolveParam(cfg.OutputDir(), cfg.MaxAssetSize(), cfg.HashAlgo())
 		assetfulMarkdown, err := s.assetResolver.Resolve(
@@ -537,10 +541,8 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// Count assets processed - use the actual count of successfully resolved local assets
 		totalAssets += len(assetfulMarkdown.LocalAssets())
 
-		// DEBUG: Dump assetfulMarkdown before normalization
-		if dumpErr := dumpAssetfulMarkdown(cfg.RandomSeed(), getURLString(nextCrawlToken.URL()), assetfulMarkdown); dumpErr != nil {
-			log.Printf("DEBUG: failed to dump assetfulMarkdown: %v", dumpErr)
-		}
+		// Dump asset resolving result
+		s.stageDumper.DumpAssetResolverOutput(urlStr, assetfulMarkdown.Content())
 
 		// 8. Markdown Normalization
 		normalizeParam := normalize.NewNormalizeParam(
@@ -706,45 +708,6 @@ func getURLString(u url.URL) string {
 	return u.String()
 }
 
-// ---------------------------------------------------------------------------
-// Temporary Debug Functions
-// These functions are for debugging purposes and should be removed later.
-// ---------------------------------------------------------------------------
-
-// sanitizeFilename converts a URL string to a safe filename prefix.
-// This is a temporary debug helper function.
-func sanitizeFilename(urlStr string) string {
-	// Remove scheme
-	result := strings.TrimPrefix(urlStr, "https://")
-	result = strings.TrimPrefix(result, "http://")
-	// Replace problematic characters
-	result = strings.ReplaceAll(result, "/", "_")
-	result = strings.ReplaceAll(result, "?", "_")
-	result = strings.ReplaceAll(result, "&", "_")
-	result = strings.ReplaceAll(result, "=", "_")
-	// Truncate if too long
-	if len(result) > 100 {
-		result = result[:100]
-	}
-	return result
-}
-
-// dumpAssetfulMarkdown writes the AssetfulMarkdownDoc content to a debug file.
-// Directory: /tmp/<randomSeed>_debug/
-// Filename: <url_prefix>_assetful.md
-// This is a temporary debug helper function.
-func dumpAssetfulMarkdown(randomSeed int64, urlStr string, doc assets.AssetfulMarkdownDoc) error {
-	dirPath := fmt.Sprintf("/tmp/%d_docs-crawler_debug", randomSeed)
-	if err := os.MkdirAll(dirPath, 0755); err != nil {
-		return err
-	}
-
-	filename := fmt.Sprintf("%s_assetful.md", sanitizeFilename(urlStr))
-	filePath := filepath.Join(dirPath, filename)
-
-	return os.WriteFile(filePath, doc.Content(), 0644)
-}
-
 // NewSchedulerWithConfig creates a new Scheduler with config-based dependency injection.
 // This constructor determines whether to use DryRunSink or LocalSink based on cfg.DryRun().
 func NewSchedulerWithConfig(cfg config.Config) Scheduler {
@@ -770,6 +733,13 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 
 	rateLimiter := limiter.NewConcurrentRateLimiter()
 	sleeper := timeutil.NewRealSleeper()
+
+	// Initialize stage dumper based on config
+	var stageDumper stagedump.Dumper = stagedump.NewNoOpDumper()
+	if cfg.DumpStageOutput() != "" {
+		stageDumper = stagedump.NewFileDumper(cfg.DumpStageOutput(), cfg.DryRun())
+	}
+
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
@@ -784,6 +754,7 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
 		sleeper:                &sleeper,
+		stageDumper:            stageDumper,
 	}
 }
 

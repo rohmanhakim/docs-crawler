@@ -75,6 +75,9 @@ type Config struct {
 	// Whether the program will simulates what it would do without
 	// actually performing any irreversible or side-effecting actions
 	dryRun bool
+	// Directory to dump intermediate stage outputs for debugging.
+	// Empty means stage dumping is disabled.
+	dumpStageOutput string
 
 	//===============
 	// Extraction
@@ -148,6 +151,7 @@ type configDTO struct {
 	MaxAssetSize           *int64              `json:"maxAssetSize,omitempty"`
 	OutputDir              *string             `json:"outputDir,omitempty"`
 	DryRun                 *bool               `json:"dryRun,omitempty"`
+	DumpStageOutput        *string             `json:"dumpStageOutput,omitempty"`
 	// Extraction parameters
 	BodySpecificityBias                 *float64 `json:"bodySpecificityBias,omitempty"`
 	LinkDensityThreshold                *float64 `json:"linkDensityThreshold,omitempty"`
@@ -226,6 +230,10 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	// DryRun is a boolean - check if explicitly set (nil means use default false)
 	if dto.DryRun != nil {
 		cfg.dryRun = *dto.DryRun
+	}
+	// DumpStageOutput - directory for stage dumps
+	if dto.DumpStageOutput != nil {
+		cfg.dumpStageOutput = *dto.DumpStageOutput
 	}
 
 	// HTTP client parameters - check if pointer is not nil
@@ -440,6 +448,11 @@ func (c *Config) WithDryRun(dryRun bool) *Config {
 	return c
 }
 
+func (c *Config) WithDumpStageOutput(dumpStageOutput string) *Config {
+	c.dumpStageOutput = dumpStageOutput
+	return c
+}
+
 func (c *Config) WithBodySpecificityBias(bias float64) *Config {
 	c.bodySpecificityBias = bias
 	return c
@@ -595,6 +608,10 @@ func (c Config) OutputDir() string {
 
 func (c Config) DryRun() bool {
 	return c.dryRun
+}
+
+func (c Config) DumpStageOutput() string {
+	return c.dumpStageOutput
 }
 
 func (c Config) MaxAttempt() int {

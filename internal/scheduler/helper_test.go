@@ -13,6 +13,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/internal/stagedump"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
@@ -82,6 +83,7 @@ func createSchedulerForTest(
 		mockStorage,
 		mockSleeper,
 		mockFailureJournal,
+		stagedump.NewNoOpDumper(),
 	)
 	return &s
 }
