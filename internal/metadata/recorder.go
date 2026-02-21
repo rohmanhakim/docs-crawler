@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -73,7 +74,8 @@ type Recorder struct {
 	workerId string
 	mu       sync.RWMutex
 	events   []Event
-	subs     []chan Event // streaming subscribers; forwarded on every append
+	subs     []chan Event   // streaming subscribers; forwarded on every append
+	subWg    sync.WaitGroup // tracks active subscriber goroutines
 }
 
 func NewRecorder(workerId string) Recorder {
@@ -83,21 +85,27 @@ func NewRecorder(workerId string) Recorder {
 }
 
 // Subscribe creates a new subscriber channel and returns it along with an
-// unsubscribe function. After this call returns, every subsequent event
-// appended to the log is forwarded to the channel in a non-blocking send.
-// Events recorded before Subscribe was called are NOT delivered — subscribers
-// receive only future events (forward-only).
+// unsubscribe function and a done callback. After this call returns, every
+// subsequent event appended to the log is forwarded to the channel in a
+// non-blocking send. Events recorded before Subscribe was called are NOT
+// delivered — subscribers receive only future events (forward-only).
 //
 // The returned channel is owned by the Recorder. Calling the unsubscribe
 // function closes the channel and removes it from the subscriber list.
 // Unsubscribe is idempotent and safe to call multiple times.
-func (r *Recorder) Subscribe() (<-chan Event, func()) {
+//
+// The done callback MUST be called when the subscriber goroutine exits.
+// After calling unsub(), call WaitForSubscribers() to block until all
+// subscriber goroutines have finished processing their buffered events.
+func (r *Recorder) Subscribe() (<-chan Event, func(), func()) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	ch := make(chan Event, 64)
+	ch := make(chan Event, 256)
 	r.subs = append(r.subs, ch)
 	idx := len(r.subs) - 1
+
+	r.subWg.Add(1)
 
 	var once sync.Once
 	unsub := func() {
@@ -111,7 +119,12 @@ func (r *Recorder) Subscribe() (<-chan Event, func()) {
 		})
 	}
 
-	return ch, unsub
+	// done must be called when the subscriber goroutine exits
+	done := func() {
+		r.subWg.Done()
+	}
+
+	return ch, unsub, done
 }
 
 // append is the single internal write path. It acquires the write lock,
@@ -123,13 +136,14 @@ func (r *Recorder) append(e Event) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, e)
-	for _, ch := range r.subs {
+	for i, ch := range r.subs {
 		if ch == nil {
 			continue // skip unsubscribed channels
 		}
 		select {
 		case ch <- e:
 		default: // slow consumer: event dropped, crawl not blocked
+			fmt.Printf("WARNING: Event dropped for subscriber %d: %v\n", i, e.Kind())
 		}
 	}
 }
@@ -179,4 +193,11 @@ Contract:
 */
 func (r *Recorder) RecordFinalCrawlStats(stats CrawlStats) {
 	r.append(Event{kind: EventKindStats, stats: &stats})
+}
+
+// WaitForSubscribers blocks until all subscriber goroutines have finished
+// processing their buffered events. Call this after unsub() to ensure no events
+// are lost due to the channel being closed before events are processed.
+func (r *Recorder) WaitForSubscribers() {
+	r.subWg.Wait()
 }

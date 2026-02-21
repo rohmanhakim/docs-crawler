@@ -293,7 +293,8 @@ func TestRecorder_Subscribe_ReceivesEvents(t *testing.T) {
 	now := time.Now()
 	r := newTestRecorder(t)
 
-	ch, _ := r.Subscribe()
+	ch, _, done := r.Subscribe()
+	defer done()
 
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
 	r.RecordSkip(metadata.NewSkipEvent("https://example.com/skip", metadata.SkipReasonRobotsDisallow, now))
@@ -320,8 +321,8 @@ func TestRecorder_Subscribe_SlowConsumerDoesNotBlock(t *testing.T) {
 	now := time.Now()
 	r := newTestRecorder(t)
 
-	// Subscribe creates a buffered channel (capacity 64)
-	_, unsub := r.Subscribe()
+	// Subscribe creates a buffered channel (capacity 256)
+	_, unsub, done := r.Subscribe()
 
 	// Record 65 events rapidly - if the channel were unbuffered or blocking,
 	// this would hang. The internal log must still receive all events.
@@ -335,6 +336,7 @@ func TestRecorder_Subscribe_SlowConsumerDoesNotBlock(t *testing.T) {
 	}
 
 	unsub() // cleanup
+	done()  // signal goroutine done
 }
 
 // TestRecorder_Subscribe_ForwardOnly verifies that a subscriber registered
@@ -347,7 +349,8 @@ func TestRecorder_Subscribe_ForwardOnly(t *testing.T) {
 	// Record one event BEFORE subscribing.
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com/before", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
 
-	ch, _ := r.Subscribe()
+	ch, _, done := r.Subscribe()
+	defer done()
 
 	// Record a second event AFTER subscribing.
 	r.RecordSkip(metadata.NewSkipEvent("https://example.com/after", metadata.SkipReasonRobotsDisallow, now))
@@ -374,8 +377,10 @@ func TestRecorder_Subscribe_MultipleSubscribers(t *testing.T) {
 	now := time.Now()
 	r := newTestRecorder(t)
 
-	ch1, _ := r.Subscribe()
-	ch2, _ := r.Subscribe()
+	ch1, _, done1 := r.Subscribe()
+	ch2, _, done2 := r.Subscribe()
+	defer done1()
+	defer done2()
 
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
 
@@ -396,7 +401,8 @@ func TestRecorder_Subscribe_MultipleSubscribers(t *testing.T) {
 func TestRecorder_Subscribe_UnsubscribeClosesChannel(t *testing.T) {
 	r := newTestRecorder(t)
 
-	ch, unsub := r.Subscribe()
+	ch, unsub, done := r.Subscribe()
+	defer done()
 
 	// Use a non-blocking select to verify channel is open without blocking
 	select {
@@ -421,11 +427,12 @@ func TestRecorder_Subscribe_UnsubscribeStopsEvents(t *testing.T) {
 	now := time.Now()
 	r := newTestRecorder(t)
 
-	ch, unsub := r.Subscribe()
+	ch, unsub, done := r.Subscribe()
 
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com/first", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
 
 	unsub()
+	done()
 
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com/second", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
 
@@ -449,7 +456,8 @@ func TestRecorder_Subscribe_UnsubscribeStopsEvents(t *testing.T) {
 func TestRecorder_Subscribe_UnsubscribeIdempotent(t *testing.T) {
 	r := newTestRecorder(t)
 
-	_, unsub := r.Subscribe()
+	_, unsub, done := r.Subscribe()
+	defer done()
 
 	// Call unsubscribe multiple times - should not panic
 	unsub()
@@ -463,11 +471,13 @@ func TestRecorder_Subscribe_RecordAfterAllUnsubscribed(t *testing.T) {
 	now := time.Now()
 	r := newTestRecorder(t)
 
-	_, unsub1 := r.Subscribe()
-	_, unsub2 := r.Subscribe()
+	_, unsub1, done1 := r.Subscribe()
+	_, unsub2, done2 := r.Subscribe()
 
 	unsub1()
 	unsub2()
+	done1()
+	done2()
 
 	// Recording after all subscribers unsubscribed should not panic
 	r.RecordFetch(metadata.NewFetchEvent(now, "https://example.com", 200, time.Second, "text/html", 0, 0, metadata.KindPage))
@@ -488,11 +498,12 @@ func TestRecorder_Subscribe_ConcurrentUnsubscribe(t *testing.T) {
 	wg.Add(goroutines * 2)
 
 	for i := 0; i < goroutines; i++ {
-		ch, unsub := r.Subscribe()
+		ch, unsub, done := r.Subscribe()
 
 		// Consumer goroutine
 		go func() {
 			defer wg.Done()
+			defer done()
 			for range ch {
 				// drain channel
 			}
@@ -516,5 +527,86 @@ func TestRecorder_Subscribe_ConcurrentUnsubscribe(t *testing.T) {
 	// All events must be recorded (no panic = success)
 	if len(r.Events()) != 100 {
 		t.Errorf("Events() len = %v, want 100", len(r.Events()))
+	}
+}
+
+// TestRecorder_Subscribe_WaitForSubscribersGuaranteesEventDelivery verifies that
+// when using the done() callback and WaitForSubscribers(), all events are
+// guaranteed to be delivered to the subscriber before the function returns.
+// This is a regression test for the race condition bug where events could be
+// lost if unsub() was called without waiting for the subscriber goroutine.
+// See: docs/metadata-event-race-condition-bug.md
+func TestRecorder_Subscribe_WaitForSubscribersGuaranteesEventDelivery(t *testing.T) {
+	now := time.Now()
+	r := newTestRecorder(t)
+
+	ch, unsub, done := r.Subscribe()
+
+	// Track events received by the subscriber
+	var receivedEvents []metadata.Event
+	var mu sync.Mutex
+
+	// Start consumer goroutine - simulates the pattern used in root.go
+	go func() {
+		defer done()
+		for e := range ch {
+			mu.Lock()
+			receivedEvents = append(receivedEvents, e)
+			mu.Unlock()
+		}
+	}()
+
+	// Record fetch events
+	for i := 0; i < 10; i++ {
+		r.RecordFetch(metadata.NewFetchEvent(
+			now, "https://example.com", 200, time.Second,
+			"text/html", 0, 0, metadata.KindPage,
+		))
+	}
+
+	// Record error events - these were the ones affected by the original bug
+	for i := 0; i < 5; i++ {
+		r.RecordError(metadata.NewErrorRecord(
+			now, "test", "TestAction",
+			metadata.CauseUnknown,
+			"test error",
+			nil,
+		))
+	}
+
+	// Unsubscribe - this closes the channel
+	unsub()
+
+	// Wait for all subscriber goroutines to finish processing
+	// This is the critical step that prevents the race condition
+	r.WaitForSubscribers()
+
+	// Verify ALL events were received
+	mu.Lock()
+	totalReceived := len(receivedEvents)
+	mu.Unlock()
+
+	wantCount := 15 // 10 fetch + 5 error events
+	if totalReceived != wantCount {
+		t.Errorf("received %d events, want %d - events were lost!", totalReceived, wantCount)
+	}
+
+	// Verify we received both fetch and error events
+	mu.Lock()
+	defer mu.Unlock()
+	fetchCount := 0
+	errorCount := 0
+	for _, e := range receivedEvents {
+		if e.Kind() == metadata.EventKindFetch {
+			fetchCount++
+		} else if e.Kind() == metadata.EventKindError {
+			errorCount++
+		}
+	}
+	if fetchCount != 10 {
+		t.Errorf("received %d fetch events, want 10", fetchCount)
+	}
+	if errorCount != 5 {
+		t.Errorf("received %d error events, want 5", errorCount)
 	}
 }
