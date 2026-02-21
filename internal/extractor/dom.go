@@ -106,6 +106,7 @@ func (d *DomExtractor) Extract(
 			0,
 		),
 	)
+
 	return result, nil
 }
 
@@ -214,6 +215,7 @@ func extractSemanticContainer(doc *html.Node, threshold MeaningfulThreshold) *ht
 // Known documentation container selectors from popular frameworks.
 // Combines default selectors with user-provided custom selectors (deduplicated).
 // Returns the first meaningful match, or nil if none found.
+// Skips matches that would miss an orphan header with H1 (important page title).
 func (d *DomExtractor) extractKnownDocContainer(doc *html.Node) *html.Node {
 	// Get all default selectors
 	defaultSelectors := getAllSelectors()
@@ -228,12 +230,104 @@ func (d *DomExtractor) extractKnownDocContainer(doc *html.Node) *html.Node {
 	for _, selector := range allSelectors {
 		if elem := gqDoc.Find(selector).First(); elem.Length() > 0 {
 			if node := elem.Nodes[0]; isMeaningful(node, d.params.Threshold) {
+				// Check if there's an orphan header with H1 outside this container
+				// If so, skip this match and let Layer 3 handle it (which may return <body>)
+				if hasOrphanHeaderWithH1(doc, node) {
+					continue
+				}
 				return node
 			}
 		}
 	}
 
 	return nil
+}
+
+// hasOrphanHeaderWithH1 checks if there's a header element with H1 that is NOT
+// inside the candidate container AND the candidate doesn't have its own H1.
+// This detects cases where extracting just the candidate would miss the only
+// important page title.
+// Returns true if an orphan header with H1 exists that would cause H1 loss.
+func hasOrphanHeaderWithH1(doc *html.Node, candidate *html.Node) bool {
+	// Find all header elements with H1 in the document
+	var headersWithH1 []*html.Node
+
+	var findHeaders func(*html.Node)
+	findHeaders = func(n *html.Node) {
+		if n == nil {
+			return
+		}
+
+		if n.Type == html.ElementNode && n.Data == "header" {
+			if hasMeaningfulContentInHeader(n) {
+				headersWithH1 = append(headersWithH1, n)
+			}
+		}
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			findHeaders(c)
+		}
+	}
+
+	findHeaders(doc)
+
+	// Check if candidate already has an H1 inside it
+	candidateHasH1 := hasH1Element(candidate)
+
+	// If candidate already has H1, orphan header is not a problem
+	if candidateHasH1 {
+		return false
+	}
+
+	// Check if any header with H1 is outside the candidate container
+	for _, header := range headersWithH1 {
+		if !isDescendant(header, candidate) {
+			return true // Found orphan header with H1 that would be lost
+		}
+	}
+
+	return false
+}
+
+// hasH1Element checks if a node contains an H1 element
+func hasH1Element(node *html.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	var check func(*html.Node) bool
+	check = func(n *html.Node) bool {
+		if n == nil {
+			return false
+		}
+		if n.Type == html.ElementNode && n.Data == "h1" {
+			return true
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			if check(c) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return check(node)
+}
+
+// isDescendant checks if a node is a descendant of (or equal to) another node
+func isDescendant(node, potentialAncestor *html.Node) bool {
+	if node == nil || potentialAncestor == nil {
+		return false
+	}
+
+	// Walk up the tree from node
+	for current := node; current != nil; current = current.Parent {
+		if current == potentialAncestor {
+			return true
+		}
+	}
+
+	return false
 }
 
 // extractContainerAfterExplicitChromesRemoval applies the third heuristic layer:
@@ -330,11 +424,49 @@ var chromeAttributeKeywords = []string{
 	"edit", "github",
 }
 
+// hasMeaningfulContentInHeader checks if a header element contains meaningful content
+// Returns true if header contains H1 elements or substantial text content (>50 chars)
+func hasMeaningfulContentInHeader(header *html.Node) bool {
+	var hasH1 bool
+	var textContent int
+
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n == nil {
+			return
+		}
+
+		switch n.Type {
+		case html.ElementNode:
+			if n.Data == "h1" {
+				hasH1 = true
+			}
+			// Skip navigation elements in content calculation
+			if n.Data != "nav" && n.Data != "ul" && n.Data != "ol" {
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
+			}
+		case html.TextNode:
+			text := strings.TrimSpace(n.Data)
+			if text != "" {
+				textContent += len(text)
+			}
+		}
+	}
+
+	walk(header)
+
+	// Consider meaningful if has H1 OR substantial text content (>50 chars)
+	return hasH1 || textContent > 50
+}
+
 // removeChromeElements removes elements that are always chrome (nav, header, footer, aside)
+// But preserves headers with meaningful content (H1s, substantial text)
 func removeChromeElements(root *html.Node) {
 	var nodesToRemove []*html.Node
 
-	// First pass: collect all chrome elements
+	// First pass: collect chrome elements, but be selective about headers
 	var collectChromeElements func(*html.Node)
 	collectChromeElements = func(n *html.Node) {
 		if n == nil {
@@ -342,7 +474,16 @@ func removeChromeElements(root *html.Node) {
 		}
 
 		if n.Type == html.ElementNode && chromeElementNames[n.Data] {
-			nodesToRemove = append(nodesToRemove, n)
+			if n.Data == "header" {
+				// Only remove header if it doesn't contain meaningful content
+				if !hasMeaningfulContentInHeader(n) {
+					nodesToRemove = append(nodesToRemove, n)
+				}
+				// Preserve headers with H1s or substantial text
+			} else {
+				// Remove other chrome elements unconditionally (nav, footer, aside)
+				nodesToRemove = append(nodesToRemove, n)
+			}
 		}
 
 		// Recurse into children (but not into already marked chrome elements)
@@ -361,10 +502,27 @@ func removeChromeElements(root *html.Node) {
 }
 
 // removeElementsWithChromeAttributes removes elements with class/id containing chrome keywords
+// BUT: preserves <header> elements and their descendants if the header has meaningful content
 func removeElementsWithChromeAttributes(root *html.Node) {
 	var nodesToRemove []*html.Node
 
-	// First pass: collect elements with chrome-related attributes
+	// First, find all headers with meaningful content to preserve their descendants
+	var meaningfulHeaders []*html.Node
+	var findMeaningfulHeaders func(*html.Node)
+	findMeaningfulHeaders = func(n *html.Node) {
+		if n == nil {
+			return
+		}
+		if n.Type == html.ElementNode && n.Data == "header" && hasMeaningfulContentInHeader(n) {
+			meaningfulHeaders = append(meaningfulHeaders, n)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			findMeaningfulHeaders(c)
+		}
+	}
+	findMeaningfulHeaders(root)
+
+	// Collect elements with chrome-related attributes
 	var collectChromeAttributedElements func(*html.Node)
 	collectChromeAttributedElements = func(n *html.Node) {
 		if n == nil {
@@ -372,7 +530,14 @@ func removeElementsWithChromeAttributes(root *html.Node) {
 		}
 
 		if n.Type == html.ElementNode && hasChromeAttribute(n) {
-			nodesToRemove = append(nodesToRemove, n)
+			// Preserve <header> elements with meaningful content
+			if n.Data == "header" && hasMeaningfulContentInHeader(n) {
+				// Don't remove this header - it has important content
+			} else if isDescendantOfMeaningfulHeader(n, meaningfulHeaders) {
+				// Don't remove elements inside a meaningful header
+			} else {
+				nodesToRemove = append(nodesToRemove, n)
+			}
 		}
 
 		// Recurse into children
@@ -388,6 +553,16 @@ func removeElementsWithChromeAttributes(root *html.Node) {
 			node.Parent.RemoveChild(node)
 		}
 	}
+}
+
+// isDescendantOfMeaningfulHeader checks if a node is inside any of the meaningful headers
+func isDescendantOfMeaningfulHeader(node *html.Node, meaningfulHeaders []*html.Node) bool {
+	for _, header := range meaningfulHeaders {
+		if isDescendant(node, header) {
+			return true
+		}
+	}
+	return false
 }
 
 // hasChromeAttribute checks if an element has class or id containing chrome keywords
@@ -407,6 +582,7 @@ func hasChromeAttribute(n *html.Node) bool {
 
 // findBestContentContainer finds the best content container using weighted scoring
 // It applies specificity bias: prefers child containers over <body>
+// BUT: if there's an orphan header with H1, prefer <body> to capture all content
 func (d *DomExtractor) findBestContentContainer(doc *html.Node) *html.Node {
 	candidates := collectCandidateNodes(doc)
 	if len(candidates) == 0 {
@@ -439,20 +615,37 @@ func (d *DomExtractor) findBestContentContainer(doc *html.Node) *html.Node {
 		}
 	}
 
+	// Handle case when no candidates found
+	if bestNode == nil {
+		return nil
+	}
+
 	// Apply specificity bias: if <body> is best, check if a child is close enough
+	// BUT: if child would miss an orphan header with H1, prefer <body>
 	if bestNode == bodyNode && bodyNode != nil {
 		for node, score := range scores {
 			if node == bodyNode {
 				continue
 			}
-			// If child score is >= bias * bodyScore, prefer the child
+			// If child score is >= bias * bodyScore, check if it would miss orphan H1
 			if score >= d.params.BodySpecificityBias*bodyScore {
 				if score > bestScore*0.9 { // Must also be reasonably close to best
+					// Check for orphan header with H1
+					if hasOrphanHeaderWithH1(doc, node) {
+						continue // Skip this child, prefer body
+					}
 					bestNode = node
 					bestScore = score
 					break
 				}
 			}
+		}
+	}
+
+	// If best is not body but there's an orphan header, prefer body
+	if bestNode != bodyNode && bodyNode != nil {
+		if hasOrphanHeaderWithH1(doc, bestNode) {
+			bestNode = bodyNode
 		}
 	}
 

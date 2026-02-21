@@ -2,6 +2,7 @@ package extractor_test
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
@@ -293,6 +294,70 @@ func TestExtract_Case_Layer2NavOnly(t *testing.T) {
 
 	require.Len(t, sink.errors, 1, "Should have recorded one error")
 	assert.Equal(t, metadata.ErrorCause(metadata.CauseContentInvalid), sink.errors[0].Cause())
+}
+
+// TestExtract_Case_MDX_HeaderWithH1 tests: Header with H1 + .mdx-content inside #content-area
+// Expected: #content-area selected (parent container with H1 + content)
+// This test verifies the extractor prefers the broader container that includes
+// both the page header (with H1) and the main content, rather than just the
+// content div alone.
+func TestExtract_Case_MDX_HeaderWithH1(t *testing.T) {
+	ext, _ := setupExtractor()
+	sourceURL := mustParseURL(t, "https://example.com/mdx-doc")
+	htmlBytes := loadFixture(t, "case_mdx_header_with_h1.html")
+	expectedBytes := loadFixture(t, "extracted/case_mdx_header_with_h1_extracted.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.NoError(t, err, "Expected successful extraction")
+	require.NotNil(t, result.DocumentRoot, "DocumentRoot should not be nil")
+	require.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+
+	// Verify #content-area is selected as content container (not .mdx-content)
+	assert.Equal(t, "div", result.ContentNode.Data, "ContentNode should be <div> element")
+	var hasContentAreaID bool
+	for _, attr := range result.ContentNode.Attr {
+		if attr.Key == "id" && attr.Val == "content-area" {
+			hasContentAreaID = true
+			break
+		}
+	}
+	assert.True(t, hasContentAreaID, "ContentNode should have id 'content-area'")
+
+	// Verify ContentNode HTML matches expected extraction output
+	var actualBuf strings.Builder
+	require.NoError(t, html.Render(&actualBuf, result.ContentNode))
+	actualHTML := strings.TrimSpace(actualBuf.String())
+	expectedHTML := strings.TrimSpace(string(expectedBytes))
+	assert.Equal(t, expectedHTML, actualHTML,
+		"ContentNode HTML should match expected extraction output")
+}
+
+// TestExtract_Case_Generic_HeaderWithH1 tests: Generic page with H1 in sibling header
+// Expected: <body> selected because header and content are siblings with no shared parent
+// This follows the body extraction rule: return <body> when no more specific meaningful child exists.
+func TestExtract_Case_Generic_HeaderWithH1(t *testing.T) {
+	ext, _ := setupExtractor()
+	sourceURL := mustParseURL(t, "https://example.com/generic-doc")
+	htmlBytes := loadFixture(t, "case_generic_header_with_h1.html")
+	expectedBytes := loadFixture(t, "extracted/case_generic_header_with_h1_extracted.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.NoError(t, err, "Expected successful extraction")
+	require.NotNil(t, result.DocumentRoot, "DocumentRoot should not be nil")
+	require.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+
+	// Verify ContentNode is <body> (header and content are siblings with no shared parent)
+	assert.True(t, isElementNode(result.ContentNode, "body"), "ContentNode should be <body> element")
+
+	// Verify ContentNode HTML matches expected extraction output
+	var actualBuf strings.Builder
+	require.NoError(t, html.Render(&actualBuf, result.ContentNode))
+	actualHTML := strings.TrimSpace(actualBuf.String())
+	expectedHTML := strings.TrimSpace(string(expectedBytes))
+	assert.Equal(t, expectedHTML, actualHTML,
+		"ContentNode HTML should match expected extraction output")
 }
 
 // TestExtract_CustomSelector tests: Using custom selector provided via constructor

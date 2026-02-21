@@ -18,6 +18,13 @@ var KnownDocSelectors = map[string][]string{
 		".theme-doc-markdown",
 		".md-content",
 	},
+	"mintlify": {
+		// Mintlify/MDX documentation framework
+		// Order: parent container first, then specific content containers
+		// This ensures page headers (H1s) are captured along with content
+		"#content-area",
+		".mdx-content",
+	},
 	"docusaurus": {
 		// Docusaurus (Meta/Facebook documentation framework)
 		".theme-doc-markdown",
@@ -66,6 +73,7 @@ func getAllSelectors() []string {
 	// Priority order for framework categories
 	frameworkOrder := []string{
 		"generic",
+		"mintlify",
 		"docusaurus",
 		"sphinx",
 		"mkdocs",
