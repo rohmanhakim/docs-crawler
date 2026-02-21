@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/pkg/debug"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
@@ -52,6 +53,7 @@ func (m *mockError) Impact() failure.ImpactLevel {
 
 // TestRetry_SuccessOnFirstAttempt verifies that a successful function returns immediately
 func TestRetry_SuccessOnFirstAttempt(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	callCount := 0
 	fn := func() (string, failure.ClassifiedError) {
 		callCount++
@@ -66,7 +68,7 @@ func TestRetry_SuccessOnFirstAttempt(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, noopLogger, fn)
+	result := retry.Retry(params, mock, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -79,6 +81,27 @@ func TestRetry_SuccessOnFirstAttempt(t *testing.T) {
 	}
 	if callCount != 1 {
 		t.Fatalf("expected 1 call, got: %d", callCount)
+	}
+
+	// Debug logging assertions
+	if !mock.LogRetryCalled {
+		t.Error("expected LogRetry to be called")
+	}
+	if len(mock.RetryEntries) != 1 {
+		t.Fatalf("expected 1 retry entry, got %d", len(mock.RetryEntries))
+	}
+	entry := mock.RetryEntries[0]
+	if entry.Attempt != 1 {
+		t.Errorf("expected attempt=1, got %d", entry.Attempt)
+	}
+	if entry.MaxAttempts != 3 {
+		t.Errorf("expected maxAttempts=3, got %d", entry.MaxAttempts)
+	}
+	if entry.Backoff != 0 {
+		t.Errorf("expected backoff=0 for success, got %v", entry.Backoff)
+	}
+	if entry.Err != nil {
+		t.Errorf("expected err=nil for success, got %v", entry.Err)
 	}
 }
 
@@ -117,6 +140,7 @@ func TestRetry_PassParameter(t *testing.T) {
 
 // TestRetry_SuccessAfterRetries verifies that retryable errors lead to retries until success
 func TestRetry_SuccessAfterRetries(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	callCount := 0
 	fn := func() (string, failure.ClassifiedError) {
 		callCount++
@@ -138,7 +162,7 @@ func TestRetry_SuccessAfterRetries(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, noopLogger, fn)
+	result := retry.Retry(params, mock, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -152,10 +176,34 @@ func TestRetry_SuccessAfterRetries(t *testing.T) {
 	if callCount != 3 {
 		t.Fatalf("expected 3 calls, got: %d", callCount)
 	}
+
+	// Debug logging assertions
+	// Should have 3 entries: 2 failed attempts with backoff + 1 success
+	if len(mock.RetryEntries) != 3 {
+		t.Fatalf("expected 3 retry entries, got %d", len(mock.RetryEntries))
+	}
+	// First two entries should have backoff and error
+	for i := 0; i < 2; i++ {
+		if mock.RetryEntries[i].Backoff == 0 {
+			t.Errorf("entry %d: expected non-zero backoff for failed attempt", i)
+		}
+		if mock.RetryEntries[i].Err == nil {
+			t.Errorf("entry %d: expected error for failed attempt", i)
+		}
+	}
+	// Last entry (success) should have no backoff and no error
+	lastEntry := mock.RetryEntries[2]
+	if lastEntry.Backoff != 0 {
+		t.Errorf("expected backoff=0 for success, got %v", lastEntry.Backoff)
+	}
+	if lastEntry.Err != nil {
+		t.Errorf("expected err=nil for success, got %v", lastEntry.Err)
+	}
 }
 
 // TestRetry_NonRetryableErrorReturnsImmediately verifies that non-retryable errors return immediately
 func TestRetry_NonRetryableErrorReturnsImmediately(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	callCount := 0
 	expectedErr := &mockError{
 		msg:       "fatal error",
@@ -176,7 +224,7 @@ func TestRetry_NonRetryableErrorReturnsImmediately(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, noopLogger, fn)
+	result := retry.Retry(params, mock, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
@@ -193,10 +241,16 @@ func TestRetry_NonRetryableErrorReturnsImmediately(t *testing.T) {
 	if result.Err().Error() != expectedErr.Error() {
 		t.Fatalf("expected error '%s', got: '%s'", expectedErr.Error(), result.Err().Error())
 	}
+
+	// Debug logging assertions - non-retryable errors should NOT trigger LogRetry
+	if mock.LogRetryCalled {
+		t.Error("expected LogRetry NOT to be called for non-retryable error")
+	}
 }
 
 // TestRetry_ExhaustedAttempts verifies that retryable errors exhaust all attempts
 func TestRetry_ExhaustedAttempts(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	callCount := 0
 	fn := func() (int, failure.ClassifiedError) {
 		callCount++
@@ -216,7 +270,7 @@ func TestRetry_ExhaustedAttempts(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, noopLogger, fn)
+	result := retry.Retry(params, mock, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error after exhausting attempts, got nil")
@@ -239,10 +293,22 @@ func TestRetry_ExhaustedAttempts(t *testing.T) {
 	if retryErr.Cause != retry.ErrExhaustedAttempts {
 		t.Fatalf("expected error cause 'ErrExhaustedAttempts', got: '%s'", retryErr.Cause)
 	}
+
+	// Debug logging assertions
+	// Should have maxAttempts entries: (maxAttempts-1) with backoff + 1 exhausted
+	if len(mock.RetryEntries) != maxAttempts {
+		t.Fatalf("expected %d retry entries, got %d", maxAttempts, len(mock.RetryEntries))
+	}
+	// Last entry should be the exhausted one with error
+	lastEntry := mock.RetryEntries[maxAttempts-1]
+	if lastEntry.Err == nil {
+		t.Error("expected error for exhausted attempt")
+	}
 }
 
 // TestRetry_MaxAttemptsLessThanOne verifies that MaxAttempts < 1 returns an error
 func TestRetry_MaxAttemptsLessThanOne(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	fn := func() (string, failure.ClassifiedError) {
 		return "success", nil
 	}
@@ -256,7 +322,7 @@ func TestRetry_MaxAttemptsLessThanOne(t *testing.T) {
 	)
 
 	var retryErr *retry.RetryError
-	result := retry.Retry(params, noopLogger, fn)
+	result := retry.Retry(params, mock, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error for MaxAttempts < 1, got nil")
@@ -274,6 +340,11 @@ func TestRetry_MaxAttemptsLessThanOne(t *testing.T) {
 	}
 	if result.Attempts() != 0 {
 		t.Fatalf("expected 0 attempts, got: %d", result.Attempts())
+	}
+
+	// Debug logging assertions - zero attempt should NOT trigger LogRetry
+	if mock.LogRetryCalled {
+		t.Error("expected LogRetry NOT to be called for zero attempt config error")
 	}
 }
 
@@ -713,5 +784,46 @@ func TestRetryErrorType(t *testing.T) {
 	result := retry.Retry(params, noopLogger, fn)
 	if result.IsSuccess() {
 		t.Fatal("expected error after exhausting attempts")
+	}
+}
+
+// TestRetry_DisabledLogger verifies that no logging occurs when logger is disabled
+func TestRetry_DisabledLogger(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
+	mock.SetEnabled(false)
+
+	callCount := 0
+	fn := func() (string, failure.ClassifiedError) {
+		callCount++
+		if callCount < 3 {
+			return "", &mockError{
+				msg:       "transient error",
+				retryable: true,
+				severity:  failure.SeverityRecoverable,
+			}
+		}
+		return "success", nil
+	}
+
+	params := retry.NewRetryParam(
+		10*time.Millisecond,
+		5*time.Millisecond,
+		42,
+		5,
+		defaultBackoffParam(),
+	)
+
+	result := retry.Retry(params, mock, fn)
+
+	if result.IsFailure() {
+		t.Fatalf("expected no error, got: %v", result.Err())
+	}
+
+	// Debug logging assertions - disabled logger should not record any entries
+	if mock.LogRetryCalled {
+		t.Error("expected LogRetry NOT to be called when logger is disabled")
+	}
+	if len(mock.RetryEntries) != 0 {
+		t.Errorf("expected 0 retry entries when logger disabled, got %d", len(mock.RetryEntries))
 	}
 }
