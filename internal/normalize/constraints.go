@@ -92,6 +92,7 @@ func (m *MarkdownConstraint) Normalize(
 	return normalizedMarkdown, nil
 }
 
+// normalize normalizes the markdown document by validating structure and generating frontmatter.
 func normalize(
 	fetchUrl url.URL,
 	inputDoc assets.AssetfulMarkdownDoc,
@@ -115,8 +116,14 @@ func normalize(
 }
 
 // validateStructure validates the Markdown document structure according to
-// normalization invariants N1, N3, N4, N5, and N6.
+// normalization invariants N1, N3, N4, and N5.
 // It uses AST parsing for correctness.
+//
+// Note: Invariant N6 (headings inside code blocks) is inherently enforced by the parser.
+// The markdown parser treats content inside code blocks as literal text, never as
+// ast.Heading nodes. Therefore, any "# Heading" text inside a fenced code block
+// is parsed as ast.CodeBlock content, not as a heading. This means N6 violations
+// are impossible to detect at the AST level because they don't produce ast.Heading nodes.
 func validateStructure(content []byte) failure.ClassifiedError {
 	// Check for empty content (Invariant N1 prerequisite)
 	if len(bytes.TrimSpace(content)) == 0 {
@@ -133,7 +140,6 @@ func validateStructure(content []byte) failure.ClassifiedError {
 	// Collect headings and validate structure via AST walk
 	var headings []headingInfo
 	var hasContentBeforeH1 bool
-	var insideCodeBlock bool
 	contentAfterHeading := make(map[int]bool) // Tracks if heading[i] has content before next same/higher level heading
 	currentHeadingIdx := -1
 	nodeIdx := 0
@@ -142,23 +148,16 @@ func validateStructure(content []byte) failure.ClassifiedError {
 		switch n := node.(type) {
 		case *ast.Heading:
 			if entering {
-				// Check if heading is inside a code block (Invariant N6)
-				if insideCodeBlock {
-					return ast.Terminate
-				}
 				currentHeadingIdx = len(headings)
 				headings = append(headings, headingInfo{node: n, index: nodeIdx})
 			}
 
 		case *ast.CodeBlock:
 			if entering {
-				insideCodeBlock = true
 				// Code blocks count as content
 				if currentHeadingIdx >= 0 {
 					contentAfterHeading[currentHeadingIdx] = true
 				}
-			} else {
-				insideCodeBlock = false
 			}
 
 		case *ast.Text:
@@ -200,14 +199,6 @@ func validateStructure(content []byte) failure.ClassifiedError {
 		nodeIdx++
 		return ast.GoToNext
 	})
-
-	// Check if heading inside code block was detected
-	if insideCodeBlock {
-		return NewNormalizationError(
-			ErrCauseBrokenAtomicBlock,
-			"heading detected inside code block",
-		)
-	}
 
 	// Validate N1: Exactly one H1
 	h1Count := 0

@@ -353,6 +353,11 @@ func TestNormalize_ValidDocuments(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:          "fenced code block with heading after",
+			fixture:       "pass/fenced_code_block_with_heading.md",
+			expectedTitle: "Main Title",
+		},
 	}
 
 	for _, tc := range testCases {
