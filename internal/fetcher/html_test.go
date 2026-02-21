@@ -1,8 +1,11 @@
 package fetcher_test
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -626,5 +629,61 @@ func TestHtmlFetcher_Fetch_ReadResponseBodyError(t *testing.T) {
 	}
 	if errorEvt.Cause() != metadata.CauseRetryFailure {
 		t.Errorf("expected cause CauseRetryFailure, got %v", errorEvt.Cause())
+	}
+}
+
+// TestHtmlFetcher_Fetch_GzippedResponse tests that Go's http.Client automatically
+// handles gzipped responses when we don't set Accept-Encoding header ourselves.
+// Go's Transport will:
+// 1. Add "Accept-Encoding: gzip" header automatically
+// 2. Decompress the response body transparently
+// 3. Remove "Content-Encoding: gzip" from response headers
+func TestHtmlFetcher_Fetch_GzippedResponse(t *testing.T) {
+	htmlContent := "<html><body>Gzipped Content</body></html>"
+
+	// Create gzipped content
+	var gzipBuf bytes.Buffer
+	gzWriter := gzip.NewWriter(&gzipBuf)
+	_, err := io.WriteString(gzWriter, htmlContent)
+	if err != nil {
+		t.Fatalf("failed to write gzip content: %v", err)
+	}
+	gzWriter.Close()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify that Go's http client automatically adds Accept-Encoding: gzip
+		acceptEncoding := r.Header.Get("Accept-Encoding")
+		if acceptEncoding != "gzip" {
+			t.Logf("Warning: Accept-Encoding header was '%s', expected 'gzip' (Go adds this automatically)", acceptEncoding)
+		}
+
+		// Send gzipped response with appropriate headers
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Content-Encoding", "gzip")
+		w.WriteHeader(http.StatusOK)
+		w.Write(gzipBuf.Bytes())
+	}))
+	defer server.Close()
+
+	sink := &mockMetadataSink{}
+	f := fetcher.NewHtmlFetcher(sink)
+	f.Init(&http.Client{}, "test-user-agent")
+
+	fetchUrl, _ := url.Parse(server.URL)
+	retryParam := createTestRetryParam(3)
+
+	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if result.Code() != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, result.Code())
+	}
+
+	// Go's http.Client should have automatically decompressed the response
+	if string(result.Body()) != htmlContent {
+		t.Errorf("expected decompressed body '%s', got '%s'", htmlContent, string(result.Body()))
 	}
 }
