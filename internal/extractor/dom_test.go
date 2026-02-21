@@ -7,6 +7,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,15 @@ func setupExtractorWithParams(params extractor.ExtractParam, customSelectors ...
 	ext := extractor.NewDomExtractor(sink, customSelectors...)
 	ext.SetExtractParam(params)
 	return &ext, sink
+}
+
+// setupExtractorWithLogger creates an extractor with a debug logger for testing.
+func setupExtractorWithLogger(customSelectors ...string) (*extractor.DomExtractor, *mockMetadataSink, *debugtest.LoggerMock) {
+	sink := &mockMetadataSink{}
+	logger := debugtest.NewLoggerMock()
+	ext := extractor.NewDomExtractor(sink, customSelectors...)
+	ext.SetDebugLogger(logger)
+	return &ext, sink, logger
 }
 
 func mustParseURL(t *testing.T, raw string) url.URL {
@@ -575,6 +585,97 @@ func hasH1Element(node *html.Node) bool {
 	}
 
 	return false
+}
+
+// TestExtract_DebugLogging_Layer1SemanticMain tests debug logging for layer 1 semantic extraction.
+// Expected: Debug logger records parse_html, layer_1_semantic, and content_selected steps.
+func TestExtract_DebugLogging_Layer1SemanticMain(t *testing.T) {
+	ext, _, logger := setupExtractorWithLogger()
+	sourceURL := mustParseURL(t, "https://example.com/docs")
+	htmlBytes := loadFixture(t, "case_a_main_valid.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.NoError(t, err, "Expected successful extraction")
+	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+
+	// Verify debug logging was called
+	assert.True(t, logger.LogStepCalled, "Should have logged steps")
+
+	// Verify step sequence
+	steps := logger.GetStepEntries()
+	assertStepLogged(t, steps, "parse_html")
+	assertStepLoggedWithField(t, steps, "layer_1_semantic", "found", true)
+	assertStepLoggedWithField(t, steps, "layer_1_semantic", "selector", "main")
+	assertStepLogged(t, steps, "content_selected")
+}
+
+// TestExtract_DebugLogging_Layer2KnownContainer tests debug logging for layer 2 known container extraction.
+// Expected: Debug logger records layer_1_semantic (not found), layer_2_known (found), and content_selected steps.
+func TestExtract_DebugLogging_Layer2KnownContainer(t *testing.T) {
+	ext, _, logger := setupExtractorWithLogger()
+	sourceURL := mustParseURL(t, "https://example.com/known-doc")
+	htmlBytes := loadFixture(t, "case_e_known_doc_container.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.NoError(t, err, "Expected successful extraction via Layer 2")
+	assert.NotNil(t, result.ContentNode, "ContentNode should not be nil")
+
+	// Verify step sequence
+	steps := logger.GetStepEntries()
+	assertStepLogged(t, steps, "parse_html")
+	assertStepLoggedWithField(t, steps, "layer_1_semantic", "found", false)
+	assertStepLoggedWithField(t, steps, "layer_2_known", "found", true)
+	assertStepLogged(t, steps, "content_selected")
+}
+
+// TestExtract_DebugLogging_NoContent tests debug logging when no content is found.
+// Expected: Debug logger records all layers as not found and extraction_failed.
+func TestExtract_DebugLogging_NoContent(t *testing.T) {
+	ext, _, logger := setupExtractorWithLogger()
+	sourceURL := mustParseURL(t, "https://example.com/no-content")
+	htmlBytes := loadFixture(t, "case_g_no_content.html")
+
+	result, err := ext.Extract(sourceURL, htmlBytes)
+
+	require.Error(t, err, "Expected extraction to fail")
+	assert.Nil(t, result.ContentNode, "ContentNode should be nil")
+
+	// Verify step sequence shows all layers tried
+	steps := logger.GetStepEntries()
+	assertStepLogged(t, steps, "parse_html")
+	assertStepLoggedWithField(t, steps, "layer_1_semantic", "found", false)
+	assertStepLoggedWithField(t, steps, "layer_2_known", "found", false)
+	assertStepLoggedWithField(t, steps, "layer_3_heuristic", "found", false)
+	assertStepLogged(t, steps, "extraction_failed")
+}
+
+// assertStepLogged asserts that a step with the given name was logged.
+func assertStepLogged(t *testing.T, steps []debugtest.StepEntry, stepName string) {
+	t.Helper()
+	for _, s := range steps {
+		if s.Step == stepName {
+			return
+		}
+	}
+	t.Errorf("Expected step '%s' to be logged", stepName)
+}
+
+// assertStepLoggedWithField asserts that a step was logged with a specific field value.
+func assertStepLoggedWithField(t *testing.T, steps []debugtest.StepEntry, stepName string, fieldKey string, expectedValue any) {
+	t.Helper()
+	for _, s := range steps {
+		if s.Step == stepName {
+			if val, ok := s.Fields[fieldKey]; ok {
+				assert.Equal(t, expectedValue, val, "Field '%s' for step '%s'", fieldKey, stepName)
+			} else {
+				t.Errorf("Step '%s' missing field '%s'", stepName, fieldKey)
+			}
+			return
+		}
+	}
+	t.Errorf("Expected step '%s' to be logged", stepName)
 }
 
 // TestSetExtractParam tests that SetExtractParam correctly overrides default parameters
