@@ -8,17 +8,23 @@ import (
 )
 
 type CrawlingExecution struct {
-	writeResults []storage.WriteResult
-	totalAssets  int
+	writeResults  []storage.WriteResult
+	totalWebPages int
+	totalAssets   int
+	totalErrors   int
 }
 
 func NewCrawlingExecution(
 	writeResults []storage.WriteResult,
+	totalWebPages int,
 	totalAssets int,
+	totalErrors int,
 ) CrawlingExecution {
 	return CrawlingExecution{
-		writeResults: writeResults,
-		totalAssets:  totalAssets,
+		writeResults:  writeResults,
+		totalWebPages: totalWebPages,
+		totalAssets:   totalAssets,
+		totalErrors:   totalErrors,
 	}
 }
 
@@ -71,4 +77,19 @@ func (i *CrawlInitialization) SeedScheme() string {
 // InitialDelayApplied indicates whether the initial rate limiting delay was applied.
 func (i *CrawlInitialization) InitialDelayApplied() bool {
 	return i.initialDelayApplied
+}
+
+// TotalPages returns the number of pages processed (write results count).
+func (c *CrawlingExecution) TotalPages() int {
+	return len(c.writeResults)
+}
+
+// TotalVisitedPages returns the number of web pages fetched from the frontier.
+func (c *CrawlingExecution) TotalVisitedPages() int {
+	return c.totalWebPages
+}
+
+// TotalErrors returns the total number of errors encountered during crawling.
+func (c *CrawlingExecution) TotalErrors() int {
+	return c.totalErrors
 }

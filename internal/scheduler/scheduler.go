@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
@@ -106,7 +108,7 @@ func NewScheduler() Scheduler {
 		markdownConversionRule: conversionRule,
 		assetResolver:          &resolver,
 		markdownConstraint:     &markdownConstraint,
-		storageSink:            &storageSink,
+		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
 		sleeper:                &sleeper,
 	}
@@ -243,10 +245,11 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 			s.crawlFinalizer.RecordFinalCrawlStats(metadata.NewCrawlStats(
 				initStartTime,
 				time.Now(),
-				0, // No pages processed during init
-				0, // No errors during init (would need to count specific init errors)
-				0, // No assets during init
-				0, // No retry queue during init (no failures yet)
+				0, // totalWebPages - no pages during init
+				0, // totalProcessedPages - no pages during init
+				0, // totalErrors - no errors during init
+				0, // totalAssets - no assets during init
+				0, // manualRetryQueueCount - no failures during init
 			))
 		}
 	}()
@@ -393,6 +396,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			execStartTime,
 			time.Now(),
 			s.frontier.VisitedCount(),
+			len(s.writeResults),
 			totalErrors,
 			totalAssets,
 			s.failureJournal.Count(),
@@ -443,6 +447,12 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		}
 
 		// 5. Sanitize extracted HTML
+		// DEBUG: Dump input HTML before sanitization
+		// urlPrefix := sanitizeFilename(getURLString(nextCrawlToken.URL()))
+		// if dumpErr := dumpHTMLNode(extractionResult.ContentNode, fmt.Sprintf("/tmp/%s_sanitizer_input.html", urlPrefix)); dumpErr != nil {
+		// 	log.Printf("DEBUG: failed to dump input HTML: %v", dumpErr)
+		// }
+
 		sanitizedHtml, err := s.htmlSanitizer.Sanitize(extractionResult.ContentNode)
 		if err != nil {
 			if err.Impact() == failure.ImpactLevelAbort {
@@ -453,6 +463,11 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			totalErrors++
 			continue
 		}
+
+		// DEBUG: Dump output HTML after sanitization
+		// if dumpErr := dumpHTMLNode(sanitizedHtml.GetContentNode(), fmt.Sprintf("/tmp/%s_sanitizer_output.html", urlPrefix)); dumpErr != nil {
+		// 	log.Printf("DEBUG: failed to dump output HTML: %v", dumpErr)
+		// }
 
 		// 5.2 Resolve relative URLs to absolute URLs and filter by host
 		discoveredURLs := sanitizedHtml.GetDiscoveredURLs()
@@ -522,6 +537,11 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		// Count assets processed - use the actual count of successfully resolved local assets
 		totalAssets += len(assetfulMarkdown.LocalAssets())
 
+		// DEBUG: Dump assetfulMarkdown before normalization
+		if dumpErr := dumpAssetfulMarkdown(cfg.RandomSeed(), getURLString(nextCrawlToken.URL()), assetfulMarkdown); dumpErr != nil {
+			log.Printf("DEBUG: failed to dump assetfulMarkdown: %v", dumpErr)
+		}
+
 		// 8. Markdown Normalization
 		normalizeParam := normalize.NewNormalizeParam(
 			build.FullVersion(),
@@ -577,7 +597,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	}
 
 	// Stats are recorded by defer - return successful execution result
-	return NewCrawlingExecution(s.writeResults, totalAssets), nil
+	return NewCrawlingExecution(s.writeResults, s.frontier.VisitedCount(), totalAssets, totalErrors), nil
 }
 
 func createHttpClient(
@@ -684,4 +704,205 @@ func (s *Scheduler) FailureJournalPath() string {
 // This works around potential pointer receiver issues.
 func getURLString(u url.URL) string {
 	return u.String()
+}
+
+// ---------------------------------------------------------------------------
+// Temporary Debug Functions
+// These functions are for debugging purposes and should be removed later.
+// ---------------------------------------------------------------------------
+
+// sanitizeFilename converts a URL string to a safe filename prefix.
+// This is a temporary debug helper function.
+func sanitizeFilename(urlStr string) string {
+	// Remove scheme
+	result := strings.TrimPrefix(urlStr, "https://")
+	result = strings.TrimPrefix(result, "http://")
+	// Replace problematic characters
+	result = strings.ReplaceAll(result, "/", "_")
+	result = strings.ReplaceAll(result, "?", "_")
+	result = strings.ReplaceAll(result, "&", "_")
+	result = strings.ReplaceAll(result, "=", "_")
+	// Truncate if too long
+	if len(result) > 100 {
+		result = result[:100]
+	}
+	return result
+}
+
+// dumpAssetfulMarkdown writes the AssetfulMarkdownDoc content to a debug file.
+// Directory: /tmp/<randomSeed>_debug/
+// Filename: <url_prefix>_assetful.md
+// This is a temporary debug helper function.
+func dumpAssetfulMarkdown(randomSeed int64, urlStr string, doc assets.AssetfulMarkdownDoc) error {
+	dirPath := fmt.Sprintf("/tmp/%d_docs-crawler_debug", randomSeed)
+	if err := os.MkdirAll(dirPath, 0755); err != nil {
+		return err
+	}
+
+	filename := fmt.Sprintf("%s_assetful.md", sanitizeFilename(urlStr))
+	filePath := filepath.Join(dirPath, filename)
+
+	return os.WriteFile(filePath, doc.Content(), 0644)
+}
+
+// NewSchedulerWithConfig creates a new Scheduler with config-based dependency injection.
+// This constructor determines whether to use DryRunSink or LocalSink based on cfg.DryRun().
+func NewSchedulerWithConfig(cfg config.Config) Scheduler {
+	recorder := metadata.NewRecorder("sample-single-sync-worker")
+	cachedRobot := robots.NewCachedRobot(&recorder)
+	frontier := frontier.NewCrawlFrontier()
+	fetcher := fetcher.NewHtmlFetcher(&recorder)
+	ext := extractor.NewDomExtractor(&recorder)
+	sanitizer := sanitizer.NewHTMLSanitizer(&recorder)
+	conversionRule := mdconvert.NewRule(&recorder)
+	markdownConstraint := normalize.NewMarkdownConstraint(&recorder)
+
+	var resolver assets.Resolver
+	var storageSink storage.Sink
+	if cfg.DryRun() {
+		resolver = assets.NewDryRunResolver(&recorder)
+		storageSink = storage.NewDryRunSink(&recorder)
+	} else {
+		r := assets.NewLocalResolver(&recorder)
+		resolver = &r
+		storageSink = storage.NewLocalSink(&recorder)
+	}
+
+	rateLimiter := limiter.NewConcurrentRateLimiter()
+	sleeper := timeutil.NewRealSleeper()
+	return Scheduler{
+		metadataSink:           &recorder,
+		crawlFinalizer:         &recorder,
+		robot:                  &cachedRobot,
+		frontier:               &frontier,
+		htmlFetcher:            &fetcher,
+		domExtractor:           &ext,
+		htmlSanitizer:          &sanitizer,
+		markdownConversionRule: conversionRule,
+		assetResolver:          resolver,
+		markdownConstraint:     &markdownConstraint,
+		storageSink:            storageSink,
+		rateLimiter:            rateLimiter,
+		sleeper:                &sleeper,
+	}
+}
+
+// InitializeWithConfig initializes the scheduler with a pre-built Config object.
+// This is used by CLI when config is built from CLI flags rather than a config file.
+func (s *Scheduler) InitializeWithConfig(cfg config.Config) (init *CrawlInitialization, err error) {
+	initStartTime := time.Now()
+
+	defer func() {
+		if err != nil && s.crawlFinalizer != nil {
+			s.crawlFinalizer.RecordFinalCrawlStats(metadata.NewCrawlStats(
+				initStartTime,
+				time.Now(),
+				0, // totalWebPages
+				0, // totalProcessedPages
+				0, // totalErrors
+				0, // totalAssets
+				0, // manualRetryQueueCount
+			))
+		}
+	}()
+
+	// Validate that at least one seed URL exists
+	if len(cfg.SeedURLs()) == 0 {
+		err = fmt.Errorf("no seed URLs configured")
+		s.metadataSink.RecordError(metadata.NewErrorRecord(
+			time.Now(),
+			"config",
+			"config validation",
+			metadata.CauseContentInvalid,
+			err.Error(),
+			[]metadata.Attribute{},
+		))
+		return nil, err
+	}
+
+	// Initialize file-based failure journal in output directory
+	if s.failureJournal == nil {
+		journalPath := filepath.Join(cfg.OutputDir(), "failures.jsonl")
+		s.failureJournal = failurejournal.NewFileJournal(journalPath)
+	}
+
+	// Note: We intentionally don't store the cancel function here.
+	// The context should remain valid throughout the crawl operation.
+	// Cancellation is handled by the HTTP client's timeout or explicit cancellation.
+	ctx, _ := context.WithTimeout(context.Background(), cfg.Timeout())
+	if s.ctx == nil {
+		s.ctx = ctx
+	}
+
+	// Initialize HTTP Client
+	s.httpClient = createHttpClient(
+		cfg.MaxIdleConns(),
+		cfg.MaxIdleConnsPerHost(),
+		cfg.IdleConnTimeout(),
+		cfg.Timeout(),
+	)
+
+	// Initialize rate limiter
+	s.rateLimiter.SetBaseDelay(cfg.BaseDelay())
+	s.rateLimiter.SetJitter(cfg.Jitter())
+	s.rateLimiter.SetRandomSeed(cfg.RandomSeed())
+
+	// Initialize Robots and Frontier
+	s.robot.Init(cfg.UserAgent(), s.httpClient)
+	s.frontier.Init(cfg)
+
+	// Configure DOM Extractor
+	extractParam := extractor.ExtractParam{
+		BodySpecificityBias:  cfg.BodySpecificityBias(),
+		LinkDensityThreshold: cfg.LinkDensityThreshold(),
+		ScoreMultiplier: extractor.ContentScoreMultiplier{
+			NonWhitespaceDivisor: cfg.ScoreMultiplierNonWhitespaceDivisor(),
+			Paragraphs:           cfg.ScoreMultiplierParagraphs(),
+			Headings:             cfg.ScoreMultiplierHeadings(),
+			CodeBlocks:           cfg.ScoreMultiplierCodeBlocks(),
+			ListItems:            cfg.ScoreMultiplierListItems(),
+		},
+		Threshold: extractor.MeaningfulThreshold{
+			MinNonWhitespace:    cfg.ThresholdMinNonWhitespace(),
+			MinHeadings:         cfg.ThresholdMinHeadings(),
+			MinParagraphsOrCode: cfg.ThresholdMinParagraphsOrCode(),
+			MaxLinkDensity:      cfg.ThresholdMaxLinkDensity(),
+		},
+	}
+	s.domExtractor.SetExtractParam(extractParam)
+
+	// Initialize Fetcher
+	s.htmlFetcher.Init(s.httpClient, cfg.UserAgent())
+
+	// Initialize Asset Resolver
+	s.assetResolver.Init(s.httpClient, cfg.UserAgent())
+
+	// Submit seed URL to frontier
+	s.currentHost = cfg.SeedURLs()[0].Host
+	seedScheme := cfg.SeedURLs()[0].Scheme
+	err = s.SubmitUrlForAdmission(cfg.SeedURLs()[0], frontier.SourceSeed, 0)
+	if err != nil {
+		if robotsErr, ok := err.(*robots.RobotsError); ok {
+			s.recordRobotsErrorAndBackoff(robotsErr, cfg.SeedURLs()[0])
+		}
+		return nil, err
+	}
+
+	// Apply rate limiting delay after successful robots check
+	delay := s.rateLimiter.ResolveDelay(s.currentHost)
+	s.sleeper.Sleep(delay)
+
+	return &CrawlInitialization{
+		config:              cfg,
+		httpClient:          s.httpClient,
+		currentHost:         s.currentHost,
+		seedScheme:          seedScheme,
+		initialDelayApplied: true,
+	}, nil
+}
+
+// GetMetadataRecorder returns the metadata sink for reading recorded events.
+// This is useful for printing events after a dry-run crawl.
+func (s *Scheduler) GetMetadataRecorder() metadata.MetadataSink {
+	return s.metadataSink
 }

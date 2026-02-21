@@ -9,6 +9,9 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/build"
 	"github.com/rohmanhakim/docs-crawler/internal/config"
+	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
+	"github.com/rohmanhakim/docs-crawler/pkg/treeprinter"
 	"github.com/spf13/cobra"
 )
 
@@ -116,6 +119,70 @@ producing high-quality Markdown suitable for embedding and retrieval.`,
 		fmt.Printf("User Agent: %s\n", cfg.UserAgent())
 		fmt.Printf("Output Directory: %s\n", cfg.OutputDir())
 		fmt.Printf("Dry Run: %t\n", cfg.DryRun())
+
+		// Create scheduler with config-based dependency injection
+		sched := scheduler.NewSchedulerWithConfig(cfg)
+
+		// Subscribe to metadata events if in dry-run mode
+		var unsub func()
+		var rec *metadata.Recorder
+		var eventPrinter *EventPrinter
+		if cfg.DryRun() {
+			// GetMetadataRecorder returns MetadataSink, but we need the Recorder for Subscribe
+			// Do type assertion to get the underlying Recorder
+			if r, ok := sched.GetMetadataRecorder().(*metadata.Recorder); ok {
+				rec = r
+				eventPrinter = NewEventPrinter(treeprinter.NewTreePrinter())
+				eventCh, unsubFunc, done := rec.Subscribe()
+				unsub = unsubFunc
+				// Start goroutine to print events as they happen
+				go func() {
+					defer done()
+					for e := range eventCh {
+						eventPrinter.PrintEvent(e)
+					}
+				}()
+			}
+		}
+
+		// Initialize the crawler
+		fmt.Println("Initializing crawler...")
+		init, err := sched.InitializeWithConfig(cfg)
+		if err != nil {
+			if unsub != nil {
+				unsub()
+			}
+			fmt.Fprintf(os.Stderr, "Error initializing crawler: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Execute the crawl
+		fmt.Println("Starting crawl...")
+		exec, err := sched.ExecuteCrawlingWithState(init)
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error during crawl: %v\n", err)
+			os.Exit(1)
+		}
+
+		if unsub != nil {
+			unsub()
+			// Wait for all subscriber goroutines to finish processing buffered events
+			if rec != nil {
+				rec.WaitForSubscribers()
+
+				// Print summary
+				fmt.Println("\n--- Crawl Summary ---")
+				fmt.Printf("Pages visited:   %d\n", exec.TotalVisitedPages())
+				fmt.Printf("Pages processed: %d\n", exec.TotalPages())
+				fmt.Printf("Errors:          %d\n", exec.TotalErrors())
+				fmt.Printf("Assets resolved: %d\n", exec.TotalAssets())
+
+				if cfg.DryRun() {
+					fmt.Println("\nDRY RUN - No files were written.")
+				}
+			}
+		}
 	},
 }
 

@@ -392,8 +392,8 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 		t.Fatal("expected stats to be recorded even when errors occur")
 	}
 
-	t.Logf("Stats recorded despite potential errors: pages=%d, errors=%d",
-		mockFinalizer.recordedStats.TotalPages(),
+	t.Logf("Stats recorded despite potential errors: visited pages=%d, errors=%d",
+		mockFinalizer.recordedStats.TotalVisitedPages(),
 		mockFinalizer.recordedStats.TotalErrors())
 }
 
@@ -481,8 +481,8 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	}
 
 	// All count fields should be non-negative
-	if mockFinalizer.recordedStats.TotalPages() < 0 {
-		t.Errorf("totalPages should be non-negative, got %d", mockFinalizer.recordedStats.TotalPages())
+	if mockFinalizer.recordedStats.TotalVisitedPages() < 0 {
+		t.Errorf("totalWebPages should be non-negative, got %d", mockFinalizer.recordedStats.TotalVisitedPages())
 	}
 	if mockFinalizer.recordedStats.TotalErrors() < 0 {
 		t.Errorf("totalErrors should be non-negative, got %d", mockFinalizer.recordedStats.TotalErrors())

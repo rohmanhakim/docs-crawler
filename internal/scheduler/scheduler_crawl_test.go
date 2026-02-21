@@ -135,7 +135,8 @@ func TestInitializeCrawling_ConfigFileNotFound_ReturnsError(t *testing.T) {
 
 	// Verify stats ARE recorded on failure (to ensure we always have stats)
 	assert.NotNil(t, mockFinalizer.recordedStats, "Stats should be recorded on init failure")
-	assert.Equal(t, 0, mockFinalizer.recordedStats.TotalPages())
+	assert.Equal(t, 0, mockFinalizer.recordedStats.TotalVisitedPages())
+	assert.Equal(t, 0, mockFinalizer.recordedStats.TotalProcessedPages())
 	assert.Equal(t, 0, mockFinalizer.recordedStats.TotalErrors())
 	assert.GreaterOrEqual(t, mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()), time.Duration(0))
 }
@@ -418,7 +419,7 @@ func TestExecuteCrawlingWithState_EmptyFrontier_Completes(t *testing.T) {
 	assert.NotNil(t, mockFinalizer.recordedStats, "Stats should be recorded after execution")
 	// Note: visited count is 1 because seed URL was submitted during init, not because it was processed
 	t.Logf("Empty frontier test: visitedCount=%d (seed was submitted during init)",
-		mockFinalizer.recordedStats.TotalPages())
+		mockFinalizer.recordedStats.TotalVisitedPages())
 
 	// Verify failure journal was flushed on completion
 	mockFailureJournal.AssertCalled(t, "Flush")
@@ -510,8 +511,9 @@ func TestExecuteCrawlingWithState_RecordsStatsCorrectly(t *testing.T) {
 	assert.GreaterOrEqual(t, mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()), time.Duration(0),
 		"Duration should be non-negative")
 
-	t.Logf("Execution stats: pages=%d, errors=%d, assets=%d, duration=%v",
-		mockFinalizer.recordedStats.TotalPages(),
+	t.Logf("Execution stats: visited pages=%d, processed pages=%d, errors=%d, assets=%d, duration=%v",
+		mockFinalizer.recordedStats.TotalVisitedPages(),
+		mockFinalizer.recordedStats.TotalProcessedPages(),
 		mockFinalizer.recordedStats.TotalErrors(),
 		mockFinalizer.recordedStats.TotalAssets(),
 		mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()))
@@ -610,8 +612,8 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 	// Verify failure journal was flushed on completion
 	mockFailureJournal.AssertCalled(t, "Flush")
 
-	t.Logf("End-to-end test passed. Final stats: pages=%d, duration=%v",
-		mockFinalizer.recordedStats.TotalPages(),
+	t.Logf("End-to-end test passed. Final stats: visited pages=%d, duration=%v",
+		mockFinalizer.recordedStats.TotalVisitedPages(),
 		mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()))
 }
 
@@ -764,7 +766,8 @@ func TestSplit_InitFailure_RecordsStats(t *testing.T) {
 
 	// Verify stats ARE recorded (even on failure)
 	assert.NotNil(t, mockFinalizer.recordedStats, "Stats should be recorded on init failure")
-	assert.Equal(t, 0, mockFinalizer.recordedStats.TotalPages())
+	assert.Equal(t, 0, mockFinalizer.recordedStats.TotalVisitedPages())
+	assert.Equal(t, 0, mockFinalizer.recordedStats.TotalProcessedPages())
 	assert.GreaterOrEqual(t, mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()), time.Duration(0))
 
 	t.Logf("Init failure stats recorded: duration=%v", mockFinalizer.recordedStats.FinishedAt().Sub(mockFinalizer.recordedStats.StartedAt()))

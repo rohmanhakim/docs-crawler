@@ -153,7 +153,7 @@ func TestRecorder_EachMethodAppendsOneEvent(t *testing.T) {
 			name: "RecordFinalCrawlStats appends EventKindStats",
 			record: func(r *metadata.Recorder) {
 				r.RecordFinalCrawlStats(metadata.NewCrawlStats(
-					now, now.Add(5*time.Second), 10, 2, 5, 1,
+					now, now.Add(5*time.Second), 10, 8, 2, 5, 1,
 				))
 			},
 			wantKind: metadata.EventKindStats,
@@ -162,8 +162,14 @@ func TestRecorder_EachMethodAppendsOneEvent(t *testing.T) {
 				if e.Stats() == nil {
 					t.Fatal("Event.Stats() is nil, want non-nil")
 				}
-				if e.Stats().TotalPages() != 10 {
-					t.Errorf("Stats().TotalPages() = %v, want 10", e.Stats().TotalPages())
+				if e.Stats().TotalVisitedPages() != 10 {
+					t.Errorf("Stats().TotalVisitedPages() = %v, want 10", e.Stats().TotalVisitedPages())
+				}
+				if e.Stats().TotalProcessedPages() != 8 {
+					t.Errorf("Stats().TotalProcessedPages() = %v, want 8", e.Stats().TotalProcessedPages())
+				}
+				if e.Stats().TotalErrors() != 2 {
+					t.Errorf("Stats().TotalErrors() = %v, want 2", e.Stats().TotalErrors())
 				}
 				if !e.Stats().FinishedAt().After(e.Stats().StartedAt()) {
 					t.Error("Stats().FinishedAt() must be after StartedAt()")

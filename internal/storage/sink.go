@@ -40,8 +40,8 @@ type LocalSink struct {
 
 func NewLocalSink(
 	metadataSink metadata.MetadataSink,
-) LocalSink {
-	return LocalSink{
+) *LocalSink {
+	return &LocalSink{
 		metadataSink: metadataSink,
 	}
 }

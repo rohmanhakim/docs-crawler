@@ -296,8 +296,8 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 	}
 
 	// Each execution should have its own stats
-	t.Logf("First execution: pages=%d, duration=%v", firstStats.TotalPages(), firstStats.FinishedAt().Sub(firstStats.StartedAt()))
-	t.Logf("Second execution: pages=%d, duration=%v", secondStats.TotalPages(), secondStats.FinishedAt().Sub(secondStats.StartedAt()))
+	t.Logf("First execution: web pages=%d, duration=%v", firstStats.TotalVisitedPages(), firstStats.FinishedAt().Sub(firstStats.StartedAt()))
+	t.Logf("Second execution: web pages=%d, duration=%v", secondStats.TotalVisitedPages(), secondStats.FinishedAt().Sub(secondStats.StartedAt()))
 }
 
 // Verify interface implementations at compile time

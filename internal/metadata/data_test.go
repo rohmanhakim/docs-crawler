@@ -598,7 +598,7 @@ func TestSkipEventConstruction(t *testing.T) {
 func TestCrawlStatsConstruction(t *testing.T) {
 	start := time.Now()
 	end := start.Add(5 * time.Second)
-	s := metadata.NewCrawlStats(start, end, 10, 2, 5, 1)
+	s := metadata.NewCrawlStats(start, end, 10, 8, 2, 5, 1)
 
 	if s.StartedAt() != start {
 		t.Errorf("CrawlStats.StartedAt() = %v, want %v", s.StartedAt(), start)
@@ -606,8 +606,11 @@ func TestCrawlStatsConstruction(t *testing.T) {
 	if !s.FinishedAt().After(s.StartedAt()) {
 		t.Error("CrawlStats.FinishedAt() must be after StartedAt()")
 	}
-	if s.TotalPages() != 10 {
-		t.Errorf("CrawlStats.TotalPages() = %v, want 10", s.TotalPages())
+	if s.TotalVisitedPages() != 10 {
+		t.Errorf("CrawlStats.TotalVisitedPages() = %v, want 10", s.TotalVisitedPages())
+	}
+	if s.TotalProcessedPages() != 8 {
+		t.Errorf("CrawlStats.TotalProcessedPages() = %v, want 8", s.TotalProcessedPages())
 	}
 	if s.TotalErrors() != 2 {
 		t.Errorf("CrawlStats.TotalErrors() = %v, want 2", s.TotalErrors())
@@ -738,9 +741,9 @@ func TestEventConstruction(t *testing.T) {
 
 	t.Run("crawl stats getters", func(t *testing.T) {
 		start := time.Now()
-		cs := metadata.NewCrawlStats(start, start.Add(time.Second), 3, 0, 0, 0)
-		if cs.TotalPages() != 3 {
-			t.Errorf("CrawlStats.TotalPages() = %v, want 3", cs.TotalPages())
+		cs := metadata.NewCrawlStats(start, start.Add(time.Second), 3, 0, 0, 0, 0)
+		if cs.TotalVisitedPages() != 3 {
+			t.Errorf("CrawlStats.TotalVisitedPages() = %v, want 3", cs.TotalVisitedPages())
 		}
 	})
 }

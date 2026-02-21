@@ -83,7 +83,7 @@ func TestEventStream_FullPipelineExecution(t *testing.T) {
 		conversionRule,
 		&assetResolver,
 		&markdownConstraint,
-		&storageSink,
+		storageSink,
 		sleeper,
 		failureJournal,
 	)
@@ -210,8 +210,10 @@ func TestEventStream_FullPipelineExecution(t *testing.T) {
 			"stats should have non-zero FinishedAt timestamp")
 		assert.True(t, stats.FinishedAt().After(stats.StartedAt()) || stats.FinishedAt().Equal(stats.StartedAt()),
 			"FinishedAt should be at or after StartedAt")
-		assert.GreaterOrEqual(t, stats.TotalPages(), 0,
-			"TotalPages should be non-negative")
+		assert.GreaterOrEqual(t, stats.TotalVisitedPages(), 0,
+			"TotalVisitedPages should be non-negative")
+		assert.GreaterOrEqual(t, stats.TotalProcessedPages(), 0,
+			"TotalProcessedPages should be non-negative")
 	}
 
 	// ========================================

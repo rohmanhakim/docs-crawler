@@ -68,7 +68,8 @@ CrawlStats represents a terminal, derived summary of a completed crawl.
 type CrawlStats struct {
 	startedAt             time.Time
 	finishedAt            time.Time
-	totalPages            int
+	totalWebPages         int // pages fetched from the web
+	totalProcessedPages   int // markdown pages written
 	totalErrors           int
 	totalAssets           int
 	manualRetryQueueCount int // URLs in manual retry queue at crawl completion
@@ -78,7 +79,8 @@ type CrawlStats struct {
 func NewCrawlStats(
 	startedAt time.Time,
 	finishedAt time.Time,
-	totalPages int,
+	totalWebPages int,
+	totalProcessedPages int,
 	totalErrors int,
 	totalAssets int,
 	manualRetryQueueCount int,
@@ -86,7 +88,8 @@ func NewCrawlStats(
 	return CrawlStats{
 		startedAt:             startedAt,
 		finishedAt:            finishedAt,
-		totalPages:            totalPages,
+		totalWebPages:         totalWebPages,
+		totalProcessedPages:   totalProcessedPages,
 		totalErrors:           totalErrors,
 		totalAssets:           totalAssets,
 		manualRetryQueueCount: manualRetryQueueCount,
@@ -95,7 +98,8 @@ func NewCrawlStats(
 
 func (c CrawlStats) StartedAt() time.Time       { return c.startedAt }
 func (c CrawlStats) FinishedAt() time.Time      { return c.finishedAt }
-func (c CrawlStats) TotalPages() int            { return c.totalPages }
+func (c CrawlStats) TotalVisitedPages() int     { return c.totalWebPages }
+func (c CrawlStats) TotalProcessedPages() int   { return c.totalProcessedPages }
 func (c CrawlStats) TotalErrors() int           { return c.totalErrors }
 func (c CrawlStats) TotalAssets() int           { return c.totalAssets }
 func (c CrawlStats) ManualRetryQueueCount() int { return c.manualRetryQueueCount }
