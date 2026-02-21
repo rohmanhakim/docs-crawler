@@ -88,12 +88,11 @@ func (s *SlogLogger) LogStage(ctx context.Context, stage string, event StageEven
 }
 
 // LogRetry logs retry attempts with backoff information.
-func (s *SlogLogger) LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, remaining time.Duration, err error) {
+func (s *SlogLogger) LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, err error) {
 	attrs := []slog.Attr{
 		slog.Int("attempt", attempt),
 		slog.Int("max_attempts", maxAttempts),
 		slog.Int64("backoff_ms", backoff.Milliseconds()),
-		slog.Int64("remaining_ms", remaining.Milliseconds()),
 	}
 
 	// Add pre-populated fields

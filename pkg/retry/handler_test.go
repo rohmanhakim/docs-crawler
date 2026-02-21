@@ -6,10 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
+
+// noopLogger is a NoOpLogger instance for tests
+var noopLogger = debug.NewNoOpLogger()
 
 // defaultBackoffParam returns a default backoff parameter for tests
 func defaultBackoffParam() timeutil.BackoffParam {
@@ -62,7 +66,7 @@ func TestRetry_SuccessOnFirstAttempt(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -95,7 +99,7 @@ func TestRetry_PassParameter(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -134,7 +138,7 @@ func TestRetry_SuccessAfterRetries(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -172,7 +176,7 @@ func TestRetry_NonRetryableErrorReturnsImmediately(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
@@ -212,7 +216,7 @@ func TestRetry_ExhaustedAttempts(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error after exhausting attempts, got nil")
@@ -252,7 +256,7 @@ func TestRetry_MaxAttemptsLessThanOne(t *testing.T) {
 	)
 
 	var retryErr *retry.RetryError
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error for MaxAttempts < 1, got nil")
@@ -300,7 +304,7 @@ func TestRetry_GenericTypePointer(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -342,7 +346,7 @@ func TestRetry_GenericTypeSlice(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -392,7 +396,7 @@ func TestRetry_MixedRetryableAndNonRetryable(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
@@ -431,7 +435,7 @@ func TestRetry_DeterministicWithSameSeed(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -468,7 +472,7 @@ func TestRetry_SuccessAfterManyFailures(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error, got: %v", result.Err())
@@ -502,7 +506,7 @@ func TestRetry_ExhaustedErrorIsRetryable(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
@@ -555,7 +559,7 @@ func TestRetry_DefaultRetryableWhenNoIsRetryable(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected no error after retry, got: %v", result.Err())
@@ -591,7 +595,7 @@ func TestRetry_ErrorWrapping(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsSuccess() {
 		t.Fatal("expected error, got nil")
@@ -627,7 +631,7 @@ func TestNewRetryParam(t *testing.T) {
 		return "success", nil
 	}
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("unexpected error: %v", result.Err())
@@ -659,7 +663,7 @@ func BenchmarkRetry(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = retry.Retry(params, fn)
+		_ = retry.Retry(params, noopLogger, fn)
 	}
 }
 
@@ -676,7 +680,7 @@ func TestRetry_NilErrorTypeSafety(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 
 	if result.IsFailure() {
 		t.Fatalf("expected nil error, got: %v", result.Err())
@@ -706,7 +710,7 @@ func TestRetryErrorType(t *testing.T) {
 		defaultBackoffParam(),
 	)
 
-	result := retry.Retry(params, fn)
+	result := retry.Retry(params, noopLogger, fn)
 	if result.IsSuccess() {
 		t.Fatal("expected error after exhausting attempts")
 	}

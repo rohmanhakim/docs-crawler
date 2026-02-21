@@ -30,7 +30,7 @@ func TestNoOpLogger(t *testing.T) {
 
 	t.Run("LogRetry is no-op", func(t *testing.T) {
 		// Should not panic
-		logger.LogRetry(context.Background(), 1, 10, 100*time.Millisecond, 0, errors.New("test"))
+		logger.LogRetry(context.Background(), 1, 10, 100*time.Millisecond, errors.New("test"))
 	})
 
 	t.Run("LogRateLimit is no-op", func(t *testing.T) {
@@ -271,7 +271,7 @@ func TestSlogLogger_AllMethods(t *testing.T) {
 		handler := NewLogstashHandler(&buf, nil)
 		logger := SlogLogger{logger: slog.New(handler), enabled: true}
 
-		logger.LogRetry(context.Background(), 1, 10, 100*time.Millisecond, 50*time.Millisecond, errors.New("timeout"))
+		logger.LogRetry(context.Background(), 1, 10, 100*time.Millisecond, errors.New("timeout"))
 
 		var result map[string]any
 		if err := json.Unmarshal(buf.Bytes(), &result); err != nil {

@@ -16,6 +16,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/fileutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
@@ -58,6 +59,7 @@ type LocalResolver struct {
 	hashToPath    map[string]string // key: contentHash, value: localPath (only for files actually written)
 	httpClient    *http.Client
 	userAgent     string
+	debugLogger   debug.DebugLogger
 }
 
 func NewLocalResolver(
@@ -67,6 +69,7 @@ func NewLocalResolver(
 		metadataSink:  metadataSink,
 		writtenAssets: make(map[string]string),
 		hashToPath:    make(map[string]string),
+		debugLogger:   debug.NewNoOpLogger(),
 	}
 }
 
@@ -75,6 +78,12 @@ func NewLocalResolver(
 func (r *LocalResolver) Init(httpClient *http.Client, userAgent string) {
 	r.httpClient = httpClient
 	r.userAgent = userAgent
+}
+
+// SetDebugLogger sets the debug logger for the resolver.
+// This is optional and defaults to NoOpLogger.
+func (r *LocalResolver) SetDebugLogger(logger debug.DebugLogger) {
+	r.debugLogger = logger
 }
 
 func (r *LocalResolver) WrittenAssets() map[string]string {
@@ -383,7 +392,7 @@ func (r *LocalResolver) fetchAssetWithRetry(
 		return r.performFetch(ctx, fetchUrl, userAgent, maxAssetSize)
 	}
 
-	result := retry.Retry(retryParam, fetchTask)
+	result := retry.Retry(retryParam, r.debugLogger, fetchTask)
 
 	return result
 }

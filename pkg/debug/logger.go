@@ -15,7 +15,7 @@ type DebugLogger interface {
 	LogStage(ctx context.Context, stage string, event StageEvent)
 
 	// LogRetry logs retry attempts with backoff information.
-	LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, remaining time.Duration, err error)
+	LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, err error)
 
 	// LogRateLimit logs rate limiting decisions.
 	LogRateLimit(ctx context.Context, host string, delay time.Duration, reason RateLimitReason)

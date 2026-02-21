@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 )
@@ -46,6 +47,7 @@ type HtmlFetcher struct {
 	metadataSink metadata.MetadataSink
 	httpClient   *http.Client
 	userAgent    string
+	debugLogger  debug.DebugLogger
 }
 
 func NewHtmlFetcher(
@@ -54,6 +56,7 @@ func NewHtmlFetcher(
 	return HtmlFetcher{
 		metadataSink: metadataSink,
 		httpClient:   nil,
+		debugLogger:  debug.NewNoOpLogger(),
 	}
 }
 
@@ -62,6 +65,12 @@ func NewHtmlFetcher(
 func (h *HtmlFetcher) Init(httpClient *http.Client, userAgent string) {
 	h.httpClient = httpClient
 	h.userAgent = userAgent
+}
+
+// SetDebugLogger sets the debug logger for the fetcher.
+// This is optional and defaults to NoOpLogger.
+func (h *HtmlFetcher) SetDebugLogger(logger debug.DebugLogger) {
+	h.debugLogger = logger
 }
 
 func (h *HtmlFetcher) Fetch(
@@ -176,7 +185,7 @@ func (h *HtmlFetcher) fetchWithRetry(
 		return h.performFetch(ctx, fetchUrl, userAgent)
 	}
 
-	return retry.Retry(retryParam, fetchTask)
+	return retry.Retry(retryParam, h.debugLogger, fetchTask)
 }
 
 func (h *HtmlFetcher) performFetch(

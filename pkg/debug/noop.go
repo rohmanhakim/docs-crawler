@@ -22,7 +22,7 @@ func (n *NoOpLogger) Enabled() bool { return false }
 func (n *NoOpLogger) LogStage(_ context.Context, _ string, _ StageEvent) {}
 
 // LogRetry is a no-op.
-func (n *NoOpLogger) LogRetry(_ context.Context, _ int, _ int, _ time.Duration, _ time.Duration, _ error) {
+func (n *NoOpLogger) LogRetry(_ context.Context, _ int, _ int, _ time.Duration, _ error) {
 }
 
 // LogRateLimit is a no-op.
