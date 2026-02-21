@@ -22,6 +22,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
 	"github.com/rohmanhakim/docs-crawler/internal/stagedump"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
@@ -82,6 +83,7 @@ type Scheduler struct {
 	rateLimiter            limiter.RateLimiter
 	sleeper                timeutil.Sleeper
 	stageDumper            stagedump.Dumper
+	debugLogger            debug.DebugLogger
 }
 
 func NewScheduler() Scheduler {
@@ -135,6 +137,7 @@ func NewSchedulerWithDeps(
 	sleeper timeutil.Sleeper,
 	failureJournal failurejournal.Journal,
 	stageDumper stagedump.Dumper,
+	debugLogger debug.DebugLogger,
 ) Scheduler {
 	return Scheduler{
 		ctx:                    ctx,
@@ -153,6 +156,7 @@ func NewSchedulerWithDeps(
 		rateLimiter:            rateLimiter,
 		sleeper:                sleeper,
 		stageDumper:            stageDumper,
+		debugLogger:            debugLogger,
 	}
 }
 
@@ -416,13 +420,32 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			break
 		}
 
-		// 3. Fetch Page URL
-		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryParam(cfg))
 		urlStr := getURLString(nextCrawlToken.URL())
+
+		// Log pipeline start for this URL
+		s.debugLogger.LogStage(s.ctx, "pipeline", debug.StageEvent{
+			Type: debug.EventTypeStart,
+			URL:  urlStr,
+		})
+
+		// 3. Fetch Page URL
+		fetchStartTime := time.Now()
+		s.debugLogger.LogStage(s.ctx, "fetcher", debug.StageEvent{
+			Type: debug.EventTypeStart,
+			URL:  urlStr,
+		})
+
+		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryParam(cfg))
 		if err != nil {
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
 			}
+			// Log fetcher error
+			s.debugLogger.LogStage(s.ctx, "fetcher", debug.StageEvent{
+				Type:     debug.EventTypeError,
+				URL:      urlStr,
+				Duration: time.Since(fetchStartTime),
+			})
 			// Track for manual retry if eligible
 			if err.RetryPolicy() == failure.RetryPolicyManual {
 				s.failureJournal.Record(failurejournal.FailureRecord{
@@ -437,6 +460,16 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			totalErrors++
 			continue
 		}
+
+		// Log fetcher completion
+		s.debugLogger.LogStage(s.ctx, "fetcher", debug.StageEvent{
+			Type:     debug.EventTypeComplete,
+			URL:      getURLString(fetchResult.URL()),
+			Duration: time.Since(fetchStartTime),
+			Fields: debug.FieldMap{
+				"status_code": fetchResult.Code(),
+			},
+		})
 
 		// Dump fetched HTML
 		s.stageDumper.DumpFetcherOutput(urlStr, fetchResult.Body())
@@ -741,6 +774,17 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 		stageDumper = stagedump.NewFileDumper(cfg.DumpStageOutput(), cfg.DryRun())
 	}
 
+	// Initialize debug logger based on config
+	debugConfig, err := debug.NewDebugConfig(cfg.Debug(), cfg.DebugFile(), cfg.DebugFormat())
+	if err != nil {
+		log.Printf("failed to create debug config: %v, using NoOpLogger", err)
+	}
+	debugLogger, err := debug.NewSlogLogger(debugConfig)
+	if err != nil {
+		log.Printf("failed to create debug logger: %v, using NoOpLogger", err)
+		debugLogger = debug.NewNoOpLogger()
+	}
+
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
@@ -756,6 +800,7 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 		rateLimiter:            rateLimiter,
 		sleeper:                &sleeper,
 		stageDumper:            stageDumper,
+		debugLogger:            debugLogger,
 	}
 }
 

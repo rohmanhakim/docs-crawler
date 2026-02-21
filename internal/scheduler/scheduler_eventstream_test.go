@@ -18,6 +18,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/stagedump"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -88,6 +89,7 @@ func TestEventStream_FullPipelineExecution(t *testing.T) {
 		sleeper,
 		failureJournal,
 		stagedump.NewNoOpDumper(),
+		debug.NewNoOpLogger(),
 	)
 
 	// Execute crawl
@@ -349,6 +351,7 @@ func TestEventStream_RobotsDisallowed_EmitsSkipEvent(t *testing.T) {
 		sleeper,
 		failureJournal,
 		stagedump.NewNoOpDumper(),
+		debug.NewNoOpLogger(),
 	)
 
 	// Set current host

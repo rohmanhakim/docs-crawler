@@ -321,6 +321,17 @@ func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
 		configBuilder = configBuilder.WithSelectorBlacklist(selectorBlacklist)
 	}
 
+	// Debug logging configuration
+	if debug {
+		configBuilder = configBuilder.WithDebug(debug)
+	}
+	if debugFile != "" {
+		configBuilder = configBuilder.WithDebugFile(debugFile)
+	}
+	if debugFormat != "" {
+		configBuilder = configBuilder.WithDebugFormat(debugFormat)
+	}
+
 	cfg, err := configBuilder.Build()
 	if err != nil {
 		return config.Config{}, err

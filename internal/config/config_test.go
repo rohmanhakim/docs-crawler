@@ -1370,3 +1370,144 @@ func TestSelectorBlacklist_ReturnsCopy(t *testing.T) {
 		t.Error("SelectorBlacklist should return a copy, not reference")
 	}
 }
+
+// Test Debug configuration builder methods
+func TestWithDebug(t *testing.T) {
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithDebug(true).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %v", err)
+	}
+	if cfg.Debug() != true {
+		t.Errorf("expected Debug true, got %v", cfg.Debug())
+	}
+}
+
+func TestWithDebugFile(t *testing.T) {
+	testFile := "/var/log/crawler-debug.jsonl"
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithDebugFile(testFile).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %v", err)
+	}
+	if cfg.DebugFile() != testFile {
+		t.Errorf("expected DebugFile '%s', got '%s'", testFile, cfg.DebugFile())
+	}
+}
+
+func TestWithDebugFormat(t *testing.T) {
+	testFormat := "text"
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithDebugFormat(testFormat).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %v", err)
+	}
+	if cfg.DebugFormat() != testFormat {
+		t.Errorf("expected DebugFormat '%s', got '%s'", testFormat, cfg.DebugFormat())
+	}
+}
+
+// Test default values for Debug configuration
+func TestDebug_DefaultValues(t *testing.T) {
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).Build()
+	if err != nil {
+		t.Fatalf("should not have any error, got %v", err)
+	}
+	if cfg.Debug() != false {
+		t.Errorf("expected default Debug false, got %v", cfg.Debug())
+	}
+	if cfg.DebugFile() != "" {
+		t.Errorf("expected default DebugFile empty, got '%s'", cfg.DebugFile())
+	}
+	if cfg.DebugFormat() != "" {
+		t.Errorf("expected default DebugFormat empty, got '%s'", cfg.DebugFormat())
+	}
+}
+
+// Test loading Debug configuration from JSON config file
+func TestWithConfigFile_DebugConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "debug.json")
+
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"debug": true,
+		"debugFile": "/var/log/debug.jsonl",
+		"debugFormat": "json"
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	if loadedConfig.Debug() != true {
+		t.Errorf("expected Debug true, got %v", loadedConfig.Debug())
+	}
+	if loadedConfig.DebugFile() != "/var/log/debug.jsonl" {
+		t.Errorf("expected DebugFile '/var/log/debug.jsonl', got '%s'", loadedConfig.DebugFile())
+	}
+	if loadedConfig.DebugFormat() != "json" {
+		t.Errorf("expected DebugFormat 'json', got '%s'", loadedConfig.DebugFormat())
+	}
+}
+
+// Test loading Debug configuration with text format
+func TestWithConfigFile_DebugConfigTextFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "debug_text.json")
+
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"debug": true,
+		"debugFormat": "text"
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	if loadedConfig.Debug() != true {
+		t.Errorf("expected Debug true, got %v", loadedConfig.Debug())
+	}
+	if loadedConfig.DebugFormat() != "text" {
+		t.Errorf("expected DebugFormat 'text', got '%s'", loadedConfig.DebugFormat())
+	}
+}
+
+// Test explicit false for debug (zero value override)
+func TestWithConfigFile_ExplicitFalseDebug(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "debug_false.json")
+
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"debug": false
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	if loadedConfig.Debug() != false {
+		t.Errorf("expected Debug false, got %v", loadedConfig.Debug())
+	}
+}
