@@ -80,6 +80,14 @@ type ExtractParam struct {
 	// Threshold holds the minimum thresholds for meaningful content detection.
 	// Used by isMeaningful to validate extracted content.
 	Threshold MeaningfulThreshold
+
+	// SelectorBlacklist contains CSS selectors for elements to remove
+	// before content extraction. Applied early in extraction pipeline,
+	// before semantic container detection (Layer 1).
+	// Used for noise suppression when elements pass the extractor's heuristics
+	// but should still be removed (e.g., promo banners, feedback widgets).
+	// Default: empty (no blacklisted selectors)
+	SelectorBlacklist []string
 }
 
 // DefaultExtractParam returns an ExtractParam with sensible default values.
@@ -100,5 +108,6 @@ func DefaultExtractParam() ExtractParam {
 			MinParagraphsOrCode: 1,
 			MaxLinkDensity:      0.8,
 		},
+		SelectorBlacklist: []string{},
 	}
 }

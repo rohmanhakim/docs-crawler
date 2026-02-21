@@ -1292,3 +1292,81 @@ func TestWithConfigFile_ExplicitZeroMaxAssetSize(t *testing.T) {
 		t.Errorf("expected MaxAssetSize 0, got %d", loadedConfig.MaxAssetSize())
 	}
 }
+
+// Test SelectorBlacklist builder method
+func TestWithSelectorBlacklist(t *testing.T) {
+	testSelectors := []string{".announcement", ".feedback-widget", "#cookie-banner"}
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).WithSelectorBlacklist(testSelectors).Build()
+	if err != nil {
+		t.Errorf("should not have any error, got %v", err)
+	}
+	if len(cfg.SelectorBlacklist()) != 3 {
+		t.Errorf("expected 3 selectors, got %d", len(cfg.SelectorBlacklist()))
+	}
+	if cfg.SelectorBlacklist()[0] != ".announcement" {
+		t.Errorf("expected first selector '.announcement', got '%s'", cfg.SelectorBlacklist()[0])
+	}
+}
+
+// Test loading SelectorBlacklist from JSON config file
+func TestWithConfigFile_SelectorBlacklist(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "blacklist.json")
+
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"selectorBlacklist": [".sidebar", ".related-posts", "#ad-banner"]
+	}`
+
+	err := os.WriteFile(configPath, []byte(configData), 0644)
+	if err != nil {
+		t.Fatalf("failed to write config file: %v", err)
+	}
+
+	loadedConfig, err := config.WithConfigFile(configPath)
+	if err != nil {
+		t.Fatalf("unexpected error loading config: %v", err)
+	}
+
+	if len(loadedConfig.SelectorBlacklist()) != 3 {
+		t.Errorf("expected 3 blacklist selectors, got %d", len(loadedConfig.SelectorBlacklist()))
+	}
+	if loadedConfig.SelectorBlacklist()[0] != ".sidebar" {
+		t.Errorf("expected first selector '.sidebar', got '%s'", loadedConfig.SelectorBlacklist()[0])
+	}
+	if loadedConfig.SelectorBlacklist()[1] != ".related-posts" {
+		t.Errorf("expected second selector '.related-posts', got '%s'", loadedConfig.SelectorBlacklist()[1])
+	}
+	if loadedConfig.SelectorBlacklist()[2] != "#ad-banner" {
+		t.Errorf("expected third selector '#ad-banner', got '%s'", loadedConfig.SelectorBlacklist()[2])
+	}
+}
+
+// Test default value for SelectorBlacklist (empty slice)
+func TestSelectorBlacklist_DefaultValue(t *testing.T) {
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, err := config.WithDefault(baseURL).Build()
+	if err != nil {
+		t.Fatalf("should not have any error, got %v", err)
+	}
+	if len(cfg.SelectorBlacklist()) != 0 {
+		t.Errorf("expected default SelectorBlacklist to be empty, got %d items", len(cfg.SelectorBlacklist()))
+	}
+}
+
+// Test that SelectorBlacklist getter returns a copy (immutability)
+func TestSelectorBlacklist_ReturnsCopy(t *testing.T) {
+	testSelectors := []string{".annoying-element"}
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+	cfg, _ := config.WithDefault(baseURL).WithSelectorBlacklist(testSelectors).Build()
+
+	// Modify returned slice
+	returned := cfg.SelectorBlacklist()
+	returned[0] = ".modified"
+
+	// Original should be unchanged
+	if cfg.SelectorBlacklist()[0] != ".annoying-element" {
+		t.Error("SelectorBlacklist should return a copy, not reference")
+	}
+}

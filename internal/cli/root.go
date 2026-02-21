@@ -31,6 +31,7 @@ var (
 	randomSeed        int64
 	allowedHosts      []string
 	allowedPathPrefix []string
+	selectorBlacklist []string
 	versionFlag       bool
 )
 
@@ -121,6 +122,9 @@ producing high-quality Markdown suitable for embedding and retrieval.`,
 		fmt.Printf("Output Directory: %s\n", cfg.OutputDir())
 		fmt.Printf("Dry Run: %t\n", cfg.DryRun())
 		fmt.Printf("Dump Stage Output: %s\n", cfg.DumpStageOutput())
+		if len(cfg.SelectorBlacklist()) > 0 {
+			fmt.Printf("Selector Blacklist: %s\n", strings.Join(cfg.SelectorBlacklist(), ", "))
+		}
 		// Create scheduler with config-based dependency injection
 		sched := scheduler.NewSchedulerWithConfig(cfg)
 
@@ -215,6 +219,7 @@ func init() {
 	rootCmd.PersistentFlags().Int64Var(&randomSeed, "random-seed", 0, "seed for random number generation (0 for current time)")
 	rootCmd.PersistentFlags().StringArrayVar(&allowedHosts, "allowed-host", []string{}, "explicit hostname allowlist (defaults to seed host)")
 	rootCmd.PersistentFlags().StringArrayVar(&allowedPathPrefix, "allowed-path-prefix", []string{}, "restrict crawl to paths like `/docs`, `/guide`")
+	rootCmd.PersistentFlags().StringArrayVar(&selectorBlacklist, "selector-blacklist", []string{}, "CSS selectors for elements to remove before extraction (e.g., .promo-banner, #ad)")
 }
 
 // InitConfig reads in config file and ENV variables if set.
@@ -304,6 +309,10 @@ func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
 		configBuilder = configBuilder.WithAllowedPathPrefix(allowedPathPrefix)
 	}
 
+	if len(selectorBlacklist) > 0 {
+		configBuilder = configBuilder.WithSelectorBlacklist(selectorBlacklist)
+	}
+
 	cfg, err := configBuilder.Build()
 	if err != nil {
 		return config.Config{}, err
@@ -327,6 +336,7 @@ func ResetFlags() {
 	randomSeed = 0
 	allowedHosts = []string{}
 	allowedPathPrefix = []string{}
+	selectorBlacklist = []string{}
 	versionFlag = false
 }
 
@@ -393,4 +403,8 @@ func SetVersionFlagForTest(v bool) {
 
 func SetDumpStageOutputForTest(dir string) {
 	dumpStageOutput = dir
+}
+
+func SetSelectorBlacklistForTest(selectors []string) {
+	selectorBlacklist = selectors
 }

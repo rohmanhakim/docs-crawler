@@ -61,4 +61,5 @@ func verifyExtractParam(t *testing.T, actual extractor.ExtractParam, expected ex
 	assert.Equal(t, expected.Threshold.MinHeadings, actual.Threshold.MinHeadings, "MinHeadings mismatch")
 	assert.Equal(t, expected.Threshold.MinParagraphsOrCode, actual.Threshold.MinParagraphsOrCode, "MinParagraphsOrCode mismatch")
 	assert.InDelta(t, expected.Threshold.MaxLinkDensity, actual.Threshold.MaxLinkDensity, 0.0001, "MaxLinkDensity mismatch")
+	assert.Equal(t, expected.SelectorBlacklist, actual.SelectorBlacklist, "SelectorBlacklist mismatch")
 }

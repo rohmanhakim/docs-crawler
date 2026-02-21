@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head><title>Selector Blacklist Test</title></head>
+<body>
+<main>
+    <h1>Documentation Page Title</h1>
+    
+    <!-- promo-banner does NOT contain any chrome keywords -->
+    <!-- Current heuristics will NOT remove this element -->
+    <!-- Only selector blacklist can remove it -->
+    <div class="promo-banner">
+        <p>🎉 Limited time offer! Upgrade now for 50% off!</p>
+        <a href="/pricing">Learn More</a>
+    </div>
+    
+    <p>This is the main documentation content that should be extracted.</p>
+    <p>We include enough text here to pass the meaningful content threshold checks.</p>
+    <p>Additional paragraph to ensure sufficient content for meaningful validation.</p>
+    
+    <!-- feedback-prompt also passes heuristics - no chrome keywords -->
+    <div class="feedback-prompt">
+        <p>Was this article helpful? 
+            <button>Yes</button> 
+            <button>No</button>
+        </p>
+    </div>
+    
+    <h2>Next Section</h2>
+    <p>More documentation content to ensure this is a meaningful article.</p>
+    
+    <!-- related-posts also passes heuristics -->
+    <div class="related-posts">
+        <h4>Related Articles</h4>
+        <ul>
+            <li><a href="/doc1">Getting Started Guide</a></li>
+            <li><a href="/doc2">Advanced Configuration</a></li>
+            <li><a href="/doc3">API Reference</a></li>
+        </ul>
+    </div>
+</main>
+</body>
+</html>

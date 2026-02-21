@@ -425,6 +425,158 @@ func TestExtract_CustomSelectorDeduplication(t *testing.T) {
 	assert.Equal(t, "div", result.ContentNode.Data, "ContentNode should be <div> element")
 }
 
+// TestExtract_SelectorBlacklist_RemovesNoiseThatPassesHeuristics tests that elements
+// that pass current heuristics (no chrome keywords) are removed when blacklisted.
+// This test uses two extractor configurations on the same fixture:
+// - Without blacklist: noise elements should be present
+// - With blacklist: noise elements should be removed
+func TestExtract_SelectorBlacklist_RemovesNoiseThatPassesHeuristics(t *testing.T) {
+	sourceURL := mustParseURL(t, "https://example.com/blacklist-test")
+	htmlBytes := loadFixture(t, "case_selector_blacklist.html")
+
+	// First: test WITHOUT blacklist - verify noise passes through current heuristics
+	extNoBlacklist, _ := setupExtractor()
+	resultNoBlacklist, err := extNoBlacklist.Extract(sourceURL, htmlBytes)
+	require.NoError(t, err, "Expected successful extraction without blacklist")
+	require.NotNil(t, resultNoBlacklist.ContentNode, "ContentNode should not be nil")
+
+	// Assert: blacklisted elements EXIST in extracted content (current behavior)
+	assertElementExistsInNode(t, resultNoBlacklist.ContentNode, "class", "promo-banner")
+	assertElementExistsInNode(t, resultNoBlacklist.ContentNode, "class", "feedback-prompt")
+	assertElementExistsInNode(t, resultNoBlacklist.ContentNode, "class", "related-posts")
+
+	// Second: test WITH blacklist - verify noise is removed
+	params := extractor.ExtractParam{
+		SelectorBlacklist: []string{".promo-banner", ".feedback-prompt", ".related-posts"},
+	}
+	extWithBlacklist, _ := setupExtractorWithParams(params)
+	resultWithBlacklist, err := extWithBlacklist.Extract(sourceURL, htmlBytes)
+
+	require.NoError(t, err, "Expected successful extraction with blacklist")
+	require.NotNil(t, resultWithBlacklist.ContentNode, "ContentNode should not be nil")
+
+	// Assert: blacklisted elements are REMOVED from extracted content
+	assertElementNotExistsInNode(t, resultWithBlacklist.ContentNode, "class", "promo-banner")
+	assertElementNotExistsInNode(t, resultWithBlacklist.ContentNode, "class", "feedback-prompt")
+	assertElementNotExistsInNode(t, resultWithBlacklist.ContentNode, "class", "related-posts")
+
+	// Assert: main content still exists - h1 element should be present
+	assert.True(t, hasH1Element(resultWithBlacklist.ContentNode), "Expected h1 element to exist in extracted content")
+}
+
+// TestExtract_SelectorBlacklist_IDSelector tests that ID selectors work in blacklist
+func TestExtract_SelectorBlacklist_IDSelector(t *testing.T) {
+	htmlContent := `<!DOCTYPE html>
+<html>
+<body>
+<main>
+    <h1>Title</h1>
+    <div id="announcement-banner">
+        <p>This should be removed via ID selector</p>
+    </div>
+    <p>Content paragraph with sufficient text for meaningful check.</p>
+    <p>Additional content to pass validation.</p>
+</main>
+</body>
+</html>`
+
+	params := extractor.ExtractParam{
+		SelectorBlacklist: []string{"#announcement-banner"},
+	}
+	ext, _ := setupExtractorWithParams(params)
+	sourceURL := mustParseURL(t, "https://example.com/id-blacklist")
+
+	result, err := ext.Extract(sourceURL, []byte(htmlContent))
+	require.NoError(t, err)
+	require.NotNil(t, result.ContentNode)
+
+	// Verify the element with ID was removed
+	assertElementNotExistsInNode(t, result.ContentNode, "id", "announcement-banner")
+}
+
+// TestExtract_SelectorBlacklist_Empty tests that empty blacklist has no effect
+func TestExtract_SelectorBlacklist_Empty(t *testing.T) {
+	htmlContent := `<!DOCTYPE html>
+<html>
+<body>
+<article>
+    <h1>Title</h1>
+    <div class="keep-me">This should remain</div>
+    <p>Content paragraph text here with enough characters.</p>
+</article>
+</body>
+</html>`
+
+	params := extractor.ExtractParam{
+		SelectorBlacklist: []string{}, // Empty blacklist
+	}
+	ext, _ := setupExtractorWithParams(params)
+	sourceURL := mustParseURL(t, "https://example.com/empty-blacklist")
+
+	result, err := ext.Extract(sourceURL, []byte(htmlContent))
+	require.NoError(t, err)
+	require.NotNil(t, result.ContentNode)
+
+	// Verify .keep-me still exists
+	assertElementExistsInNode(t, result.ContentNode, "class", "keep-me")
+}
+
+// assertElementExistsInNode asserts that an element with the specified attribute exists
+func assertElementExistsInNode(t *testing.T, node *html.Node, attrKey, attrVal string) {
+	t.Helper()
+	found := hasElementWithAttr(node, attrKey, attrVal)
+	assert.True(t, found, "Expected element with %s='%s' to exist in node", attrKey, attrVal)
+}
+
+// assertElementNotExistsInNode asserts that an element with the specified attribute does NOT exist
+func assertElementNotExistsInNode(t *testing.T, node *html.Node, attrKey, attrVal string) {
+	t.Helper()
+	found := hasElementWithAttr(node, attrKey, attrVal)
+	assert.False(t, found, "Expected element with %s='%s' to NOT exist in node", attrKey, attrVal)
+}
+
+// hasElementWithAttr checks if any element in the subtree has the specified attribute
+func hasElementWithAttr(node *html.Node, attrKey, attrVal string) bool {
+	if node == nil {
+		return false
+	}
+
+	if node.Type == html.ElementNode {
+		for _, attr := range node.Attr {
+			if attr.Key == attrKey && attr.Val == attrVal {
+				return true
+			}
+		}
+	}
+
+	for c := node.FirstChild; c != nil; c = c.NextSibling {
+		if hasElementWithAttr(c, attrKey, attrVal) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// hasH1Element checks if a node contains an H1 element
+func hasH1Element(node *html.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	if node.Type == html.ElementNode && node.Data == "h1" {
+		return true
+	}
+
+	for c := node.FirstChild; c != nil; c = c.NextSibling {
+		if hasH1Element(c) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // TestSetExtractParam tests that SetExtractParam correctly overrides default parameters
 // Expected: Custom parameters are applied to extraction behavior
 func TestSetExtractParam(t *testing.T) {

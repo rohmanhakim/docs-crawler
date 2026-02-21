@@ -148,6 +148,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 			MinParagraphsOrCode: 2,
 			MaxLinkDensity:      0.9,
 		},
+		SelectorBlacklist: []string{},
 	}
 	// Set up extractor expectations with custom params
 	mockExtractor.On("SetExtractParam", customParams).Return()
@@ -257,6 +258,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 			MinParagraphsOrCode: 1,
 			MaxLinkDensity:      0.8,
 		},
+		SelectorBlacklist: []string{},
 	}
 	// Set up extractor expectations with custom params
 	mockExtractor.On("SetExtractParam", customParams).Return()
@@ -376,6 +378,7 @@ func TestScheduler_Extract_DefaultParamsStructure(t *testing.T) {
 			MinParagraphsOrCode: 1,
 			MaxLinkDensity:      0.8,
 		},
+		SelectorBlacklist: []string{},
 	}
 
 	// Verify the default parameters match

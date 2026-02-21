@@ -128,6 +128,12 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 		)
 	}
 
+	// Layer 0: Remove blacklisted elements before any extraction
+	// This ensures noise elements are removed regardless of which layer finds content
+	if len(d.params.SelectorBlacklist) > 0 {
+		removeBlacklistedElements(doc, d.params.SelectorBlacklist)
+	}
+
 	// Layer 1: Extract semantic container (main, article, [role="main"])
 	contentNode := extractSemanticContainer(doc, d.params.Threshold)
 	if contentNode != nil {
@@ -869,4 +875,36 @@ func isMeaningful(node *html.Node, threshold MeaningfulThreshold) bool {
 	hasHeadingsWithText := stats.headings > threshold.MinHeadings && stats.nonWhitespace >= 20
 
 	return hasContent || hasHeadingsWithText
+}
+
+// removeBlacklistedElements removes elements matching the provided CSS selectors
+// from the document tree. This is applied before any extraction layer (Layer 0)
+// to ensure user-specified noise elements are removed regardless of which
+// extraction heuristic finds the content.
+// The function modifies the document tree in place.
+func removeBlacklistedElements(doc *html.Node, selectors []string) {
+	if len(selectors) == 0 {
+		return
+	}
+
+	// Use goquery as convenience wrapper for CSS selector matching
+	gqDoc := goquery.NewDocumentFromNode(doc)
+
+	// Collect all nodes to remove (can't modify while iterating)
+	var nodesToRemove []*html.Node
+
+	for _, selector := range selectors {
+		gqDoc.Find(selector).Each(func(i int, s *goquery.Selection) {
+			if len(s.Nodes) > 0 {
+				nodesToRemove = append(nodesToRemove, s.Nodes...)
+			}
+		})
+	}
+
+	// Remove collected nodes from their parents
+	for _, node := range nodesToRemove {
+		if node.Parent != nil {
+			node.Parent.RemoveChild(node)
+		}
+	}
 }

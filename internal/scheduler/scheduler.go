@@ -335,6 +335,7 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 			MinParagraphsOrCode: cfg.ThresholdMinParagraphsOrCode(),
 			MaxLinkDensity:      cfg.ThresholdMaxLinkDensity(),
 		},
+		SelectorBlacklist: cfg.SelectorBlacklist(),
 	}
 	s.domExtractor.SetExtractParam(extractParam)
 
@@ -839,6 +840,7 @@ func (s *Scheduler) InitializeWithConfig(cfg config.Config) (init *CrawlInitiali
 			MinParagraphsOrCode: cfg.ThresholdMinParagraphsOrCode(),
 			MaxLinkDensity:      cfg.ThresholdMaxLinkDensity(),
 		},
+		SelectorBlacklist: cfg.SelectorBlacklist(),
 	}
 	s.domExtractor.SetExtractParam(extractParam)
 

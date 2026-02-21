@@ -127,6 +127,14 @@ type Config struct {
 	// Hash Algorithm
 	//===============
 	hashAlgo string
+
+	//===============
+	// Selector Blacklist
+	//===============
+	// CSS selectors for elements to remove before content extraction.
+	// Used for noise suppression when elements pass the extractor's heuristics
+	// but should still be removed (e.g., promo banners, feedback widgets).
+	selectorBlacklist []string
 }
 
 type configDTO struct {
@@ -165,6 +173,8 @@ type configDTO struct {
 	ThresholdMinParagraphsOrCode        *int     `json:"thresholdMinParagraphsOrCode,omitempty"`
 	ThresholdMaxLinkDensity             *float64 `json:"thresholdMaxLinkDensity,omitempty"`
 	HashAlgo                            *string  `json:"hashAlgo,omitempty"`
+	// Selector blacklist for noise suppression
+	SelectorBlacklist *[]string `json:"selectorBlacklist,omitempty"`
 }
 
 func newConfigFromDTO(dto configDTO) (Config, error) {
@@ -285,6 +295,11 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	// HashAlgo - override if provided (pointer not nil)
 	if dto.HashAlgo != nil {
 		cfg.hashAlgo = *dto.HashAlgo
+	}
+
+	// SelectorBlacklist - override if provided (pointer not nil)
+	if dto.SelectorBlacklist != nil {
+		cfg.selectorBlacklist = *dto.SelectorBlacklist
 	}
 
 	return cfg, nil
@@ -528,6 +543,11 @@ func (c *Config) WithIdleConnTimeout(idleConnTimeout time.Duration) *Config {
 	return c
 }
 
+func (c *Config) WithSelectorBlacklist(selectors []string) *Config {
+	c.selectorBlacklist = selectors
+	return c
+}
+
 func (c *Config) Build() (Config, error) {
 	if len(c.seedURLs) == 0 {
 		return Config{}, fmt.Errorf("%w: seedUrls cannot be empty", ErrInvalidConfig)
@@ -688,4 +708,10 @@ func (c Config) MaxIdleConnsPerHost() int {
 
 func (c Config) IdleConnTimeout() time.Duration {
 	return c.idleConnTimeout
+}
+
+func (c Config) SelectorBlacklist() []string {
+	selectors := make([]string, len(c.selectorBlacklist))
+	copy(selectors, c.selectorBlacklist)
+	return selectors
 }
