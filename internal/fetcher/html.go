@@ -207,6 +207,15 @@ func (h *HtmlFetcher) performFetch(
 		req.Header.Set(key, value)
 	}
 
+	// Log request creation if debug enabled
+	if h.debugLogger.Enabled() {
+		h.debugLogger.LogStep(ctx, "fetcher", "create_request", debug.FieldMap{
+			"url":        fetchUrl.String(),
+			"method":     http.MethodGet,
+			"user_agent": userAgent,
+		})
+	}
+
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		// Network/transport errors are retryable
@@ -216,6 +225,15 @@ func (h *HtmlFetcher) performFetch(
 		)
 	}
 	defer resp.Body.Close()
+
+	// Log response received if debug enabled
+	if h.debugLogger.Enabled() {
+		h.debugLogger.LogStep(ctx, "fetcher", "response_received", debug.FieldMap{
+			"status_code":    resp.StatusCode,
+			"content_type":   resp.Header.Get("Content-Type"),
+			"content_length": resp.Header.Get("Content-Length"),
+		})
+	}
 
 	// Handle HTTP status codes
 	switch {
@@ -272,6 +290,13 @@ func (h *HtmlFetcher) performFetch(
 			ErrCauseReadResponseBodyError,
 			fmt.Sprintf("failed to read response body: %v", err),
 		)
+	}
+
+	// Log body read if debug enabled
+	if h.debugLogger.Enabled() {
+		h.debugLogger.LogStep(ctx, "fetcher", "body_read", debug.FieldMap{
+			"body_size": len(body),
+		})
 	}
 
 	// Build response headers map

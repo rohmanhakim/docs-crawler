@@ -16,6 +16,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
@@ -51,7 +52,9 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	f := fetcher.NewHtmlFetcher(sink)
+	f.SetDebugLogger(mockLogger)
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
@@ -101,6 +104,47 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 	// Verify no error events were recorded
 	if len(sink.ErrorRecords) != 0 {
 		t.Errorf("expected 0 error events, got %d", len(sink.ErrorRecords))
+	}
+
+	// Verify debug logging: step sequence for successful fetch
+	steps := mockLogger.StepsByStage("fetcher")
+	if len(steps) < 3 {
+		t.Fatalf("expected at least 3 debug steps, got %d", len(steps))
+	}
+
+	// Verify create_request step
+	createReqSteps := mockLogger.StepsByName("create_request")
+	if len(createReqSteps) != 1 {
+		t.Fatalf("expected 1 create_request step, got %d", len(createReqSteps))
+	}
+	if createReqSteps[0].Fields["url"] != server.URL {
+		t.Errorf("expected url %s, got %v", server.URL, createReqSteps[0].Fields["url"])
+	}
+	if createReqSteps[0].Fields["method"] != "GET" {
+		t.Errorf("expected method GET, got %v", createReqSteps[0].Fields["method"])
+	}
+
+	// Verify response_received step
+	respSteps := mockLogger.StepsByName("response_received")
+	if len(respSteps) != 1 {
+		t.Fatalf("expected 1 response_received step, got %d", len(respSteps))
+	}
+	if respSteps[0].Fields["status_code"] != http.StatusOK {
+		t.Errorf("expected status_code %d, got %v", http.StatusOK, respSteps[0].Fields["status_code"])
+	}
+
+	// Verify body_read step
+	bodyReadSteps := mockLogger.StepsByName("body_read")
+	if len(bodyReadSteps) != 1 {
+		t.Fatalf("expected 1 body_read step, got %d", len(bodyReadSteps))
+	}
+	if bodyReadSteps[0].Fields["body_size"] != len("<html><body>Hello World</body></html>") {
+		t.Errorf("expected body_size %d, got %v", len("<html><body>Hello World</body></html>"), bodyReadSteps[0].Fields["body_size"])
+	}
+
+	// Verify retry logging was called for success
+	if !mockLogger.LogRetryCalled {
+		t.Error("expected LogRetry to be called")
 	}
 }
 
@@ -227,7 +271,9 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	f := fetcher.NewHtmlFetcher(sink)
+	f.SetDebugLogger(mockLogger)
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
@@ -267,6 +313,28 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 	fetchEvt := sink.FetchEvents[0]
 	if fetchEvt.RetryCount() != 2 {
 		t.Errorf("expected retry count 2 (actual attempts), got %d", fetchEvt.RetryCount())
+	}
+
+	// Verify debug logging: each retry attempt logs create_request and response_received
+	createReqSteps := mockLogger.StepsByName("create_request")
+	if len(createReqSteps) != 2 {
+		t.Errorf("expected 2 create_request steps (one per retry), got %d", len(createReqSteps))
+	}
+
+	respSteps := mockLogger.StepsByName("response_received")
+	if len(respSteps) != 2 {
+		t.Errorf("expected 2 response_received steps (one per retry), got %d", len(respSteps))
+	}
+
+	// Verify body_read was NOT logged (error before body read)
+	bodyReadSteps := mockLogger.StepsByName("body_read")
+	if len(bodyReadSteps) != 0 {
+		t.Errorf("expected 0 body_read steps (error before body read), got %d", len(bodyReadSteps))
+	}
+
+	// Verify retry logging was called
+	if !mockLogger.LogRetryCalled {
+		t.Error("expected LogRetry to be called")
 	}
 }
 
@@ -321,7 +389,9 @@ func TestHtmlFetcher_Fetch_SuccessAfterRetry(t *testing.T) {
 	defer server.Close()
 
 	sink := &mockMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	f := fetcher.NewHtmlFetcher(sink)
+	f.SetDebugLogger(mockLogger)
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
@@ -353,6 +423,28 @@ func TestHtmlFetcher_Fetch_SuccessAfterRetry(t *testing.T) {
 	// Verify no error events were recorded (success case)
 	if len(sink.ErrorRecords) != 0 {
 		t.Errorf("expected 0 error events, got %d", len(sink.ErrorRecords))
+	}
+
+	// Verify debug logging: 2 attempts = 2 create_request + 2 response_received + 1 body_read
+	createReqSteps := mockLogger.StepsByName("create_request")
+	if len(createReqSteps) != 2 {
+		t.Errorf("expected 2 create_request steps (one per attempt), got %d", len(createReqSteps))
+	}
+
+	respSteps := mockLogger.StepsByName("response_received")
+	if len(respSteps) != 2 {
+		t.Errorf("expected 2 response_received steps (one per attempt), got %d", len(respSteps))
+	}
+
+	// Verify body_read was logged only once (on successful attempt)
+	bodyReadSteps := mockLogger.StepsByName("body_read")
+	if len(bodyReadSteps) != 1 {
+		t.Errorf("expected 1 body_read step (only on success), got %d", len(bodyReadSteps))
+	}
+
+	// Verify retry logging was called
+	if !mockLogger.LogRetryCalled {
+		t.Error("expected LogRetry to be called")
 	}
 }
 
