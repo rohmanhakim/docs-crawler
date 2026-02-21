@@ -387,6 +387,35 @@ func TestSanitize_URLExtraction(t *testing.T) {
 // - Documents requiring heading normalization
 // - Documents requiring duplicate/empty node removal
 // - Documents with URL extraction
+// TestSanitize_PreH1ChromeRemoval verifies that elements with pre-H1 chrome keywords
+// are removed when they appear before the first H1 heading.
+// This tests the two-factor match: position (pre-H1) + keyword match.
+func TestSanitize_PreH1ChromeRemoval(t *testing.T) {
+	// Arrange
+	mockSink := &mockMetadataSink{}
+	s := sanitizer.NewHTMLSanitizer(mockSink)
+
+	fixtureBytes := loadFixture(t, "pass/pre_h1_chrome_eyebrow.html")
+	doc, err := html.Parse(strings.NewReader(string(fixtureBytes)))
+	require.NoError(t, err, "Failed to parse fixture HTML")
+
+	// Act
+	result, sanitizationErr := s.Sanitize(doc)
+
+	// Assert
+	require.NoError(t, sanitizationErr, "Sanitize should not return error for pre-H1 chrome fixture")
+	require.NotNil(t, result.GetContentNode(), "Result should have a non-nil content node")
+
+	// Verify the eyebrow element was removed
+	actualHTML := renderHtmlForTest(result.GetContentNode())
+	assert.NotContains(t, actualHTML, `class="eyebrow"`, "Eyebrow element should be removed")
+	assert.NotContains(t, actualHTML, "Get started", "Eyebrow text should be removed")
+
+	// Verify H1 and content are preserved
+	assert.Contains(t, actualHTML, "<h1>Documentation Title</h1>", "H1 should be preserved")
+	assert.Contains(t, actualHTML, "This is the main content", "Main content should be preserved")
+}
+
 func TestSanitize_Determinism(t *testing.T) {
 	determinismFixtures := []struct {
 		name    string
@@ -411,6 +440,10 @@ func TestSanitize_Determinism(t *testing.T) {
 		{
 			name:    "url_extraction_various_links",
 			fixture: "pass/url_extraction_various_links.html",
+		},
+		{
+			name:    "pre_h1_chrome_eyebrow",
+			fixture: "pass/pre_h1_chrome_eyebrow.html",
 		},
 	}
 

@@ -127,11 +127,15 @@ func sanitize(doc *html.Node) (SanitizedHTMLDoc, *SanitizationError) {
 	// This renumbers headings to fix skipped levels without reordering nodes
 	normalizedDoc := normalizeHeadingLevels(doc)
 
-	// Step 4: Remove duplicate and empty nodes (Invariant S4)
+	// Step 4: Remove pre-H1 chrome elements
+	// This removes elements like "eyebrow" that precede the main H1 heading
+	removePreH1Chrome(normalizedDoc)
+
+	// Step 5: Remove duplicate and empty nodes (Invariant S4)
 	// This performs structural cleanup: removes empty wrappers and deduplicates identical nodes
 	cleanedDoc := removeDuplicateAndEmptyNode(normalizedDoc)
 
-	// Step 5: Extract URLs from the document
+	// Step 6: Extract URLs from the document
 	// Extracts hyperlinks exactly as authored, preserving relative URLs
 	discoveredUrls := extractUrl(cleanedDoc)
 
