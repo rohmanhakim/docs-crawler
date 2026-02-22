@@ -785,6 +785,28 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 		debugLogger = debug.NewNoOpLogger()
 	}
 
+	// Propagate debug logger to all components
+	fetcher.SetDebugLogger(debugLogger)
+	ext.SetDebugLogger(debugLogger)
+	sanitizer.SetDebugLogger(debugLogger)
+	cachedRobot.SetDebugLogger(debugLogger)
+	frontier.SetDebugLogger(debugLogger)
+	rateLimiter.SetDebugLogger(debugLogger)
+	conversionRule.SetDebugLogger(debugLogger)
+	markdownConstraint.SetDebugLogger(debugLogger)
+
+	// Set debug logger for resolver and storage sink
+	// Note: These may be pointer or interface types, handle accordingly
+	if r, ok := resolver.(*assets.LocalResolver); ok {
+		r.SetDebugLogger(debugLogger)
+	}
+	if s, ok := storageSink.(*storage.LocalSink); ok {
+		s.SetDebugLogger(debugLogger)
+	}
+	if s, ok := storageSink.(*storage.DryRunSink); ok {
+		s.SetDebugLogger(debugLogger)
+	}
+
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
