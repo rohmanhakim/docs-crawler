@@ -1511,3 +1511,61 @@ func TestWithConfigFile_ExplicitFalseDebug(t *testing.T) {
 		t.Errorf("expected Debug false, got %v", loadedConfig.Debug())
 	}
 }
+
+// Test SuppressDefaultOutput method
+func TestSuppressDefaultOutput(t *testing.T) {
+	baseURL := []url.URL{{Scheme: "https", Host: "base.org"}}
+
+	tests := []struct {
+		name           string
+		debug          bool
+		debugFile      string
+		expectedResult bool
+	}{
+		{
+			name:           "debug_false_no_file",
+			debug:          false,
+			debugFile:      "",
+			expectedResult: false, // no debug, normal output
+		},
+		{
+			name:           "debug_true_no_file",
+			debug:          true,
+			debugFile:      "",
+			expectedResult: true, // debug without file, suppress output
+		},
+		{
+			name:           "debug_true_with_file",
+			debug:          true,
+			debugFile:      "/var/log/debug.jsonl",
+			expectedResult: false, // debug with file, normal output
+		},
+		{
+			name:           "debug_false_with_file",
+			debug:          false,
+			debugFile:      "/var/log/debug.jsonl",
+			expectedResult: false, // no debug, normal output
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfgBuilder := config.WithDefault(baseURL)
+			if tt.debug {
+				cfgBuilder = cfgBuilder.WithDebug(tt.debug)
+			}
+			if tt.debugFile != "" {
+				cfgBuilder = cfgBuilder.WithDebugFile(tt.debugFile)
+			}
+			cfg, err := cfgBuilder.Build()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			result := cfg.SuppressDefaultOutput()
+			if result != tt.expectedResult {
+				t.Errorf("expected SuppressDefaultOutput=%v, got %v", tt.expectedResult, result)
+			}
+		})
+	}
+}

@@ -767,3 +767,10 @@ func (c Config) DebugFile() string {
 func (c Config) DebugFormat() string {
 	return c.debugFormat
 }
+
+// SuppressDefaultOutput returns true if default CLI output should be suppressed.
+// This is true when debug mode is enabled but debug logs are going to stdout
+// (no debug file specified), keeping stdout clean for programmatic consumption.
+func (c Config) SuppressDefaultOutput() bool {
+	return c.debug && c.debugFile == ""
+}

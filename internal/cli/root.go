@@ -96,38 +96,44 @@ producing high-quality Markdown suitable for embedding and retrieval.`,
 		// Build config using initConfig with parsed seed URLs
 		cfg := InitConfig(parsedURLs)
 
+		// Determine if default output should be suppressed
+		// Suppress when --debug is set without --debug-file to keep stdout clean for debug logs
+		suppressOutput := cfg.SuppressDefaultOutput()
+
 		// Display configuration for verification
-		fmt.Printf("Configuration initialized successfully\n")
-		if len(cfg.SeedURLs()) > 0 {
-			var urls []string
-			for _, u := range cfg.SeedURLs() {
-				urls = append(urls, u.String())
+		if !suppressOutput {
+			fmt.Printf("Configuration initialized successfully\n")
+			if len(cfg.SeedURLs()) > 0 {
+				var urls []string
+				for _, u := range cfg.SeedURLs() {
+					urls = append(urls, u.String())
+				}
+				fmt.Printf("Seed URLs: %s\n", strings.Join(urls, ", "))
 			}
-			fmt.Printf("Seed URLs: %s\n", strings.Join(urls, ", "))
-		}
-		if len(cfg.AllowedHosts()) > 0 {
-			var hosts []string
-			for host := range cfg.AllowedHosts() {
-				hosts = append(hosts, host)
+			if len(cfg.AllowedHosts()) > 0 {
+				var hosts []string
+				for host := range cfg.AllowedHosts() {
+					hosts = append(hosts, host)
+				}
+				fmt.Printf("Allowed Hosts: %s\n", strings.Join(hosts, ", "))
 			}
-			fmt.Printf("Allowed Hosts: %s\n", strings.Join(hosts, ", "))
-		}
-		if len(cfg.AllowedPathPrefix()) > 0 {
-			fmt.Printf("Allowed Path Prefixes: %s\n", strings.Join(cfg.AllowedPathPrefix(), ", "))
-		}
-		fmt.Printf("Max Depth: %d\n", cfg.MaxDepth())
-		fmt.Printf("Max Pages: %d\n", cfg.MaxPages())
-		fmt.Printf("Concurrency: %d\n", cfg.Concurrency())
-		fmt.Printf("Base Delay: %v\n", cfg.BaseDelay())
-		fmt.Printf("Jitter: %v\n", cfg.Jitter())
-		fmt.Printf("Random Seed: %d\n", cfg.RandomSeed())
-		fmt.Printf("Timeout: %v\n", cfg.Timeout())
-		fmt.Printf("User Agent: %s\n", cfg.UserAgent())
-		fmt.Printf("Output Directory: %s\n", cfg.OutputDir())
-		fmt.Printf("Dry Run: %t\n", cfg.DryRun())
-		fmt.Printf("Dump Stage Output: %s\n", cfg.DumpStageOutput())
-		if len(cfg.SelectorBlacklist()) > 0 {
-			fmt.Printf("Selector Blacklist: %s\n", strings.Join(cfg.SelectorBlacklist(), ", "))
+			if len(cfg.AllowedPathPrefix()) > 0 {
+				fmt.Printf("Allowed Path Prefixes: %s\n", strings.Join(cfg.AllowedPathPrefix(), ", "))
+			}
+			fmt.Printf("Max Depth: %d\n", cfg.MaxDepth())
+			fmt.Printf("Max Pages: %d\n", cfg.MaxPages())
+			fmt.Printf("Concurrency: %d\n", cfg.Concurrency())
+			fmt.Printf("Base Delay: %v\n", cfg.BaseDelay())
+			fmt.Printf("Jitter: %v\n", cfg.Jitter())
+			fmt.Printf("Random Seed: %d\n", cfg.RandomSeed())
+			fmt.Printf("Timeout: %v\n", cfg.Timeout())
+			fmt.Printf("User Agent: %s\n", cfg.UserAgent())
+			fmt.Printf("Output Directory: %s\n", cfg.OutputDir())
+			fmt.Printf("Dry Run: %t\n", cfg.DryRun())
+			fmt.Printf("Dump Stage Output: %s\n", cfg.DumpStageOutput())
+			if len(cfg.SelectorBlacklist()) > 0 {
+				fmt.Printf("Selector Blacklist: %s\n", strings.Join(cfg.SelectorBlacklist(), ", "))
+			}
 		}
 		// Create scheduler with config-based dependency injection
 		sched := scheduler.NewSchedulerWithConfig(cfg)
@@ -155,7 +161,9 @@ producing high-quality Markdown suitable for embedding and retrieval.`,
 		}
 
 		// Initialize the crawler
-		fmt.Println("Initializing crawler...")
+		if !suppressOutput {
+			fmt.Println("Initializing crawler...")
+		}
 		init, err := sched.InitializeWithConfig(cfg)
 		if err != nil {
 			if unsub != nil {
@@ -166,7 +174,9 @@ producing high-quality Markdown suitable for embedding and retrieval.`,
 		}
 
 		// Execute the crawl
-		fmt.Println("Starting crawl...")
+		if !suppressOutput {
+			fmt.Println("Starting crawl...")
+		}
 		exec, err := sched.ExecuteCrawlingWithState(init)
 
 		if err != nil {
@@ -180,15 +190,17 @@ producing high-quality Markdown suitable for embedding and retrieval.`,
 			if rec != nil {
 				rec.WaitForSubscribers()
 
-				// Print summary
-				fmt.Println("\n--- Crawl Summary ---")
-				fmt.Printf("Pages visited:   %d\n", exec.TotalVisitedPages())
-				fmt.Printf("Pages processed: %d\n", exec.TotalPages())
-				fmt.Printf("Errors:          %d\n", exec.TotalErrors())
-				fmt.Printf("Assets resolved: %d\n", exec.TotalAssets())
+				// Print summary (only if not suppressed)
+				if !suppressOutput {
+					fmt.Println("\n--- Crawl Summary ---")
+					fmt.Printf("Pages visited:   %d\n", exec.TotalVisitedPages())
+					fmt.Printf("Pages processed: %d\n", exec.TotalPages())
+					fmt.Printf("Errors:          %d\n", exec.TotalErrors())
+					fmt.Printf("Assets resolved: %d\n", exec.TotalAssets())
 
-				if cfg.DryRun() {
-					fmt.Println("\nDRY RUN - No files were written.")
+					if cfg.DryRun() {
+						fmt.Println("\nDRY RUN - No files were written.")
+					}
 				}
 			}
 		}
@@ -249,8 +261,13 @@ func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
 		return config.Config{}, fmt.Errorf("%w: seedUrls cannot be empty", config.ErrInvalidConfig)
 	}
 
+	// Check if output should be suppressed (debug mode without debug file)
+	suppressOutput := debug && debugFile == ""
+
 	if cfgFile != "" {
-		fmt.Printf("Initializing config from file: %s\n", cfgFile)
+		if !suppressOutput {
+			fmt.Printf("Initializing config from file: %s\n", cfgFile)
+		}
 		cfg, err := config.WithConfigFile(cfgFile)
 		if err != nil {
 			return cfg, fmt.Errorf("error initializing config from file: %w", err)
@@ -259,7 +276,9 @@ func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
 	}
 
 	// Build config from CLI flags using the With... functions with method chaining
-	fmt.Println("No config file specified. Using default flag values or environment variables")
+	if !suppressOutput {
+		fmt.Println("No config file specified. Using default flag values or environment variables")
+	}
 
 	// Start with default config using provided seed URLs and apply overrides using method chaining
 	configBuilder := config.WithDefault(seedUrls)
