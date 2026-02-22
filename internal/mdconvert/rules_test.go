@@ -7,6 +7,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -292,4 +293,51 @@ func TestConvert_ErrorEmitsAttrURL(t *testing.T) {
 		}
 	}
 	assert.True(t, foundURL, "ErrorRecord must contain AttrURL with the page URL")
+}
+
+// TestConvert_DebugLogging verifies that debug logging is called correctly
+// during the conversion process.
+func TestConvert_DebugLogging(t *testing.T) {
+	mockSink := &mockMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
+	rule := mdconvert.NewRule(mockSink)
+	rule.SetDebugLogger(mockLogger)
+
+	htmlContent := loadHtmlFixture(t, "mdconvert_heading_single_h1_clean.html")
+	doc := createSanitizedDoc(t, string(htmlContent))
+
+	result, err := rule.Convert(doc, "https://example.com/page")
+	require.NoError(t, err)
+
+	// Verify debug logging was called
+	assert.True(t, mockLogger.LogStepCalled, "Expected LogStep to be called")
+
+	// Verify steps were logged for mdconvert stage
+	steps := mockLogger.StepsByStage("mdconvert")
+	require.Len(t, steps, 2, "Expected 2 debug steps for mdconvert stage")
+
+	// Verify create_converter step
+	assert.Equal(t, "create_converter", steps[0].Step)
+	assert.NotNil(t, steps[0].Fields["plugins"])
+
+	// Verify build_markdown step
+	assert.Equal(t, "build_markdown", steps[1].Step)
+	assert.Equal(t, len(result.GetMarkdownContent()), steps[1].Fields["output_size_bytes"])
+	assert.Equal(t, len(result.GetLinkRefs()), steps[1].Fields["links_count"])
+}
+
+// TestConvert_DebugLoggingDisabled verifies that no logging overhead occurs
+// when debug is disabled (NoOpLogger is used by default).
+func TestConvert_DebugLoggingDisabled(t *testing.T) {
+	mockSink := &mockMetadataSink{}
+	rule := mdconvert.NewRule(mockSink)
+	// No SetDebugLogger called - uses NoOpLogger by default
+
+	htmlContent := loadHtmlFixture(t, "mdconvert_heading_single_h1_clean.html")
+	doc := createSanitizedDoc(t, string(htmlContent))
+
+	_, err := rule.Convert(doc, "https://example.com/page")
+	require.NoError(t, err)
+
+	// Test passes if no panic or error occurs with NoOpLogger
 }
