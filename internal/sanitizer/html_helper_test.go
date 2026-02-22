@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"golang.org/x/net/html"
 )
 
@@ -34,4 +35,14 @@ func normalizeHtmlForTest(s string) string {
 		}
 	}
 	return strings.Join(result, "\n")
+}
+
+// hasStep checks if a step with the given name exists in the entries.
+func hasStep(entries []debugtest.StepEntry, stepName string) bool {
+	for _, e := range entries {
+		if e.Step == stepName {
+			return true
+		}
+	}
+	return false
 }

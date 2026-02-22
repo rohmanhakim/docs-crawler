@@ -20,9 +20,16 @@ var PreH1ChromeKeywords = []string{
 // removeEmptyNodesBottomUp performs a post-order traversal to remove empty nodes.
 // This ensures nested empty containers are fully cleaned (innermost first).
 func removeEmptyNodesBottomUp(node *html.Node) {
+	_ = removeEmptyNodesBottomUpWithCount(node)
+}
+
+// removeEmptyNodesBottomUpWithCount is like removeEmptyNodesBottomUp but returns the count of removed nodes.
+func removeEmptyNodesBottomUpWithCount(node *html.Node) int {
 	if node == nil {
-		return
+		return 0
 	}
+
+	removedCount := 0
 
 	// First, recursively process children
 	// We need to be careful because removing nodes affects the linked list
@@ -32,7 +39,7 @@ func removeEmptyNodesBottomUp(node *html.Node) {
 	}
 
 	for _, child := range children {
-		removeEmptyNodesBottomUp(child)
+		removedCount += removeEmptyNodesBottomUpWithCount(child)
 	}
 
 	// Now check if this node itself is empty and should be removed
@@ -41,8 +48,11 @@ func removeEmptyNodesBottomUp(node *html.Node) {
 		// Remove this node from its parent
 		if node.Parent != nil {
 			node.Parent.RemoveChild(node)
+			removedCount++
 		}
 	}
+
+	return removedCount
 }
 
 // shouldRemoveEmptyElement returns true if an empty element of this type should be removed.
@@ -167,9 +177,16 @@ func hasPreH1ChromeKeyword(node *html.Node) bool {
 // removeDuplicateNodes removes duplicate structural nodes, keeping the first occurrence.
 // It uses a signature-based approach to detect structural duplicates.
 func removeDuplicateNodes(root *html.Node) {
+	_ = removeDuplicateNodesWithCount(root)
+}
+
+// removeDuplicateNodesWithCount is like removeDuplicateNodes but returns the count of removed nodes.
+func removeDuplicateNodesWithCount(root *html.Node) int {
 	if root == nil {
-		return
+		return 0
 	}
+
+	removedCount := 0
 
 	// Track seen signatures at each sibling level
 	// We use a map of parent pointer -> set of seen signatures
@@ -200,6 +217,7 @@ func removeDuplicateNodes(root *html.Node) {
 					if seenSignatures[parent][sig] {
 						// This is a duplicate - remove it
 						parent.RemoveChild(node)
+						removedCount++
 						return // Node is removed, don't traverse its children
 					}
 
@@ -222,4 +240,6 @@ func removeDuplicateNodes(root *html.Node) {
 	}
 
 	traverse(root)
+
+	return removedCount
 }
