@@ -9,6 +9,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
@@ -37,6 +38,14 @@ func testRetryParam() retry.RetryParam {
 func newTestResolver(mockSink *metadatatest.SinkMock) assets.LocalResolver {
 	resolver := assets.NewLocalResolver(mockSink)
 	resolver.Init(&http.Client{Timeout: 5 * time.Second}, "test-user-agent")
+	return resolver
+}
+
+// newTestResolverWithLogger creates a LocalResolver with test dependencies and a debug logger
+func newTestResolverWithLogger(mockSink *metadatatest.SinkMock, logger *debugtest.LoggerMock) assets.LocalResolver {
+	resolver := assets.NewLocalResolver(mockSink)
+	resolver.Init(&http.Client{Timeout: 5 * time.Second}, "test-user-agent")
+	resolver.SetDebugLogger(logger)
 	return resolver
 }
 
