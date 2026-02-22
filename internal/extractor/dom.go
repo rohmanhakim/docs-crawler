@@ -2,6 +2,7 @@ package extractor
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -127,7 +128,7 @@ func (d *DomExtractor) Extract(
 func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	// Log input size at the start
 	if d.debugLogger.Enabled() {
-		d.debugLogger.LogStep(nil, "extractor", "parse_html", debug.FieldMap{
+		d.debugLogger.LogStep(context.TODO(), "extractor", "parse_html", debug.FieldMap{
 			"input_size_bytes": len(htmlByte),
 		})
 	}
@@ -154,7 +155,7 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	if len(d.params.SelectorBlacklist) > 0 {
 		removedCount := removeBlacklistedElementsWithCount(doc, d.params.SelectorBlacklist)
 		if d.debugLogger.Enabled() {
-			d.debugLogger.LogStep(nil, "extractor", "layer_0_blacklist", debug.FieldMap{
+			d.debugLogger.LogStep(context.TODO(), "extractor", "layer_0_blacklist", debug.FieldMap{
 				"selectors_count": len(d.params.SelectorBlacklist),
 				"removed_count":   removedCount,
 			})
@@ -165,11 +166,11 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	contentNode, selector := extractSemanticContainerWithSelector(doc, d.params.Threshold)
 	if contentNode != nil {
 		if d.debugLogger.Enabled() {
-			d.debugLogger.LogStep(nil, "extractor", "layer_1_semantic", debug.FieldMap{
+			d.debugLogger.LogStep(context.TODO(), "extractor", "layer_1_semantic", debug.FieldMap{
 				"found":    true,
 				"selector": selector,
 			})
-			d.debugLogger.LogStep(nil, "extractor", "content_selected", debug.FieldMap{
+			d.debugLogger.LogStep(context.TODO(), "extractor", "content_selected", debug.FieldMap{
 				"final_layer": 1,
 				"node_tag":    contentNode.Data,
 			})
@@ -182,7 +183,7 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 
 	// Log that layer 1 didn't find content
 	if d.debugLogger.Enabled() {
-		d.debugLogger.LogStep(nil, "extractor", "layer_1_semantic", debug.FieldMap{
+		d.debugLogger.LogStep(context.TODO(), "extractor", "layer_1_semantic", debug.FieldMap{
 			"found": false,
 		})
 	}
@@ -191,11 +192,11 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	contentNode, selector = d.extractKnownDocContainerWithSelector(doc)
 	if contentNode != nil {
 		if d.debugLogger.Enabled() {
-			d.debugLogger.LogStep(nil, "extractor", "layer_2_known", debug.FieldMap{
+			d.debugLogger.LogStep(context.TODO(), "extractor", "layer_2_known", debug.FieldMap{
 				"found":    true,
 				"selector": selector,
 			})
-			d.debugLogger.LogStep(nil, "extractor", "content_selected", debug.FieldMap{
+			d.debugLogger.LogStep(context.TODO(), "extractor", "content_selected", debug.FieldMap{
 				"final_layer": 2,
 				"node_tag":    contentNode.Data,
 			})
@@ -208,7 +209,7 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 
 	// Log that layer 2 didn't find content
 	if d.debugLogger.Enabled() {
-		d.debugLogger.LogStep(nil, "extractor", "layer_2_known", debug.FieldMap{
+		d.debugLogger.LogStep(context.TODO(), "extractor", "layer_2_known", debug.FieldMap{
 			"found": false,
 		})
 	}
@@ -217,11 +218,11 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	contentNode = d.extractContainerAfterExplicitChromesRemoval(*doc)
 	if contentNode != nil {
 		if d.debugLogger.Enabled() {
-			d.debugLogger.LogStep(nil, "extractor", "layer_3_heuristic", debug.FieldMap{
+			d.debugLogger.LogStep(context.TODO(), "extractor", "layer_3_heuristic", debug.FieldMap{
 				"found":    true,
 				"node_tag": contentNode.Data,
 			})
-			d.debugLogger.LogStep(nil, "extractor", "content_selected", debug.FieldMap{
+			d.debugLogger.LogStep(context.TODO(), "extractor", "content_selected", debug.FieldMap{
 				"final_layer": 3,
 				"node_tag":    contentNode.Data,
 			})
@@ -234,14 +235,14 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 
 	// Log that layer 3 didn't find content
 	if d.debugLogger.Enabled() {
-		d.debugLogger.LogStep(nil, "extractor", "layer_3_heuristic", debug.FieldMap{
+		d.debugLogger.LogStep(context.TODO(), "extractor", "layer_3_heuristic", debug.FieldMap{
 			"found": false,
 		})
 	}
 
 	// All layers failed to find meaningful content
 	if d.debugLogger.Enabled() {
-		d.debugLogger.LogStep(nil, "extractor", "extraction_failed", debug.FieldMap{
+		d.debugLogger.LogStep(context.TODO(), "extractor", "extraction_failed", debug.FieldMap{
 			"error_cause": string(ErrCauseNoContent),
 		})
 	}
