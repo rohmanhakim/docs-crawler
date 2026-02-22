@@ -12,10 +12,10 @@
     "maxDepth": 7,
     "maxPages": 299,
     "concurrency": 29,
-    "baseDelay": 2000000000,
-    "jitter": 1000000000,
+    "baseDelay": "2s",
+    "jitter": "1s",
     "randomSeed": 42,
-    "timeout": 30000000000,
+    "timeout": "30s",
     "userAgent": "TestBot/1.0",
     "outputDir": "test_output",
     "dryRun": true

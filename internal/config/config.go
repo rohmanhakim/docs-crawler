@@ -154,17 +154,17 @@ type configDTO struct {
 	MaxDepth               *int                `json:"maxDepth,omitempty"`
 	MaxPages               *int                `json:"maxPages,omitempty"`
 	Concurrency            *int                `json:"concurrency,omitempty"`
-	BaseDelay              *time.Duration      `json:"baseDelay,omitempty"`
-	Jitter                 *time.Duration      `json:"jitter,omitempty"`
+	BaseDelay              *string             `json:"baseDelay,omitempty"`
+	Jitter                 *string             `json:"jitter,omitempty"`
 	RandomSeed             *int64              `json:"randomSeed,omitempty"`
 	MaxAttempt             *int                `json:"maxAttempt,omitempty"`
-	BackoffInitialDuration *time.Duration      `json:"backoffInitialDuration,omitempty"`
+	BackoffInitialDuration *string             `json:"backoffInitialDuration,omitempty"`
 	BackoffMultiplier      *float64            `json:"backoffMultiplier,omitempty"`
-	BackoffMaxDuration     *time.Duration      `json:"backoffMaxDuration,omitempty"`
-	Timeout                *time.Duration      `json:"timeout,omitempty"`
+	BackoffMaxDuration     *string             `json:"backoffMaxDuration,omitempty"`
+	Timeout                *string             `json:"timeout,omitempty"`
 	MaxIdleConns           *int                `json:"maxIdleConns,omitempty"`
 	MaxIdleConnsPerHost    *int                `json:"maxIdleConnsPerHost,omitempty"`
-	IdleConnTimeout        *time.Duration      `json:"idleConnTimeout,omitempty"`
+	IdleConnTimeout        *string             `json:"idleConnTimeout,omitempty"`
 	UserAgent              *string             `json:"userAgent,omitempty"`
 	MaxAssetSize           *int64              `json:"maxAssetSize,omitempty"`
 	OutputDir              *string             `json:"outputDir,omitempty"`
@@ -207,6 +207,16 @@ func parseSeedURLs(urlStrings []string) ([]url.URL, error) {
 		urls[i] = *parsedURL
 	}
 	return urls, nil
+}
+
+// parseDurationString parses a duration string like "30s", "500ms" into time.Duration.
+// Returns an error with field context if parsing fails.
+func parseDurationString(s string, fieldName string) (time.Duration, error) {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid duration for %s: %q (%w)", fieldName, s, err)
+	}
+	return d, nil
 }
 
 // WithConfigFile loads config from a JSON file and returns a Config.
@@ -274,10 +284,18 @@ func newConfigFromDTOBuilder(dto configDTO) (*Config, error) {
 		cfg.concurrency = *dto.Concurrency
 	}
 	if dto.BaseDelay != nil {
-		cfg.baseDelay = *dto.BaseDelay
+		d, err := parseDurationString(*dto.BaseDelay, "baseDelay")
+		if err != nil {
+			return nil, err
+		}
+		cfg.baseDelay = d
 	}
 	if dto.Jitter != nil {
-		cfg.jitter = *dto.Jitter
+		d, err := parseDurationString(*dto.Jitter, "jitter")
+		if err != nil {
+			return nil, err
+		}
+		cfg.jitter = d
 	}
 	if dto.RandomSeed != nil {
 		cfg.randomSeed = *dto.RandomSeed
@@ -286,17 +304,29 @@ func newConfigFromDTOBuilder(dto configDTO) (*Config, error) {
 		cfg.maxAttempt = *dto.MaxAttempt
 	}
 	if dto.BackoffInitialDuration != nil {
-		cfg.backoffInitialDuration = *dto.BackoffInitialDuration
+		d, err := parseDurationString(*dto.BackoffInitialDuration, "backoffInitialDuration")
+		if err != nil {
+			return nil, err
+		}
+		cfg.backoffInitialDuration = d
 	}
 	if dto.BackoffMultiplier != nil {
 		cfg.backoffMultiplier = *dto.BackoffMultiplier
 	}
 	if dto.BackoffMaxDuration != nil {
-		cfg.backoffMaxDuration = *dto.BackoffMaxDuration
+		d, err := parseDurationString(*dto.BackoffMaxDuration, "backoffMaxDuration")
+		if err != nil {
+			return nil, err
+		}
+		cfg.backoffMaxDuration = d
 	}
 
 	if dto.Timeout != nil {
-		cfg.timeout = *dto.Timeout
+		d, err := parseDurationString(*dto.Timeout, "timeout")
+		if err != nil {
+			return nil, err
+		}
+		cfg.timeout = d
 	}
 	if dto.UserAgent != nil {
 		cfg.userAgent = *dto.UserAgent
@@ -324,7 +354,11 @@ func newConfigFromDTOBuilder(dto configDTO) (*Config, error) {
 		cfg.maxIdleConnsPerHost = *dto.MaxIdleConnsPerHost
 	}
 	if dto.IdleConnTimeout != nil {
-		cfg.idleConnTimeout = *dto.IdleConnTimeout
+		d, err := parseDurationString(*dto.IdleConnTimeout, "idleConnTimeout")
+		if err != nil {
+			return nil, err
+		}
+		cfg.idleConnTimeout = d
 	}
 
 	// Extraction parameters - check if pointer is not nil
