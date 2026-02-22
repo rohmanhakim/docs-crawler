@@ -1,15 +1,7 @@
 {
     "seedUrls": [
-        {
-            "Scheme": "https",
-            "Host": "my-documentation.com",
-            "Path": "/docs"
-        },
-        {
-            "Scheme": "http",
-            "Host": "my-other-documentation.com",
-            "Path": "/docs"
-        }
+        "https://my-documentation.com/docs",
+        "http://my-other-documentation.com/docs"
     ],
     "allowedHosts": {
         "custom.com": {}

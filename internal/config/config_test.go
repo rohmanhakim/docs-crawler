@@ -632,7 +632,7 @@ func TestWithConfigFile_PartialConfig(t *testing.T) {
 
 	// Create a partial config - only override some fields (seedUrls is required)
 	partialData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "partial-example.com"}],
+		"seedUrls": ["https://partial-example.com"],
 		"maxDepth": 7,
 		"userAgent": "PartialBot/1.0",
 		"outputDir": "partial_output"
@@ -679,8 +679,8 @@ func TestWithConfigFile_AllowedHostsDefaultsToSeedUrls(t *testing.T) {
 	// Create a config without allowedHosts - should default to seed URLs
 	configData := `{
 		"seedUrls": [
-			{"Scheme": "https", "Host": "docs.example.com"},
-			{"Scheme": "https", "Host": "api.example.com"}
+			"https://docs.example.com",
+			"https://api.example.com"
 		],
 		"maxDepth": 5
 	}`
@@ -762,7 +762,7 @@ func TestWithConfigFile_MaxAssetSize(t *testing.T) {
 
 	// Create a config with maxAssetSize set
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxAssetSize": 5242880
 	}`
 
@@ -1030,16 +1030,8 @@ func completeConfigJson() string {
 	return `
 	{
     "seedUrls": [
-        {
-            "Scheme": "https",
-            "Host": "my-documentation.com",
-            "Path": "/docs"
-        },
-        {
-            "Scheme": "http",
-            "Host": "my-other-documentation.com",
-            "Path": "/docs"
-        }
+        "https://my-documentation.com/docs",
+        "http://my-other-documentation.com/docs"
     ],
     "allowedHosts": {
         "custom.com": {}
@@ -1088,7 +1080,7 @@ func TestWithConfigFile_ExplicitZeroMaxDepth(t *testing.T) {
 
 	// Explicitly set maxDepth to 0 - should override default of 3
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 
@@ -1114,7 +1106,7 @@ func TestWithConfigFile_ExplicitZeroMaxPages(t *testing.T) {
 
 	// Explicitly set maxPages to 0 - should override default of 100
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxPages": 0
 	}`
 
@@ -1140,7 +1132,7 @@ func TestWithConfigFile_ExplicitZeroBackoffMultiplier(t *testing.T) {
 
 	// Explicitly set backoffMultiplier to 0.0 - should override default of 2.0
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"backoffMultiplier": 0.0
 	}`
 
@@ -1167,7 +1159,7 @@ func TestWithConfigFile_ExplicitZeroThresholdMinHeadings(t *testing.T) {
 	// Explicitly set thresholdMinHeadings to 0 - should override default of 0
 	// (this was already working but let's verify the pointer fix maintains it)
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"thresholdMinHeadings": 0
 	}`
 
@@ -1193,7 +1185,7 @@ func TestWithConfigFile_ExplicitZeroThresholdMinNonWhitespace(t *testing.T) {
 
 	// Explicitly set thresholdMinNonWhitespace to 0 - should override default of 50
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"thresholdMinNonWhitespace": 0
 	}`
 
@@ -1219,7 +1211,7 @@ func TestWithConfigFile_ExplicitZeroThresholdMinParagraphsOrCode(t *testing.T) {
 
 	// Explicitly set thresholdMinParagraphsOrCode to 0 - should override default of 1
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"thresholdMinParagraphsOrCode": 0
 	}`
 
@@ -1246,7 +1238,7 @@ func TestWithConfigFile_ExplicitFalseDryRun(t *testing.T) {
 	// Explicitly set dryRun to false - should override default of false
 	// (this tests that we can explicitly set a boolean to its zero value)
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"dryRun": false
 	}`
 
@@ -1273,7 +1265,7 @@ func TestWithConfigFile_ExplicitZeroMaxAssetSize(t *testing.T) {
 	// Explicitly set maxAssetSize to 0 (unlimited) - should override default of 0
 	// This is the same as the default, but verifies explicit setting works
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxAssetSize": 0
 	}`
 
@@ -1315,7 +1307,7 @@ func TestWithConfigFile_SelectorBlacklist(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "blacklist.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"selectorBlacklist": [".sidebar", ".related-posts", "#ad-banner"]
 	}`
 
@@ -1431,7 +1423,7 @@ func TestWithConfigFile_DebugConfig(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "debug.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"debug": true,
 		"debugFile": "/var/log/debug.jsonl",
 		"debugFormat": "json"
@@ -1464,7 +1456,7 @@ func TestWithConfigFile_DebugConfigTextFormat(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "debug_text.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"debug": true,
 		"debugFormat": "text"
 	}`
@@ -1493,7 +1485,7 @@ func TestWithConfigFile_ExplicitFalseDebug(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "debug_false.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"debug": false
 	}`
 

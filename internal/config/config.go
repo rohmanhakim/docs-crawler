@@ -148,7 +148,7 @@ type Config struct {
 }
 
 type configDTO struct {
-	SeedURLs               []url.URL           `json:"seedUrls"`
+	SeedURLs               []string            `json:"seedUrls"`
 	AllowedHosts           map[string]struct{} `json:"allowedHosts,omitempty"`
 	AllowedPathPrefix      []string            `json:"allowedPathPrefix,omitempty"`
 	MaxDepth               *int                `json:"maxDepth,omitempty"`
@@ -191,10 +191,33 @@ type configDTO struct {
 	DebugFormat *string `json:"debugFormat,omitempty"`
 }
 
+// parseSeedURLs converts a slice of URL strings to []url.URL.
+// Returns an error if any URL string fails to parse.
+func parseSeedURLs(urlStrings []string) ([]url.URL, error) {
+	if len(urlStrings) == 0 {
+		return nil, nil
+	}
+
+	urls := make([]url.URL, len(urlStrings))
+	for i, urlStr := range urlStrings {
+		parsedURL, err := url.Parse(urlStr)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing seed URL %q: %w", urlStr, err)
+		}
+		urls[i] = *parsedURL
+	}
+	return urls, nil
+}
+
 func newConfigFromDTO(dto configDTO) (Config, error) {
+	// Parse seed URLs from strings to url.URL
+	seedURLs, err := parseSeedURLs(dto.SeedURLs)
+	if err != nil {
+		return Config{}, err
+	}
 
 	// Start with default config
-	cfg, err := WithDefault(dto.SeedURLs).Build()
+	cfg, err := WithDefault(seedURLs).Build()
 	if err != nil {
 		return Config{}, err
 	}
@@ -367,9 +390,14 @@ func WithConfigFileBuilder(path string) (*Config, error) {
 
 // newConfigFromDTOBuilder creates a *Config from configDTO for builder pattern chaining.
 func newConfigFromDTOBuilder(dto configDTO) (*Config, error) {
+	// Parse seed URLs from strings to url.URL
+	seedURLs, err := parseSeedURLs(dto.SeedURLs)
+	if err != nil {
+		return nil, err
+	}
 
 	// Start with default config
-	cfg := WithDefault(dto.SeedURLs)
+	cfg := WithDefault(seedURLs)
 
 	// AllowedHosts can be empty - if so, default to seed URLs hostnames
 	if len(dto.AllowedHosts) > 0 {
