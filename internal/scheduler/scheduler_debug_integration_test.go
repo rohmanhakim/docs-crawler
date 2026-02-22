@@ -2,10 +2,12 @@ package scheduler_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1073,17 +1075,283 @@ func TestIntegration_DebugLogging_Disabled(t *testing.T) {
 }
 
 // =============================================================================
-// Test 8: JSONL File Output (Optional - validates full SlogLogger output)
+// Test 8: JSONL File Output (validates full SlogLogger output)
 // =============================================================================
 
+// JSONLEntry represents a parsed JSONL log entry matching the design document structure.
+type JSONLEntry struct {
+	Timestamp     string `json:"@timestamp"`
+	Version       string `json:"@version"`
+	Level         string `json:"level"`
+	LoggerName    string `json:"logger_name"`
+	Message       string `json:"message"`
+	ThreadName    string `json:"thread_name"`
+	Stage         string `json:"stage,omitempty"`
+	EventType     string `json:"event_type,omitempty"`
+	URL           string `json:"url,omitempty"`
+	DurationMs    int64  `json:"duration_ms,omitempty"`
+	StatusCode    int    `json:"status_code,omitempty"`
+	Attempt       int    `json:"attempt,omitempty"`
+	MaxAttempts   int    `json:"max_attempts,omitempty"`
+	BackoffMs     int64  `json:"backoff_ms,omitempty"`
+	Host          string `json:"host,omitempty"`
+	DelayMs       int64  `json:"delay_ms,omitempty"`
+	RateLimitReas string `json:"rate_limit_reason,omitempty"`
+	Step          string `json:"step,omitempty"`
+	Error         string `json:"error,omitempty"`
+}
+
+// parseJSONLFile reads and parses a JSONL file into structured entries.
+func parseJSONLFile(t *testing.T, path string) []JSONLEntry {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err, "failed to read JSONL file")
+
+	lines := splitLines(string(data))
+	entries := make([]JSONLEntry, 0, len(lines))
+
+	for i, line := range lines {
+		line = trimWhitespace(line)
+		if line == "" {
+			continue
+		}
+
+		var entry JSONLEntry
+		err := json.Unmarshal([]byte(line), &entry)
+		require.NoError(t, err, "failed to parse JSONL line %d: %s", i+1, line)
+		entries = append(entries, entry)
+	}
+
+	return entries
+}
+
+// splitLines splits a string into lines.
+func splitLines(s string) []string {
+	return strings.Split(s, "\n")
+}
+
+// trimWhitespace removes leading and trailing whitespace.
+func trimWhitespace(s string) string {
+	return strings.TrimSpace(s)
+}
+
+// assertValidJSONLFields validates required fields per the design document.
+func assertValidJSONLFields(t *testing.T, entry JSONLEntry) {
+	t.Helper()
+
+	// Required fields per design document section 6.1
+	assert.NotEmpty(t, entry.Timestamp, "@timestamp should be present")
+	assert.Equal(t, "1", entry.Version, "@version should be '1'")
+	assert.Equal(t, "DEBUG", entry.Level, "level should be 'DEBUG'")
+	assert.Equal(t, "docs-crawler", entry.LoggerName, "logger_name should be 'docs-crawler'")
+	assert.NotEmpty(t, entry.Message, "message should be present")
+	assert.Equal(t, "main", entry.ThreadName, "thread_name should be 'main'")
+
+	// Validate timestamp format (RFC3339Nano)
+	_, err := time.Parse(time.RFC3339Nano, entry.Timestamp)
+	assert.NoError(t, err, "@timestamp should be valid RFC3339Nano format")
+}
+
 // TestIntegration_DebugLogging_JSONLFileOutput verifies that debug logs
-// are correctly written to a JSONL file.
-// TODO: Add test for JSONL file output validation
-// This test would:
-// 1. Create a temp file for debug output
-// 2. Run crawl with SlogLogger configured for file output
-// 3. Parse the JSONL file and verify structure
-// 4. Verify fields like @timestamp, level, stage, url, etc.
+// are correctly written to a JSONL file with proper structure.
+func TestIntegration_DebugLogging_JSONLFileOutput(t *testing.T) {
+	ctx := context.Background()
+
+	// Create temp directory for outputs
+	tmpDir := t.TempDir()
+	debugFilePath := filepath.Join(tmpDir, "debug.jsonl")
+
+	// Create SlogLogger with file output
+	debugConfig, err := debug.NewDebugConfig(true, debugFilePath, "json")
+	require.NoError(t, err, "failed to create debug config")
+
+	debugLogger, err := debug.NewSlogLogger(debugConfig)
+	require.NoError(t, err, "failed to create slog logger")
+	// Note: Logger will be closed after ExecuteCrawlingWithState, before reading the file
+
+	// Setup mocks for minimal crawl
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFetcher := newFetcherMockForTest(t)
+	mockRobot := NewRobotsMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
+	mockSleeper := newSleeperMock(t)
+	mockExtractor := newExtractorMockForTest(t)
+	mockSanitizer := newSanitizerMockForTest(t)
+	mockConvert := newConvertMockForTest(t)
+	mockResolver := newResolverMockForTest(t)
+	mockNormalize := newNormalizeMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
+	mockFailureJournal := newFailureJournalMockForTest(t)
+
+	// Setup robot mock
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed:    true,
+		Reason:     robots.EmptyRuleSet,
+		CrawlDelay: 0,
+	}, nil).Once()
+
+	// Setup frontier mock with explicit dequeue control
+	mockFrontier.disableAutoEnqueue = true
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	seedToken := frontier.NewCrawlToken(*mustParseDebugURL("https://example.com"), 0)
+	mockFrontier.OnDequeue(seedToken, true).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
+	// Setup other mocks
+	mockSleeper.On("Sleep", mock.Anything).Return()
+	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+
+	// Setup successful fetch
+	testURL, _ := url.Parse("https://example.com/test")
+	htmlBody := []byte("<html><body><main><h1>Test</h1><p>Content</p></main></body></html>")
+	fetchResult := fetcher.NewFetchResultForTest(
+		*testURL,
+		htmlBody,
+		200,
+		"text/html",
+		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
+	)
+	mockFetcher.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(fetchResult, nil)
+
+	// Setup extractor
+	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
+	setupExtractorMockWithSuccess(mockExtractor, contentNode)
+	mockExtractor.On("SetExtractParam", mock.Anything).Return()
+
+	// Setup sanitizer
+	mockSanitizer.On("Sanitize", contentNode).Return(createDebugSanitizedHTMLDoc(nil), nil)
+
+	// Setup convert
+	setupConvertMockWithSuccess(mockConvert)
+
+	// Setup resolver
+	setupResolverMockWithSuccess(mockResolver)
+
+	// Setup normalize
+	setupNormalizeMockWithSuccess(mockNormalize)
+
+	// Setup storage
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).
+		Return(storage.NewWriteResult("abc123", "/output/abc123.md", "sha256:def456"), nil)
+
+	// Create scheduler with real SlogLogger
+	s := scheduler.NewSchedulerWithDeps(
+		ctx,
+		mockFinalizer,
+		noopSink,
+		mockLimiter,
+		mockFrontier,
+		mockFetcher,
+		mockRobot,
+		mockExtractor,
+		mockSanitizer,
+		mockConvert,
+		mockResolver,
+		mockNormalize,
+		mockStorage,
+		mockSleeper,
+		mockFailureJournal,
+		stagedump.NewNoOpDumper(),
+		debugLogger,
+	)
+
+	// Create config file
+	configPath := filepath.Join(tmpDir, "config.json")
+	configData := `{
+		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"maxDepth": 0
+	}`
+	err = os.WriteFile(configPath, []byte(configData), 0644)
+	require.NoError(t, err, "failed to write config file")
+
+	// Execute crawl
+	init, err := s.InitializeCrawling(configPath)
+	require.NoError(t, err, "failed to initialize crawl")
+
+	_, err = s.ExecuteCrawlingWithState(init)
+	require.NoError(t, err, "failed to execute crawl")
+
+	// Close logger to flush file output
+	err = debugLogger.Close()
+	require.NoError(t, err, "failed to close debug logger")
+
+	// Verify JSONL file exists
+	_, err = os.Stat(debugFilePath)
+	require.NoError(t, err, "JSONL file should exist")
+
+	// Parse JSONL file
+	entries := parseJSONLFile(t, debugFilePath)
+
+	// Verify we have entries
+	assert.NotEmpty(t, entries, "JSONL file should contain entries")
+	t.Logf("Total JSONL entries: %d", len(entries))
+
+	// Validate all entries have required fields
+	for i, entry := range entries {
+		t.Logf("Entry %d: stage=%s, event_type=%s, message=%s",
+			i+1, entry.Stage, entry.EventType, entry.Message)
+		assertValidJSONLFields(t, entry)
+	}
+
+	// Find pipeline start event
+	var foundPipelineStart, foundFetcherStart, foundFetcherComplete bool
+	for _, entry := range entries {
+		if entry.Stage == "pipeline" && entry.EventType == "start" {
+			foundPipelineStart = true
+			assert.NotEmpty(t, entry.URL, "pipeline start should have URL")
+		}
+		if entry.Stage == "fetcher" && entry.EventType == "start" {
+			foundFetcherStart = true
+		}
+		if entry.Stage == "fetcher" && entry.EventType == "complete" {
+			foundFetcherComplete = true
+			// Note: Duration can be 0 for very fast mock operations
+			assert.GreaterOrEqual(t, entry.DurationMs, int64(0), "fetcher complete should have duration_ms >= 0")
+			assert.NotEmpty(t, entry.URL, "fetcher complete should have URL")
+		}
+	}
+
+	// Verify expected stage events were logged
+	assert.True(t, foundPipelineStart, "should have pipeline start event")
+	assert.True(t, foundFetcherStart, "should have fetcher start event")
+	assert.True(t, foundFetcherComplete, "should have fetcher complete event")
+
+	// Verify stage order (pipeline start should come before fetcher start)
+	var pipelineStartIdx, fetcherStartIdx int = -1, -1
+	for i, entry := range entries {
+		if entry.Stage == "pipeline" && entry.EventType == "start" && pipelineStartIdx == -1 {
+			pipelineStartIdx = i
+		}
+		if entry.Stage == "fetcher" && entry.EventType == "start" && fetcherStartIdx == -1 {
+			fetcherStartIdx = i
+		}
+	}
+	assert.Less(t, pipelineStartIdx, fetcherStartIdx, "pipeline start should come before fetcher start")
+
+	// Log sample entries for debugging
+	t.Log("Sample JSONL entries:")
+	for i := 0; i < min(3, len(entries)); i++ {
+		entryJSON, _ := json.MarshalIndent(entries[i], "  ", "  ")
+		t.Logf("  Entry %d: %s", i+1, string(entryJSON))
+	}
+}
+
+// min returns the minimum of two integers.
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 // =============================================================================
 // Test 9: Concurrent Workers (Future Enhancement)
