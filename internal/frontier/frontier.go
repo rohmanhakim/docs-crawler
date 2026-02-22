@@ -78,7 +78,12 @@ func (f *CrawlFrontier) Init(cfg config.Config) {
 
 // SetDebugLogger sets the debug logger for the frontier.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (f *CrawlFrontier) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		f.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	f.debugLogger = logger
 }
 

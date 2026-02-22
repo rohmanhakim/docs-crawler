@@ -52,7 +52,12 @@ func NewLocalSink(
 
 // SetDebugLogger sets the debug logger for the sink.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (s *LocalSink) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		s.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	s.debugLogger = logger
 }
 

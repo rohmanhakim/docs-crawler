@@ -775,14 +775,16 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 	}
 
 	// Initialize debug logger based on config
+	var debugLogger debug.DebugLogger = debug.NewNoOpLogger()
 	debugConfig, err := debug.NewDebugConfig(cfg.Debug(), cfg.DebugFile(), cfg.DebugFormat())
 	if err != nil {
 		log.Printf("failed to create debug config: %v, using NoOpLogger", err)
-	}
-	debugLogger, err := debug.NewSlogLogger(debugConfig)
-	if err != nil {
-		log.Printf("failed to create debug logger: %v, using NoOpLogger", err)
-		debugLogger = debug.NewNoOpLogger()
+	} else {
+		debugLogger, err = debug.NewSlogLogger(debugConfig)
+		if err != nil {
+			log.Printf("failed to create debug logger: %v, using NoOpLogger", err)
+			debugLogger = debug.NewNoOpLogger()
+		}
 	}
 
 	// Propagate debug logger to all components

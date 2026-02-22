@@ -74,7 +74,12 @@ func (r *CachedRobot) InitWithCache(userAgent string, httpClient *http.Client, c
 
 // SetDebugLogger sets the debug logger for the robot.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (r *CachedRobot) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		r.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	r.debugLogger = logger
 }
 

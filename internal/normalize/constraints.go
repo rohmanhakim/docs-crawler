@@ -63,7 +63,12 @@ func NewMarkdownConstraint(
 
 // SetDebugLogger sets the debug logger for the constraint.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (m *MarkdownConstraint) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		m.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	m.debugLogger = logger
 }
 

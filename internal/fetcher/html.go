@@ -69,7 +69,12 @@ func (h *HtmlFetcher) Init(httpClient *http.Client, userAgent string) {
 
 // SetDebugLogger sets the debug logger for the fetcher.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (h *HtmlFetcher) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		h.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	h.debugLogger = logger
 }
 

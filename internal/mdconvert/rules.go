@@ -58,7 +58,12 @@ func NewRule(metadataSink metadata.MetadataSink) *StrictConversionRule {
 
 // SetDebugLogger sets the debug logger for the converter.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (s *StrictConversionRule) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		s.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	s.debugLogger = logger
 }
 

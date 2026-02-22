@@ -82,9 +82,14 @@ func (r *ConcurrentRateLimiter) SetRandomSeed(randomSeed int64) {
 
 // SetDebugLogger sets the debug logger for the rate limiter.
 // This method is not part of the RateLimiter interface to maintain backward compatibility.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (r *ConcurrentRateLimiter) SetDebugLogger(logger debug.DebugLogger) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if logger == nil {
+		r.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	r.debugLogger = logger
 }
 

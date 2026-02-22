@@ -37,7 +37,12 @@ func NewHTMLSanitizer(metadataSink metadata.MetadataSink) HtmlSanitizer {
 
 // SetDebugLogger sets the debug logger for the sanitizer.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (h *HtmlSanitizer) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		h.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	h.debugLogger = logger
 }
 

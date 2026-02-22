@@ -82,7 +82,12 @@ func (r *LocalResolver) Init(httpClient *http.Client, userAgent string) {
 
 // SetDebugLogger sets the debug logger for the resolver.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (r *LocalResolver) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		r.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	r.debugLogger = logger
 }
 

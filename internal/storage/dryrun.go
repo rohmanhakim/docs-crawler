@@ -40,7 +40,12 @@ func NewDryRunSink(
 
 // SetDebugLogger sets the debug logger for the sink.
 // This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
 func (d *DryRunSink) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		d.debugLogger = debug.NewNoOpLogger()
+		return
+	}
 	d.debugLogger = logger
 }
 
