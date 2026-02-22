@@ -287,6 +287,7 @@ func TestInitConfigWithSeedURLs(t *testing.T) {
 }
 
 // TestInitConfigWithPartialConfigFile tests loading config from a partial config file
+// with CLI flags overriding config file values
 func TestInitConfigWithPartialConfigFile(t *testing.T) {
 	cmd.ResetFlags()
 
@@ -294,7 +295,7 @@ func TestInitConfigWithPartialConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.json")
 
-	// Partial config with seedUrls (required) and some other fields
+	// Partial config with seedUrls and some other fields
 	configContent := `{
 		"seedUrls": [{"Scheme": "https", "Host": "test-docs.com", "Path": "/docs"}],
 		"maxDepth": 10,
@@ -343,9 +344,9 @@ func TestInitConfigWithPartialConfigFile(t *testing.T) {
 	if cfg.RandomSeed() != 123456789 {
 		t.Errorf("Expected RandomSeed 123456789, got %d", cfg.RandomSeed())
 	}
-	// When using config file, seed URLs from file should be used
-	if len(cfg.SeedURLs()) != 1 || cfg.SeedURLs()[0].String() != "https://test-docs.com/docs" {
-		t.Errorf("Expected SeedURLs to be loaded from config, got %v", cfg.SeedURLs())
+	// When both config file and CLI seed URLs are provided, CLI should override
+	if len(cfg.SeedURLs()) != 1 || cfg.SeedURLs()[0].String() != "https://example.com" {
+		t.Errorf("Expected SeedURLs to be from CLI override, got %v", cfg.SeedURLs())
 	}
 
 	// Verify default fields are preserved (baseDelay, jitter, timeout should use defaults)
@@ -366,14 +367,53 @@ func TestInitConfigWithPartialConfigFile(t *testing.T) {
 	}
 }
 
-func TestInitConfigWithPartialConfigFileNoSeedUrls(t *testing.T) {
+// TestInitConfigWithConfigFileOnly tests loading config from file without CLI seed URLs
+func TestInitConfigWithConfigFileOnly(t *testing.T) {
 	cmd.ResetFlags()
 
-	// Create a temporary partial config file
+	// Create a temporary config file
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "config.json")
 
-	// Partial config without seedUrls (should fail)
+	// Config with seedUrls
+	configContent := `{
+		"seedUrls": [{"Scheme": "https", "Host": "test-docs.com", "Path": "/docs"}],
+		"maxDepth": 10,
+		"concurrency": 5,
+		"outputDir": "test-output"
+	}`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	cmd.SetConfigFileForTest(configFile)
+
+	// Pass empty seed URLs - config file should provide them
+	cfg, err := cmd.InitConfigWithError([]url.URL{})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Seed URLs should come from config file
+	if len(cfg.SeedURLs()) != 1 || cfg.SeedURLs()[0].String() != "https://test-docs.com/docs" {
+		t.Errorf("Expected SeedURLs to be loaded from config, got %v", cfg.SeedURLs())
+	}
+	if cfg.MaxDepth() != 10 {
+		t.Errorf("Expected MaxDepth 10, got %d", cfg.MaxDepth())
+	}
+}
+
+// TestInitConfigWithConfigFileNoSeedUrlsButCLIProvides tests that CLI seed URLs
+// are used when config file doesn't have seed URLs
+func TestInitConfigWithConfigFileNoSeedUrlsButCLIProvides(t *testing.T) {
+	cmd.ResetFlags()
+
+	// Create a temporary partial config file without seedUrls
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+
 	configContent := `{
 		"maxDepth": 10,
 		"concurrency": 5,
@@ -393,10 +433,52 @@ func TestInitConfigWithPartialConfigFileNoSeedUrls(t *testing.T) {
 
 	cmd.SetConfigFileForTest(configFile)
 
+	// CLI provides seed URLs - should work fine
 	testURLs := defaultTestURLs()
-	_, err = cmd.InitConfigWithError(testURLs)
+	cfg, err := cmd.InitConfigWithError(testURLs)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// CLI seed URLs should be used
+	if len(cfg.SeedURLs()) != 1 || cfg.SeedURLs()[0].String() != "https://example.com" {
+		t.Errorf("Expected SeedURLs from CLI, got %v", cfg.SeedURLs())
+	}
+	// Config file values should still be loaded
+	if cfg.MaxDepth() != 10 {
+		t.Errorf("Expected MaxDepth 10 from config, got %d", cfg.MaxDepth())
+	}
+	if cfg.OutputDir() != "test-output" {
+		t.Errorf("Expected OutputDir 'test-output' from config, got %s", cfg.OutputDir())
+	}
+}
+
+// TestInitConfigWithConfigFileNoSeedUrlsAndNoCLI tests that an error is returned
+// when neither config file nor CLI provides seed URLs
+func TestInitConfigWithConfigFileNoSeedUrlsAndNoCLI(t *testing.T) {
+	cmd.ResetFlags()
+
+	// Create a temporary partial config file without seedUrls
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+
+	configContent := `{
+		"maxDepth": 10,
+		"concurrency": 5,
+		"outputDir": "test-output"
+	}`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	cmd.SetConfigFileForTest(configFile)
+
+	// No CLI seed URLs - should fail since config file also doesn't have seed URLs
+	_, err = cmd.InitConfigWithError([]url.URL{})
 	if err == nil {
-		t.Errorf("Should error")
+		t.Errorf("Should error when no seed URLs provided anywhere")
 	}
 	if err != nil {
 		if !errors.Is(err, config.ErrInvalidConfig) {

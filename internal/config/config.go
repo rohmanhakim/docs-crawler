@@ -330,26 +330,175 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	return cfg, nil
 }
 
+// WithConfigFile loads config from a JSON file and returns a Config.
+// This is a convenience function that loads and builds the config in one step.
 func WithConfigFile(path string) (Config, error) {
+	cfg, err := WithConfigFileBuilder(path)
+	if err != nil {
+		return Config{}, err
+	}
+	return cfg.Build()
+}
+
+// WithConfigFileBuilder loads config from a JSON file and returns *Config for method chaining.
+// This allows CLI flags to override config file values using the builder pattern.
+func WithConfigFileBuilder(path string) (*Config, error) {
 	_, err := os.Stat(path)
 	if err != nil {
-		return Config{}, fmt.Errorf("%w: %s", ErrFileDoesNotExist, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrFileDoesNotExist, err.Error())
 	}
 	configContent, err := os.ReadFile(path)
 	if err != nil {
-		return Config{}, fmt.Errorf("%w: %s", ErrReadConfigFail, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrReadConfigFail, err.Error())
 	}
 	cfgDTO := configDTO{}
 
 	err = json.Unmarshal(configContent, &cfgDTO)
 	if err != nil {
-		return Config{}, fmt.Errorf("%w: %s", ErrConfigParsingFail, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrConfigParsingFail, err.Error())
 	}
 
-	cfg, err := newConfigFromDTO(cfgDTO)
+	cfg, err := newConfigFromDTOBuilder(cfgDTO)
 	if err != nil {
-		return Config{}, err
+		return nil, err
 	}
+	return cfg, nil
+}
+
+// newConfigFromDTOBuilder creates a *Config from configDTO for builder pattern chaining.
+func newConfigFromDTOBuilder(dto configDTO) (*Config, error) {
+
+	// Start with default config
+	cfg := WithDefault(dto.SeedURLs)
+
+	// AllowedHosts can be empty - if so, default to seed URLs hostnames
+	if len(dto.AllowedHosts) > 0 {
+		cfg.allowedHosts = dto.AllowedHosts
+	}
+
+	// AllowedPathPrefix can be empty - always use DTO values
+	cfg.allowedPathPrefix = dto.AllowedPathPrefix
+
+	// For pointer fields, check if nil (not provided) before overriding defaults
+	if dto.MaxDepth != nil {
+		cfg.maxDepth = *dto.MaxDepth
+	}
+	if dto.MaxPages != nil {
+		cfg.maxPages = *dto.MaxPages
+	}
+	if dto.Concurrency != nil {
+		cfg.concurrency = *dto.Concurrency
+	}
+	if dto.BaseDelay != nil {
+		cfg.baseDelay = *dto.BaseDelay
+	}
+	if dto.Jitter != nil {
+		cfg.jitter = *dto.Jitter
+	}
+	if dto.RandomSeed != nil {
+		cfg.randomSeed = *dto.RandomSeed
+	}
+	if dto.MaxAttempt != nil {
+		cfg.maxAttempt = *dto.MaxAttempt
+	}
+	if dto.BackoffInitialDuration != nil {
+		cfg.backoffInitialDuration = *dto.BackoffInitialDuration
+	}
+	if dto.BackoffMultiplier != nil {
+		cfg.backoffMultiplier = *dto.BackoffMultiplier
+	}
+	if dto.BackoffMaxDuration != nil {
+		cfg.backoffMaxDuration = *dto.BackoffMaxDuration
+	}
+
+	if dto.Timeout != nil {
+		cfg.timeout = *dto.Timeout
+	}
+	if dto.UserAgent != nil {
+		cfg.userAgent = *dto.UserAgent
+	}
+	if dto.MaxAssetSize != nil {
+		cfg.maxAssetSize = *dto.MaxAssetSize
+	}
+	if dto.OutputDir != nil {
+		cfg.outputDir = *dto.OutputDir
+	}
+	// DryRun is a boolean - check if explicitly set (nil means use default false)
+	if dto.DryRun != nil {
+		cfg.dryRun = *dto.DryRun
+	}
+	// DumpStageOutput - directory for stage dumps
+	if dto.DumpStageOutput != nil {
+		cfg.dumpStageOutput = *dto.DumpStageOutput
+	}
+
+	// HTTP client parameters - check if pointer is not nil
+	if dto.MaxIdleConns != nil {
+		cfg.maxIdleConns = *dto.MaxIdleConns
+	}
+	if dto.MaxIdleConnsPerHost != nil {
+		cfg.maxIdleConnsPerHost = *dto.MaxIdleConnsPerHost
+	}
+	if dto.IdleConnTimeout != nil {
+		cfg.idleConnTimeout = *dto.IdleConnTimeout
+	}
+
+	// Extraction parameters - check if pointer is not nil
+	if dto.BodySpecificityBias != nil {
+		cfg.bodySpecificityBias = *dto.BodySpecificityBias
+	}
+	if dto.LinkDensityThreshold != nil {
+		cfg.linkDensityThreshold = *dto.LinkDensityThreshold
+	}
+	if dto.ScoreMultiplierNonWhitespaceDivisor != nil {
+		cfg.scoreMultiplierNonWhitespaceDivisor = *dto.ScoreMultiplierNonWhitespaceDivisor
+	}
+	if dto.ScoreMultiplierParagraphs != nil {
+		cfg.scoreMultiplierParagraphs = *dto.ScoreMultiplierParagraphs
+	}
+	if dto.ScoreMultiplierHeadings != nil {
+		cfg.scoreMultiplierHeadings = *dto.ScoreMultiplierHeadings
+	}
+	if dto.ScoreMultiplierCodeBlocks != nil {
+		cfg.scoreMultiplierCodeBlocks = *dto.ScoreMultiplierCodeBlocks
+	}
+	if dto.ScoreMultiplierListItems != nil {
+		cfg.scoreMultiplierListItems = *dto.ScoreMultiplierListItems
+	}
+	if dto.ThresholdMinNonWhitespace != nil {
+		cfg.thresholdMinNonWhitespace = *dto.ThresholdMinNonWhitespace
+	}
+	// Note: ThresholdMinHeadings can be 0 (which is a valid value)
+	if dto.ThresholdMinHeadings != nil {
+		cfg.thresholdMinHeadings = *dto.ThresholdMinHeadings
+	}
+	if dto.ThresholdMinParagraphsOrCode != nil {
+		cfg.thresholdMinParagraphsOrCode = *dto.ThresholdMinParagraphsOrCode
+	}
+	if dto.ThresholdMaxLinkDensity != nil {
+		cfg.thresholdMaxLinkDensity = *dto.ThresholdMaxLinkDensity
+	}
+	// HashAlgo - override if provided (pointer not nil)
+	if dto.HashAlgo != nil {
+		cfg.hashAlgo = *dto.HashAlgo
+	}
+
+	// SelectorBlacklist - override if provided (pointer not nil)
+	if dto.SelectorBlacklist != nil {
+		cfg.selectorBlacklist = *dto.SelectorBlacklist
+	}
+
+	// Debug logging configuration
+	if dto.Debug != nil {
+		cfg.debug = *dto.Debug
+	}
+	if dto.DebugFile != nil {
+		cfg.debugFile = *dto.DebugFile
+	}
+	if dto.DebugFormat != nil {
+		cfg.debugFormat = *dto.DebugFormat
+	}
+
 	return cfg, nil
 }
 

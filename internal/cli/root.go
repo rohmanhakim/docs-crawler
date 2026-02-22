@@ -79,18 +79,22 @@ This tool aims to provide a deterministic and repeatable crawl process,
 producing high-quality Markdown suitable for embedding and retrieval.`,
 	Version: fmt.Sprintf("%s (commit: %s, built: %s)", build.Version, build.Commit, build.BuildTime),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Check if seed URLs are provided
-		if len(seedURLs) == 0 {
-			fmt.Fprintf(os.Stderr, "Error: --seed-url is required. Please provide at least one seed URL to start crawling.\n")
+		// Check if either seed URLs or config file is provided
+		if len(seedURLs) == 0 && cfgFile == "" {
+			fmt.Fprintf(os.Stderr, "Error: either --seed-url or --config-file is required.\n")
 			cmd.Usage()
 			os.Exit(1)
 		}
 
-		// Parse seed URLs
-		parsedURLs, err := parseSeedURLs(seedURLs)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-			os.Exit(1)
+		// Parse seed URLs if provided
+		var parsedURLs []url.URL
+		var err error
+		if len(seedURLs) > 0 {
+			parsedURLs, err = parseSeedURLs(seedURLs)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+				os.Exit(1)
+			}
 		}
 
 		// Build config using initConfig with parsed seed URLs
@@ -254,34 +258,38 @@ func InitConfig(seedUrls []url.URL) config.Config {
 }
 
 // InitConfigWithError reads in config file and ENV variables if set, returning any errors.
-// seedUrls is a mandatory parameter and must contain at least one valid URL.
+// seedUrls can be empty if a config file is provided that contains seed URLs.
+// If both are provided, CLI flags override config file values.
 // This makes it easier to test error cases.
 func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
-	if len(seedUrls) == 0 {
-		return config.Config{}, fmt.Errorf("%w: seedUrls cannot be empty", config.ErrInvalidConfig)
-	}
-
 	// Check if output should be suppressed (debug mode without debug file)
 	suppressOutput := debug && debugFile == ""
+
+	var configBuilder *config.Config
 
 	if cfgFile != "" {
 		if !suppressOutput {
 			fmt.Printf("Initializing config from file: %s\n", cfgFile)
 		}
-		cfg, err := config.WithConfigFile(cfgFile)
+		var err error
+		configBuilder, err = config.WithConfigFileBuilder(cfgFile)
 		if err != nil {
-			return cfg, fmt.Errorf("error initializing config from file: %w", err)
+			return config.Config{}, fmt.Errorf("error initializing config from file: %w", err)
 		}
-		return cfg, nil
+		// Override seed URLs if provided via CLI
+		if len(seedUrls) > 0 {
+			configBuilder = configBuilder.WithSeedUrls(seedUrls)
+		}
+	} else {
+		// No config file - seed URLs must be provided via CLI
+		if len(seedUrls) == 0 {
+			return config.Config{}, fmt.Errorf("%w: either --seed-url or --config-file is required", config.ErrInvalidConfig)
+		}
+		if !suppressOutput {
+			fmt.Println("No config file specified. Using default flag values or environment variables")
+		}
+		configBuilder = config.WithDefault(seedUrls)
 	}
-
-	// Build config from CLI flags using the With... functions with method chaining
-	if !suppressOutput {
-		fmt.Println("No config file specified. Using default flag values or environment variables")
-	}
-
-	// Start with default config using provided seed URLs and apply overrides using method chaining
-	configBuilder := config.WithDefault(seedUrls)
 
 	// Override with CLI flag values where provided
 	if maxDepth > 0 {
