@@ -1,11 +1,13 @@
 package frontier
 
 import (
+	"context"
 	"net/url"
 	"sync"
 
 	"github.com/rohmanhakim/docs-crawler/internal/config"
 	"github.com/rohmanhakim/docs-crawler/pkg/collections"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
 )
 
@@ -58,18 +60,31 @@ type CrawlFrontier struct {
 	maxDepth      int
 	currentDepth  int
 	maxPages      int
+	debugLogger   debug.DebugLogger
 }
 
 func NewCrawlFrontier() CrawlFrontier {
 	return CrawlFrontier{
 		queuesByDepth: make(map[int]*collections.FIFOQueue[CrawlToken]),
 		visitedUrl:    collections.NewSet[string](),
+		debugLogger:   debug.NewNoOpLogger(),
 	}
 }
 
 func (f *CrawlFrontier) Init(cfg config.Config) {
 	f.maxDepth = cfg.MaxDepth()
 	f.maxPages = cfg.MaxPages()
+}
+
+// SetDebugLogger sets the debug logger for the frontier.
+// This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
+func (f *CrawlFrontier) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		f.debugLogger = debug.NewNoOpLogger()
+		return
+	}
+	f.debugLogger = logger
 }
 
 /*
@@ -84,12 +99,28 @@ func (f *CrawlFrontier) Submit(admission CrawlAdmissionCandidate) {
 	// return if the visited URL size has reached its allowed max page count from config
 	// maxPages = 0 means unlimited
 	if f.visitedUrl.Size() == f.maxPages && f.maxPages != 0 {
+		// Log skip due to max pages reached
+		if f.debugLogger.Enabled() {
+			f.debugLogger.LogStep(context.TODO(), "frontier", "submit_skipped_max_pages", debug.FieldMap{
+				"url":           admission.targetURL.String(),
+				"max_pages":     f.maxPages,
+				"visited_count": f.visitedUrl.Size(),
+			})
+		}
 		return
 	}
 
 	// return if new URL depth is higher than the allowed max depth from config
 	// maxDepth = 0 means unlimited
 	if admission.discoveryMetadata.depth > f.maxDepth && f.maxDepth != 0 {
+		// Log skip due to depth exceeded
+		if f.debugLogger.Enabled() {
+			f.debugLogger.LogStep(context.TODO(), "frontier", "submit_skipped_depth", debug.FieldMap{
+				"url":       admission.targetURL.String(),
+				"depth":     admission.discoveryMetadata.depth,
+				"max_depth": f.maxDepth,
+			})
+		}
 		return
 	}
 
@@ -106,6 +137,13 @@ func (f *CrawlFrontier) Enqueue(incomingToken CrawlToken) {
 	}
 	f.queuesByDepth[incomingToken.depth].Enqueue(incomingToken)
 	if incomingToken.depth > f.currentDepth {
+		// Log depth advancement
+		if f.debugLogger.Enabled() {
+			f.debugLogger.LogStep(context.TODO(), "frontier", "depth_advanced", debug.FieldMap{
+				"old_depth": f.currentDepth,
+				"new_depth": incomingToken.depth,
+			})
+		}
 		f.currentDepth = incomingToken.depth
 	}
 }
@@ -175,6 +213,12 @@ func (f *CrawlFrontier) Dequeue() (CrawlToken, bool) {
 func (f *CrawlFrontier) deduplicate(canonicalizedUrl url.URL, depth int) {
 	// if already visited skip
 	if f.visitedUrl.Contains(canonicalizedUrl.String()) {
+		// Log skip due to duplicate URL
+		if f.debugLogger.Enabled() {
+			f.debugLogger.LogStep(context.TODO(), "frontier", "submit_skipped_duplicate", debug.FieldMap{
+				"url": canonicalizedUrl.String(),
+			})
+		}
 		return
 	}
 	f.visitedUrl.Add(canonicalizedUrl.String())

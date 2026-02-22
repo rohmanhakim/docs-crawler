@@ -33,6 +33,10 @@ var (
 	allowedPathPrefix []string
 	selectorBlacklist []string
 	versionFlag       bool
+	// Debug logging flags
+	debug       bool
+	debugFile   string
+	debugFormat string
 )
 
 // parseStringSliceToSet converts a string slice to a map[string]struct{} set
@@ -220,6 +224,10 @@ func init() {
 	rootCmd.PersistentFlags().StringArrayVar(&allowedHosts, "allowed-host", []string{}, "explicit hostname allowlist (defaults to seed host)")
 	rootCmd.PersistentFlags().StringArrayVar(&allowedPathPrefix, "allowed-path-prefix", []string{}, "restrict crawl to paths like `/docs`, `/guide`")
 	rootCmd.PersistentFlags().StringArrayVar(&selectorBlacklist, "selector-blacklist", []string{}, "CSS selectors for elements to remove before extraction (e.g., .promo-banner, #ad)")
+	// Debug logging flags
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
+	rootCmd.PersistentFlags().StringVar(&debugFile, "debug-file", "", "file path for debug logs (stdout only if empty)")
+	rootCmd.PersistentFlags().StringVar(&debugFormat, "debug-format", "json", "debug output format: json or text")
 }
 
 // InitConfig reads in config file and ENV variables if set.
@@ -313,6 +321,17 @@ func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
 		configBuilder = configBuilder.WithSelectorBlacklist(selectorBlacklist)
 	}
 
+	// Debug logging configuration
+	if debug {
+		configBuilder = configBuilder.WithDebug(debug)
+	}
+	if debugFile != "" {
+		configBuilder = configBuilder.WithDebugFile(debugFile)
+	}
+	if debugFormat != "" {
+		configBuilder = configBuilder.WithDebugFormat(debugFormat)
+	}
+
 	cfg, err := configBuilder.Build()
 	if err != nil {
 		return config.Config{}, err
@@ -338,6 +357,9 @@ func ResetFlags() {
 	allowedPathPrefix = []string{}
 	selectorBlacklist = []string{}
 	versionFlag = false
+	debug = false
+	debugFile = ""
+	debugFormat = "json"
 }
 
 // Test helper functions to set flag values from tests
@@ -407,4 +429,16 @@ func SetDumpStageOutputForTest(dir string) {
 
 func SetSelectorBlacklistForTest(selectors []string) {
 	selectorBlacklist = selectors
+}
+
+func SetDebugForTest(d bool) {
+	debug = d
+}
+
+func SetDebugFileForTest(file string) {
+	debugFile = file
+}
+
+func SetDebugFormatForTest(format string) {
+	debugFormat = format
 }

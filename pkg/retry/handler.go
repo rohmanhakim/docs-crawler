@@ -1,10 +1,12 @@
 package retry
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
 
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
@@ -16,7 +18,10 @@ import (
 // Type parameter T represents the return type of the function being retried.
 // Returns a Result containing the value (if successful), error (if failed),
 // and the number of attempts made.
-func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError)) Result[T] {
+//
+// The logger parameter provides debug logging capabilities. When debug mode is
+// disabled (NoOpLogger), there is zero overhead from logging.
+func Retry[T any](retryParam RetryParam, logger debug.DebugLogger, fn func() (T, failure.ClassifiedError)) Result[T] {
 	var lastErr failure.ClassifiedError
 	var zero T
 
@@ -42,6 +47,10 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 
 		// Success case: no error
 		if err == nil {
+			// Log successful retry if debug enabled
+			if logger.Enabled() {
+				logger.LogRetry(context.TODO(), attempt, retryParam.MaxAttempts, 0, nil)
+			}
 			return NewSuccessResult(result, attempt)
 		}
 
@@ -70,8 +79,18 @@ func Retry[T any](retryParam RetryParam, fn func() (T, failure.ClassifiedError))
 			retryParam.BackoffParam,
 		)
 
+		// Log retry attempt if debug enabled
+		if logger.Enabled() {
+			logger.LogRetry(context.TODO(), attempt, retryParam.MaxAttempts, backoffDelay, err)
+		}
+
 		// Sleep for the computed delay
 		time.Sleep(backoffDelay)
+	}
+
+	// Log exhausted attempts if debug enabled
+	if logger.Enabled() {
+		logger.LogRetry(context.TODO(), retryParam.MaxAttempts, retryParam.MaxAttempts, 0, lastErr)
 	}
 
 	// Return failure result when max attempts are exhausted

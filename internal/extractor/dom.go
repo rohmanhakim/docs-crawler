@@ -2,6 +2,7 @@ package extractor
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"golang.org/x/net/html"
 )
@@ -52,6 +54,7 @@ type DomExtractor struct {
 	metadataSink    metadata.MetadataSink
 	customSelectors []string
 	params          ExtractParam
+	debugLogger     debug.DebugLogger
 }
 
 // NewDomExtractor creates a new DomExtractor with default parameters.
@@ -64,6 +67,7 @@ func NewDomExtractor(
 		metadataSink:    metadataSink,
 		customSelectors: customSelectors,
 		params:          DefaultExtractParam(),
+		debugLogger:     debug.NewNoOpLogger(),
 	}
 }
 
@@ -71,6 +75,17 @@ func NewDomExtractor(
 // This enables runtime configuration of extraction behavior.
 func (d *DomExtractor) SetExtractParam(params ExtractParam) {
 	d.params = params
+}
+
+// SetDebugLogger sets the debug logger for the extractor.
+// This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
+func (d *DomExtractor) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		d.debugLogger = debug.NewNoOpLogger()
+		return
+	}
+	d.debugLogger = logger
 }
 
 func (d *DomExtractor) Extract(
@@ -111,6 +126,13 @@ func (d *DomExtractor) Extract(
 }
 
 func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
+	// Log input size at the start
+	if d.debugLogger.Enabled() {
+		d.debugLogger.LogStep(context.TODO(), "extractor", "parse_html", debug.FieldMap{
+			"input_size_bytes": len(htmlByte),
+		})
+	}
+
 	// Parse HTML
 	doc, err := html.Parse(bytes.NewReader(htmlByte))
 	if err != nil {
@@ -131,37 +153,99 @@ func (d *DomExtractor) extract(htmlByte []byte) (ExtractionResult, error) {
 	// Layer 0: Remove blacklisted elements before any extraction
 	// This ensures noise elements are removed regardless of which layer finds content
 	if len(d.params.SelectorBlacklist) > 0 {
-		removeBlacklistedElements(doc, d.params.SelectorBlacklist)
+		removedCount := removeBlacklistedElementsWithCount(doc, d.params.SelectorBlacklist)
+		if d.debugLogger.Enabled() {
+			d.debugLogger.LogStep(context.TODO(), "extractor", "layer_0_blacklist", debug.FieldMap{
+				"selectors_count": len(d.params.SelectorBlacklist),
+				"removed_count":   removedCount,
+			})
+		}
 	}
 
 	// Layer 1: Extract semantic container (main, article, [role="main"])
-	contentNode := extractSemanticContainer(doc, d.params.Threshold)
+	contentNode, selector := extractSemanticContainerWithSelector(doc, d.params.Threshold)
 	if contentNode != nil {
+		if d.debugLogger.Enabled() {
+			d.debugLogger.LogStep(context.TODO(), "extractor", "layer_1_semantic", debug.FieldMap{
+				"found":    true,
+				"selector": selector,
+			})
+			d.debugLogger.LogStep(context.TODO(), "extractor", "content_selected", debug.FieldMap{
+				"final_layer": 1,
+				"node_tag":    contentNode.Data,
+			})
+		}
 		return ExtractionResult{
 			DocumentRoot: doc,
 			ContentNode:  contentNode,
 		}, nil
 	}
 
+	// Log that layer 1 didn't find content
+	if d.debugLogger.Enabled() {
+		d.debugLogger.LogStep(context.TODO(), "extractor", "layer_1_semantic", debug.FieldMap{
+			"found": false,
+		})
+	}
+
 	// Layer 2: Try known documentation container selectors
-	contentNode = d.extractKnownDocContainer(doc)
+	contentNode, selector = d.extractKnownDocContainerWithSelector(doc)
 	if contentNode != nil {
+		if d.debugLogger.Enabled() {
+			d.debugLogger.LogStep(context.TODO(), "extractor", "layer_2_known", debug.FieldMap{
+				"found":    true,
+				"selector": selector,
+			})
+			d.debugLogger.LogStep(context.TODO(), "extractor", "content_selected", debug.FieldMap{
+				"final_layer": 2,
+				"node_tag":    contentNode.Data,
+			})
+		}
 		return ExtractionResult{
 			DocumentRoot: doc,
 			ContentNode:  contentNode,
 		}, nil
+	}
+
+	// Log that layer 2 didn't find content
+	if d.debugLogger.Enabled() {
+		d.debugLogger.LogStep(context.TODO(), "extractor", "layer_2_known", debug.FieldMap{
+			"found": false,
+		})
 	}
 
 	// Layer 3: Explicit chrome removal + text-density scoring
 	contentNode = d.extractContainerAfterExplicitChromesRemoval(*doc)
 	if contentNode != nil {
+		if d.debugLogger.Enabled() {
+			d.debugLogger.LogStep(context.TODO(), "extractor", "layer_3_heuristic", debug.FieldMap{
+				"found":    true,
+				"node_tag": contentNode.Data,
+			})
+			d.debugLogger.LogStep(context.TODO(), "extractor", "content_selected", debug.FieldMap{
+				"final_layer": 3,
+				"node_tag":    contentNode.Data,
+			})
+		}
 		return ExtractionResult{
 			DocumentRoot: doc,
 			ContentNode:  contentNode,
 		}, nil
 	}
 
+	// Log that layer 3 didn't find content
+	if d.debugLogger.Enabled() {
+		d.debugLogger.LogStep(context.TODO(), "extractor", "layer_3_heuristic", debug.FieldMap{
+			"found": false,
+		})
+	}
+
 	// All layers failed to find meaningful content
+	if d.debugLogger.Enabled() {
+		d.debugLogger.LogStep(context.TODO(), "extractor", "extraction_failed", debug.FieldMap{
+			"error_cause": string(ErrCauseNoContent),
+		})
+	}
 	return ExtractionResult{}, NewExtractionError(
 		ErrCauseNoContent,
 		"no meaningful content container found",
@@ -190,31 +274,38 @@ func isValidHTML(doc *html.Node) bool {
 // Priority: <main> -> <article> -> [role="main"]
 // Returns the first meaningful match, or nil if none found
 func extractSemanticContainer(doc *html.Node, threshold MeaningfulThreshold) *html.Node {
+	node, _ := extractSemanticContainerWithSelector(doc, threshold)
+	return node
+}
+
+// extractSemanticContainerWithSelector is like extractSemanticContainer but also returns
+// the selector that matched the content node for debug logging.
+func extractSemanticContainerWithSelector(doc *html.Node, threshold MeaningfulThreshold) (*html.Node, string) {
 	// Use goquery as convenience wrapper
 	gqDoc := goquery.NewDocumentFromNode(doc)
 
 	// Priority 1: <main>
 	if main := gqDoc.Find("main").First(); main.Length() > 0 {
 		if node := main.Nodes[0]; isMeaningful(node, threshold) {
-			return node
+			return node, "main"
 		}
 	}
 
 	// Priority 2: <article>
 	if article := gqDoc.Find("article").First(); article.Length() > 0 {
 		if node := article.Nodes[0]; isMeaningful(node, threshold) {
-			return node
+			return node, "article"
 		}
 	}
 
 	// Priority 3: [role="main"]
 	if roleMain := gqDoc.Find("[role='main']").First(); roleMain.Length() > 0 {
 		if node := roleMain.Nodes[0]; isMeaningful(node, threshold) {
-			return node
+			return node, "[role='main']"
 		}
 	}
 
-	return nil
+	return nil, ""
 }
 
 // extractKnownDocContainer applies the second heuristic layer:
@@ -223,6 +314,13 @@ func extractSemanticContainer(doc *html.Node, threshold MeaningfulThreshold) *ht
 // Returns the first meaningful match, or nil if none found.
 // Skips matches that would miss an orphan header with H1 (important page title).
 func (d *DomExtractor) extractKnownDocContainer(doc *html.Node) *html.Node {
+	node, _ := d.extractKnownDocContainerWithSelector(doc)
+	return node
+}
+
+// extractKnownDocContainerWithSelector is like extractKnownDocContainer but also returns
+// the selector that matched the content node for debug logging.
+func (d *DomExtractor) extractKnownDocContainerWithSelector(doc *html.Node) (*html.Node, string) {
 	// Get all default selectors
 	defaultSelectors := getAllSelectors()
 
@@ -241,12 +339,12 @@ func (d *DomExtractor) extractKnownDocContainer(doc *html.Node) *html.Node {
 				if hasOrphanHeaderWithH1(doc, node) {
 					continue
 				}
-				return node
+				return node, selector
 			}
 		}
 	}
 
-	return nil
+	return nil, ""
 }
 
 // hasOrphanHeaderWithH1 checks if there's a header element with H1 that is NOT
@@ -907,4 +1005,35 @@ func removeBlacklistedElements(doc *html.Node, selectors []string) {
 			node.Parent.RemoveChild(node)
 		}
 	}
+}
+
+// removeBlacklistedElementsWithCount is like removeBlacklistedElements but returns
+// the count of removed elements for debug logging.
+func removeBlacklistedElementsWithCount(doc *html.Node, selectors []string) int {
+	if len(selectors) == 0 {
+		return 0
+	}
+
+	// Use goquery as convenience wrapper for CSS selector matching
+	gqDoc := goquery.NewDocumentFromNode(doc)
+
+	// Collect all nodes to remove (can't modify while iterating)
+	var nodesToRemove []*html.Node
+
+	for _, selector := range selectors {
+		gqDoc.Find(selector).Each(func(i int, s *goquery.Selection) {
+			if len(s.Nodes) > 0 {
+				nodesToRemove = append(nodesToRemove, s.Nodes...)
+			}
+		})
+	}
+
+	// Remove collected nodes from their parents
+	for _, node := range nodesToRemove {
+		if node.Parent != nil {
+			node.Parent.RemoveChild(node)
+		}
+	}
+
+	return len(nodesToRemove)
 }

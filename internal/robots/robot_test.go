@@ -11,6 +11,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	"github.com/rohmanhakim/docs-crawler/internal/robots/cache"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 )
 
 // robotTestMetadataSink is an alias to the shared mock in metadatatest package.
@@ -78,7 +79,9 @@ Allow: /`
 	defer server.Close()
 
 	sink := &robotTestMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	robot := robots.NewCachedRobot(sink)
+	robot.SetDebugLogger(mockLogger)
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	robot.Init("test-agent/1.0", httpClient)
 
@@ -96,6 +99,40 @@ Allow: /`
 	if decision.Reason != robots.AllowedByRobots && decision.Reason != robots.EmptyRuleSet && decision.Reason != robots.NoMatchingRules {
 		t.Errorf("Expected positive reason, got: %s", decision.Reason)
 	}
+
+	// Assert debug logging was called
+	if !mockLogger.LogStepCalled {
+		t.Error("Expected LogStep to be called")
+	}
+
+	// Verify robots_fetch step
+	fetchSteps := mockLogger.StepsByName("robots_fetch")
+	if len(fetchSteps) != 1 {
+		t.Errorf("Expected 1 robots_fetch step, got %d", len(fetchSteps))
+	} else {
+		if fetchSteps[0].Fields["host"] == nil {
+			t.Error("Expected host field in robots_fetch step")
+		}
+		if fetchSteps[0].Fields["from_cache"] != false {
+			t.Error("Expected from_cache=false on first fetch")
+		}
+	}
+
+	// Verify parse_rules step
+	parseSteps := mockLogger.StepsByName("parse_rules")
+	if len(parseSteps) != 1 {
+		t.Errorf("Expected 1 parse_rules step, got %d", len(parseSteps))
+	}
+
+	// Verify decision_made step
+	decisionSteps := mockLogger.StepsByName("decision_made")
+	if len(decisionSteps) != 1 {
+		t.Errorf("Expected 1 decision_made step, got %d", len(decisionSteps))
+	} else {
+		if decisionSteps[0].Fields["allowed"] != true {
+			t.Error("Expected allowed=true in decision_made step")
+		}
+	}
 }
 
 func TestRobot_Decide_DisallowAll(t *testing.T) {
@@ -107,7 +144,9 @@ Disallow: /`
 	defer server.Close()
 
 	sink := &robotTestMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	robot := robots.NewCachedRobot(sink)
+	robot.SetDebugLogger(mockLogger)
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	robot.Init("test-agent/1.0", httpClient)
 
@@ -124,6 +163,25 @@ Disallow: /`
 
 	if decision.Reason != robots.DisallowedByRobots {
 		t.Errorf("Expected reason DisallowedByRobots, got: %s", decision.Reason)
+	}
+
+	// Verify decision_made step shows disallowed
+	decisionSteps := mockLogger.StepsByName("decision_made")
+	if len(decisionSteps) != 1 {
+		t.Errorf("Expected 1 decision_made step, got %d", len(decisionSteps))
+	} else {
+		if decisionSteps[0].Fields["allowed"] != false {
+			t.Error("Expected allowed=false in decision_made step")
+		}
+		if decisionSteps[0].Fields["reason"] != string(robots.DisallowedByRobots) {
+			t.Errorf("Expected reason=%s in decision_made step, got %v", robots.DisallowedByRobots, decisionSteps[0].Fields["reason"])
+		}
+	}
+
+	// Verify match_rules step was logged
+	matchSteps := mockLogger.StepsByName("match_rules")
+	if len(matchSteps) == 0 {
+		t.Error("Expected at least one match_rules step for disallow rule")
 	}
 }
 
@@ -297,7 +355,9 @@ Allow: /`
 	defer server.Close()
 
 	sink := &robotTestMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	robot := robots.NewCachedRobot(sink)
+	robot.SetDebugLogger(mockLogger)
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	robot.Init("test-agent/1.0", httpClient)
 
@@ -316,6 +376,26 @@ Allow: /`
 		t.Error("Expected crawl delay to be set")
 	} else if decision.CrawlDelay != 5*time.Second {
 		t.Errorf("Expected crawl delay of 5s, got: %v", decision.CrawlDelay)
+	}
+
+	// Verify parse_rules step contains crawl_delay_ms
+	parseSteps := mockLogger.StepsByName("parse_rules")
+	if len(parseSteps) != 1 {
+		t.Errorf("Expected 1 parse_rules step, got %d", len(parseSteps))
+	} else {
+		if parseSteps[0].Fields["crawl_delay_ms"] != int64(5000) {
+			t.Errorf("Expected crawl_delay_ms=5000, got %v", parseSteps[0].Fields["crawl_delay_ms"])
+		}
+	}
+
+	// Verify decision_made step contains crawl_delay_ms
+	decisionSteps := mockLogger.StepsByName("decision_made")
+	if len(decisionSteps) != 1 {
+		t.Errorf("Expected 1 decision_made step, got %d", len(decisionSteps))
+	} else {
+		if decisionSteps[0].Fields["crawl_delay_ms"] != int64(5000) {
+			t.Errorf("Expected crawl_delay_ms=5000 in decision_made, got %v", decisionSteps[0].Fields["crawl_delay_ms"])
+		}
 	}
 }
 
@@ -364,7 +444,9 @@ Allow: /`
 	defer server.Close()
 
 	sink := &robotTestMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	robot := robots.NewCachedRobot(sink)
+	robot.SetDebugLogger(mockLogger)
 	httpClient := &http.Client{Timeout: 30 * time.Second}
 	robot.Init("test-agent/1.0", httpClient)
 
@@ -381,6 +463,24 @@ Allow: /`
 	// Due to caching, robots.txt should only be fetched once
 	if requestCount != 1 {
 		t.Errorf("Expected robots.txt to be fetched once due to caching, but was fetched %d times", requestCount)
+	}
+
+	// Verify robots_fetch shows from_cache correctly
+	fetchSteps := mockLogger.StepsByName("robots_fetch")
+	if len(fetchSteps) != 3 {
+		t.Errorf("Expected 3 robots_fetch steps (one per Decide call), got %d", len(fetchSteps))
+	} else {
+		// First fetch should be from_cache=false
+		if fetchSteps[0].Fields["from_cache"] != false {
+			t.Error("Expected first fetch to have from_cache=false")
+		}
+		// Second and third fetches should be from_cache=true
+		if fetchSteps[1].Fields["from_cache"] != true {
+			t.Error("Expected second fetch to have from_cache=true")
+		}
+		if fetchSteps[2].Fields["from_cache"] != true {
+			t.Error("Expected third fetch to have from_cache=true")
+		}
 	}
 }
 

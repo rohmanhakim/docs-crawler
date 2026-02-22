@@ -9,6 +9,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/normalize"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 )
 
@@ -16,6 +17,10 @@ func TestNormalize_SuccessfulFrontmatterGeneration(t *testing.T) {
 	// Arrange
 	metadataSink := &metadataSinkMock{}
 	constraint := normalize.NewMarkdownConstraint(metadataSink)
+
+	// Set up debug logger mock
+	debugLogger := debugtest.NewLoggerMock()
+	constraint.SetDebugLogger(debugLogger)
 
 	fetchURL, _ := url.Parse("https://docs.example.com/guide/getting-started")
 	content := loadFixture(t, "pass/success.md")
@@ -109,6 +114,39 @@ func TestNormalize_SuccessfulFrontmatterGeneration(t *testing.T) {
 	}
 	if pipelineEvent.PageURL() != fetchURL.String() {
 		t.Errorf("expected PipelineEvent.PageURL to be '%s', got: '%s'", fetchURL.String(), pipelineEvent.PageURL())
+	}
+
+	// Verify debug logging was called
+	if !debugLogger.LogStepCalled {
+		t.Error("expected debugLogger.LogStep to be called")
+	}
+	stepEntries := debugLogger.GetStepEntries()
+	if len(stepEntries) < 2 {
+		t.Fatalf("expected at least 2 step entries, got %d", len(stepEntries))
+	}
+
+	// Verify normalize_start was logged
+	startFound := false
+	completeFound := false
+	for _, entry := range stepEntries {
+		if entry.Step == "normalize_start" {
+			startFound = true
+			if entry.Fields["url"] != fetchURL.String() {
+				t.Errorf("expected normalize_start url to be '%s', got: '%v'", fetchURL.String(), entry.Fields["url"])
+			}
+		}
+		if entry.Step == "normalize_complete" {
+			completeFound = true
+			if entry.Fields["title"] != "Getting Started" {
+				t.Errorf("expected normalize_complete title to be 'Getting Started', got: '%v'", entry.Fields["title"])
+			}
+		}
+	}
+	if !startFound {
+		t.Error("expected normalize_start step to be logged")
+	}
+	if !completeFound {
+		t.Error("expected normalize_complete step to be logged")
 	}
 }
 

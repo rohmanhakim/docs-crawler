@@ -1,10 +1,12 @@
 package limiter
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
@@ -34,6 +36,7 @@ type ConcurrentRateLimiter struct {
 	hostTimings  map[string]hostTiming
 	rng          *rand.Rand
 	backoffParam timeutil.BackoffParam
+	debugLogger  debug.DebugLogger
 }
 
 func NewConcurrentRateLimiter() *ConcurrentRateLimiter {
@@ -45,6 +48,7 @@ func NewConcurrentRateLimiter() *ConcurrentRateLimiter {
 			2.0,
 			30*time.Second,
 		),
+		debugLogger: debug.NewNoOpLogger(),
 	}
 }
 
@@ -76,6 +80,19 @@ func (r *ConcurrentRateLimiter) SetRandomSeed(randomSeed int64) {
 	r.rng = rand.New(rand.NewSource(randomSeed))
 }
 
+// SetDebugLogger sets the debug logger for the rate limiter.
+// This method is not part of the RateLimiter interface to maintain backward compatibility.
+// If logger is nil, NoOpLogger is used as a safe default.
+func (r *ConcurrentRateLimiter) SetDebugLogger(logger debug.DebugLogger) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if logger == nil {
+		r.debugLogger = debug.NewNoOpLogger()
+		return
+	}
+	r.debugLogger = logger
+}
+
 // Set delay to given host, separated from global base delay
 func (r *ConcurrentRateLimiter) SetCrawlDelay(host string, delay time.Duration) {
 	r.mu.Lock()
@@ -89,6 +106,14 @@ func (r *ConcurrentRateLimiter) SetCrawlDelay(host string, delay time.Duration) 
 		r.hostTimings[host] = hostTiming{
 			crawlDelay: delay,
 		}
+	}
+
+	// Log crawl delay set if debug enabled
+	if r.debugLogger.Enabled() {
+		r.debugLogger.LogStep(context.TODO(), "rate_limiter", "crawl_delay_set", debug.FieldMap{
+			"host":           host,
+			"crawl_delay_ms": delay.Milliseconds(),
+		})
 	}
 }
 
@@ -104,18 +129,35 @@ func (r *ConcurrentRateLimiter) Backoff(host string) {
 	if r.rng == nil {
 		r.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
+
+	var backoffDelay time.Duration
+	var backoffCount int
+
 	if exists {
 		currentHostTiming.backoffCount++
 		currentHostTiming.backoffDelay = timeutil.ExponentialBackoffDelay(currentHostTiming.backoffCount, r.jitter, *r.rng, r.backoffParam)
+		backoffDelay = currentHostTiming.backoffDelay
+		backoffCount = currentHostTiming.backoffCount
 		r.hostTimings[host] = currentHostTiming
 	} else {
 		// Initialize with backoffCount=1
+		backoffDelay = timeutil.ExponentialBackoffDelay(1, r.jitter, *r.rng, r.backoffParam)
+		backoffCount = 1
 		r.hostTimings[host] = hostTiming{
 			backoffCount: 1,
-			backoffDelay: timeutil.ExponentialBackoffDelay(1, r.jitter, *r.rng, r.backoffParam),
+			backoffDelay: backoffDelay,
 		}
 	}
 	r.rngMu.Unlock()
+
+	// Log backoff triggered if debug enabled
+	if r.debugLogger.Enabled() {
+		r.debugLogger.LogStep(context.TODO(), "rate_limiter", "backoff_triggered", debug.FieldMap{
+			"host":             host,
+			"backoff_count":    backoffCount,
+			"backoff_delay_ms": backoffDelay.Milliseconds(),
+		})
+	}
 }
 
 // ResetBackoff resets the backoff counter for the given host.
@@ -165,6 +207,7 @@ func (r *ConcurrentRateLimiter) ResolveDelay(host string) time.Duration {
 	currentHostTiming, exists := r.hostTimings[host]
 	base := r.baseDelay
 	jitter := r.jitter
+	logger := r.debugLogger
 	r.mu.RUnlock()
 
 	// return no delay if the host not registered yet
@@ -177,23 +220,44 @@ func (r *ConcurrentRateLimiter) ResolveDelay(host string) time.Duration {
 	// compute the highest delay between BaseDelay, crawlDelay, and BackoffDelay
 	finalDelay := timeutil.MaxDuration(delays)
 
+	// Determine the rate limit reason based on which delay factor is dominant
+	reason := determineRateLimitReason(base, currentHostTiming.crawlDelay, currentHostTiming.backoffDelay)
+
 	r.rngMu.Lock()
 	// add jitter to the final delay (computeJitter protects rng)
 	if r.rng == nil {
 		r.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
-	finalDelay += timeutil.ComputeJitter(jitter, *r.rng)
+	jitterAmount := timeutil.ComputeJitter(jitter, *r.rng)
+	finalDelay += jitterAmount
 	r.rngMu.Unlock()
 
 	elapsed := time.Since(currentHostTiming.lastFetchAt)
 
-	// return the remaining time since the host last been fetched,
-	// else don't delay
+	// Calculate the remaining delay
+	var remainingDelay time.Duration
 	if elapsed < finalDelay {
-		return finalDelay - elapsed
+		remainingDelay = finalDelay - elapsed
 	}
 
-	return time.Duration(0)
+	// Log rate limit decision if debug enabled
+	if logger.Enabled() {
+		logger.LogRateLimit(context.TODO(), host, remainingDelay, reason)
+	}
+
+	return remainingDelay
+}
+
+// determineRateLimitReason determines which delay factor is dominant
+func determineRateLimitReason(baseDelay, crawlDelay, backoffDelay time.Duration) debug.RateLimitReason {
+	// Determine the reason based on which delay factor is dominant
+	if backoffDelay >= baseDelay && backoffDelay >= crawlDelay {
+		return debug.RateLimitReasonBackoff
+	}
+	if crawlDelay >= baseDelay && crawlDelay >= backoffDelay {
+		return debug.RateLimitReasonCrawlDelay
+	}
+	return debug.RateLimitReasonBaseDelay
 }
 
 func (r *ConcurrentRateLimiter) BaseDelay() time.Duration {

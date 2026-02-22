@@ -18,6 +18,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/scheduler"
 	"github.com/rohmanhakim/docs-crawler/internal/stagedump"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/net/html"
@@ -495,6 +496,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
+		debug.NewNoOpLogger(),
 	)
 
 	tmpDir := t.TempDir()
@@ -599,6 +601,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
+		debug.NewNoOpLogger(),
 	)
 
 	tmpDir := t.TempDir()

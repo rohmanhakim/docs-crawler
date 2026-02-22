@@ -7,6 +7,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/html"
@@ -25,7 +26,9 @@ func TestSanitize_SuccessCases(t *testing.T) {
 		t.Run(fixture, func(t *testing.T) {
 			// Arrange
 			mockSink := &mockMetadataSink{}
+			mockLogger := debugtest.NewLoggerMock()
 			s := sanitizer.NewHTMLSanitizer(mockSink)
+			s.SetDebugLogger(mockLogger)
 
 			fixtureBytes := loadFixture(t, fixture)
 			doc, err := html.Parse(strings.NewReader(string(fixtureBytes)))
@@ -42,6 +45,14 @@ func TestSanitize_SuccessCases(t *testing.T) {
 			require.Len(t, mockSink.PipelineEvents, 1, "Successful sanitization should emit one PipelineEvent")
 			assert.Equal(t, metadata.StageSanitize, mockSink.PipelineEvents[0].Stage())
 			assert.True(t, mockSink.PipelineEvents[0].Success())
+
+			// Assert debug logging was called
+			assert.True(t, mockLogger.LogStepCalled, "Debug logging should be called for successful sanitization")
+			steps := mockLogger.StepsByStage("sanitizer")
+			assert.True(t, hasStep(steps, "validate_input"), "Should log validate_input step")
+			assert.True(t, hasStep(steps, "check_repairable"), "Should log check_repairable step")
+			assert.True(t, hasStep(steps, "normalize_headings"), "Should log normalize_headings step")
+			assert.True(t, hasStep(steps, "extract_urls"), "Should log extract_urls step")
 		})
 	}
 }
@@ -152,7 +163,9 @@ func TestSanitize_StructurallyInvalidCases(t *testing.T) {
 func TestSanitize_NilNode(t *testing.T) {
 	// Arrange
 	mockSink := &mockMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	s := sanitizer.NewHTMLSanitizer(mockSink)
+	s.SetDebugLogger(mockLogger)
 
 	// Act - pass nil node
 	result, err := s.Sanitize(nil)
@@ -161,12 +174,27 @@ func TestSanitize_NilNode(t *testing.T) {
 	assert.Error(t, err, "Sanitize should return error for nil node")
 	assert.Nil(t, result.GetContentNode(), "Result should have nil content node")
 	assert.NotEmpty(t, mockSink.ErrorRecords, "Error should be recorded in metadata sink")
+
+	// Assert debug logging for error path
+	assert.True(t, mockLogger.LogStepCalled, "Debug logging should be called for nil node")
+	steps := mockLogger.StepsByStage("sanitizer")
+	assert.True(t, hasStep(steps, "validate_input"), "Should log validate_input step")
+	// Verify the logged has_content field is false
+	for _, step := range steps {
+		if step.Step == "validate_input" {
+			hasContent, ok := step.Fields["has_content"].(bool)
+			assert.True(t, ok, "has_content should be a bool")
+			assert.False(t, hasContent, "has_content should be false for nil node")
+		}
+	}
 }
 
 func TestSanitize_EmptyNode(t *testing.T) {
 	// Arrange
 	mockSink := &mockMetadataSink{}
+	mockLogger := debugtest.NewLoggerMock()
 	s := sanitizer.NewHTMLSanitizer(mockSink)
+	s.SetDebugLogger(mockLogger)
 
 	// Create an empty node with no children
 	emptyNode := &html.Node{
@@ -181,6 +209,19 @@ func TestSanitize_EmptyNode(t *testing.T) {
 	assert.Error(t, err, "Sanitize should return error for empty node (no children)")
 	assert.Nil(t, result.GetContentNode(), "Result should have nil content node")
 	assert.NotEmpty(t, mockSink.ErrorRecords, "Error should be recorded in metadata sink")
+
+	// Assert debug logging for error path
+	assert.True(t, mockLogger.LogStepCalled, "Debug logging should be called for empty node")
+	steps := mockLogger.StepsByStage("sanitizer")
+	assert.True(t, hasStep(steps, "validate_input"), "Should log validate_input step")
+	// Verify the logged has_content field is false
+	for _, step := range steps {
+		if step.Step == "validate_input" {
+			hasContent, ok := step.Fields["has_content"].(bool)
+			assert.True(t, ok, "has_content should be a bool")
+			assert.False(t, hasContent, "has_content should be false for empty node")
+		}
+	}
 }
 
 func TestSanitize_ReturnsSanitizationErrorType(t *testing.T) {

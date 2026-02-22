@@ -135,6 +135,16 @@ type Config struct {
 	// Used for noise suppression when elements pass the extractor's heuristics
 	// but should still be removed (e.g., promo banners, feedback widgets).
 	selectorBlacklist []string
+
+	//===============
+	// Debug Logging
+	//===============
+	// Enable debug logging output
+	debug bool
+	// File path for debug logs (empty means stdout only)
+	debugFile string
+	// Debug output format: "json" or "text"
+	debugFormat string
 }
 
 type configDTO struct {
@@ -175,6 +185,10 @@ type configDTO struct {
 	HashAlgo                            *string  `json:"hashAlgo,omitempty"`
 	// Selector blacklist for noise suppression
 	SelectorBlacklist *[]string `json:"selectorBlacklist,omitempty"`
+	// Debug logging configuration
+	Debug       *bool   `json:"debug,omitempty"`
+	DebugFile   *string `json:"debugFile,omitempty"`
+	DebugFormat *string `json:"debugFormat,omitempty"`
 }
 
 func newConfigFromDTO(dto configDTO) (Config, error) {
@@ -300,6 +314,17 @@ func newConfigFromDTO(dto configDTO) (Config, error) {
 	// SelectorBlacklist - override if provided (pointer not nil)
 	if dto.SelectorBlacklist != nil {
 		cfg.selectorBlacklist = *dto.SelectorBlacklist
+	}
+
+	// Debug logging configuration
+	if dto.Debug != nil {
+		cfg.debug = *dto.Debug
+	}
+	if dto.DebugFile != nil {
+		cfg.debugFile = *dto.DebugFile
+	}
+	if dto.DebugFormat != nil {
+		cfg.debugFormat = *dto.DebugFormat
 	}
 
 	return cfg, nil
@@ -548,6 +573,21 @@ func (c *Config) WithSelectorBlacklist(selectors []string) *Config {
 	return c
 }
 
+func (c *Config) WithDebug(debug bool) *Config {
+	c.debug = debug
+	return c
+}
+
+func (c *Config) WithDebugFile(file string) *Config {
+	c.debugFile = file
+	return c
+}
+
+func (c *Config) WithDebugFormat(format string) *Config {
+	c.debugFormat = format
+	return c
+}
+
 func (c *Config) Build() (Config, error) {
 	if len(c.seedURLs) == 0 {
 		return Config{}, fmt.Errorf("%w: seedUrls cannot be empty", ErrInvalidConfig)
@@ -714,4 +754,16 @@ func (c Config) SelectorBlacklist() []string {
 	selectors := make([]string, len(c.selectorBlacklist))
 	copy(selectors, c.selectorBlacklist)
 	return selectors
+}
+
+func (c Config) Debug() bool {
+	return c.debug
+}
+
+func (c Config) DebugFile() string {
+	return c.debugFile
+}
+
+func (c Config) DebugFormat() string {
+	return c.debugFormat
 }

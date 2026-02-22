@@ -14,6 +14,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -996,6 +997,149 @@ func TestResolve_QueryParamsPreserved(t *testing.T) {
 	output := string(doc.Content())
 	assert.NotContains(t, output, "s=35268aa0ad50b8c385913810e7604550", "Document should have local path, not original URL")
 	assert.Contains(t, output, "assets/images/", "Document should contain local asset path")
+}
+
+// TestResolve_DebugLogging_SuccessfulFetch tests that debug logging is called correctly
+// for a successful asset fetch.
+func TestResolve_DebugLogging_SuccessfulFetch(t *testing.T) {
+	// Arrange - create a mock HTTP server that returns a valid image response
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("fake-image-data"))
+	}))
+	defer server.Close()
+
+	mockSink := &metadataSinkMock{}
+	mockLogger := debugtest.NewLoggerMock()
+	resolver := newTestResolverWithLogger(mockSink, mockLogger)
+
+	tempDir := t.TempDir()
+	imageURL := server.URL + "/image.png"
+	linkRefs := []mdconvert.LinkRef{
+		mdconvert.NewLinkRef(imageURL, mdconvert.KindImage),
+	}
+	inputMarkdown := "# Test\n\n![Alt text](" + imageURL + ")"
+	conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+	pageUrl, _ := url.Parse(server.URL + "/page")
+
+	// Act
+	ctx := context.Background()
+	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
+	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+
+	// Assert - no error
+	assert.NoError(t, err)
+
+	// Assert - debug logging was called
+	assert.True(t, mockLogger.LogStepCalled, "LogStep should be called")
+
+	// Verify key steps are present
+	steps := mockLogger.StepsByStage("assets")
+	assert.GreaterOrEqual(t, len(steps), 4, "Should have at least 4 debug steps")
+
+	// Verify extract_image_urls step
+	extractSteps := mockLogger.StepsByName("extract_image_urls")
+	assert.Equal(t, 1, len(extractSteps), "Should have 1 extract_image_urls step")
+	assert.Equal(t, 1, extractSteps[0].Fields["count"], "Should have 1 image URL")
+
+	// Verify deduplicate_assets step
+	dedupSteps := mockLogger.StepsByName("deduplicate_assets")
+	assert.Equal(t, 1, len(dedupSteps), "Should have 1 deduplicate_assets step")
+	assert.Equal(t, 1, dedupSteps[0].Fields["input_count"], "Input count should be 1")
+	assert.Equal(t, 1, dedupSteps[0].Fields["output_count"], "Output count should be 1")
+
+	// Verify resolve_asset step
+	resolveSteps := mockLogger.StepsByName("resolve_asset")
+	assert.Equal(t, 1, len(resolveSteps), "Should have 1 resolve_asset step")
+	assert.Equal(t, imageURL, resolveSteps[0].Fields["asset_url"], "Asset URL should match")
+
+	// Verify asset_fetched step
+	fetchedSteps := mockLogger.StepsByName("asset_fetched")
+	assert.Equal(t, 1, len(fetchedSteps), "Should have 1 asset_fetched step")
+	assert.Equal(t, http.StatusOK, fetchedSteps[0].Fields["status_code"], "Status code should be 200")
+
+	// Verify asset_written step
+	writtenSteps := mockLogger.StepsByName("asset_written")
+	assert.Equal(t, 1, len(writtenSteps), "Should have 1 asset_written step")
+	assert.Contains(t, writtenSteps[0].Fields["local_path"], "assets/images/", "Local path should contain assets/images/")
+}
+
+// TestResolve_DebugLogging_FailedFetch tests that debug logging is called correctly
+// for a failed asset fetch.
+func TestResolve_DebugLogging_FailedFetch(t *testing.T) {
+	// Arrange - create a mock HTTP server that returns 404 error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	mockSink := &metadataSinkMock{}
+	mockLogger := debugtest.NewLoggerMock()
+	resolver := newTestResolverWithLogger(mockSink, mockLogger)
+
+	tempDir := t.TempDir()
+	imageURL := server.URL + "/missing-image.png"
+	linkRefs := []mdconvert.LinkRef{
+		mdconvert.NewLinkRef(imageURL, mdconvert.KindImage),
+	}
+	inputMarkdown := "# Test\n\n![Alt text](" + imageURL + ")"
+	conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+	pageUrl, _ := url.Parse(server.URL + "/page")
+
+	// Act
+	ctx := context.Background()
+	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
+	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+
+	// Assert - no error from Resolve (missing assets are reported, not fatal)
+	assert.NoError(t, err)
+
+	// Verify asset_failed step is logged
+	failedSteps := mockLogger.StepsByName("asset_failed")
+	assert.Equal(t, 1, len(failedSteps), "Should have 1 asset_failed step")
+	assert.Equal(t, imageURL, failedSteps[0].Fields["asset_url"], "Asset URL should match")
+	assert.Contains(t, failedSteps[0].Fields["error"], "client error: 404", "Error message should contain 404")
+}
+
+// TestResolve_DebugLogging_ContentHashDedup tests that debug logging is called correctly
+// for content-hash deduplication.
+func TestResolve_DebugLogging_ContentHashDedup(t *testing.T) {
+	// Arrange - two different URLs returning identical content
+	sharedContent := []byte("shared-image-content")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(sharedContent)
+	}))
+	defer server.Close()
+
+	mockSink := &metadataSinkMock{}
+	mockLogger := debugtest.NewLoggerMock()
+	resolver := newTestResolverWithLogger(mockSink, mockLogger)
+
+	tempDir := t.TempDir()
+	url1 := server.URL + "/image1.png"
+	url2 := server.URL + "/image2.png"
+	linkRefs := []mdconvert.LinkRef{
+		mdconvert.NewLinkRef(url1, mdconvert.KindImage),
+		mdconvert.NewLinkRef(url2, mdconvert.KindImage),
+	}
+	inputMarkdown := "![Img1](" + url1 + ")\n\n![Img2](" + url2 + ")"
+	conversionResult := mdconvert.NewConversionResult([]byte(inputMarkdown), linkRefs)
+	pageUrl, _ := url.Parse(server.URL + "/page")
+
+	// Act
+	ctx := context.Background()
+	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
+	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+
+	// Assert - no error
+	assert.NoError(t, err)
+
+	// Verify asset_content_dedup step is logged for second URL
+	dedupSteps := mockLogger.StepsByName("asset_content_dedup")
+	assert.Equal(t, 1, len(dedupSteps), "Should have 1 asset_content_dedup step for second URL")
+	assert.Contains(t, dedupSteps[0].Fields["asset_url"], "/image2.png", "Dedup should be for second URL")
+	assert.NotEmpty(t, dedupSteps[0].Fields["existing_path"], "Should have existing_path")
 }
 
 // TestResolve_QueryParamsDeduplication tests that URLs with different query params

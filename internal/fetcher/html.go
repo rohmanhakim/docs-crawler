@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 )
@@ -46,6 +47,7 @@ type HtmlFetcher struct {
 	metadataSink metadata.MetadataSink
 	httpClient   *http.Client
 	userAgent    string
+	debugLogger  debug.DebugLogger
 }
 
 func NewHtmlFetcher(
@@ -54,6 +56,7 @@ func NewHtmlFetcher(
 	return HtmlFetcher{
 		metadataSink: metadataSink,
 		httpClient:   nil,
+		debugLogger:  debug.NewNoOpLogger(),
 	}
 }
 
@@ -62,6 +65,17 @@ func NewHtmlFetcher(
 func (h *HtmlFetcher) Init(httpClient *http.Client, userAgent string) {
 	h.httpClient = httpClient
 	h.userAgent = userAgent
+}
+
+// SetDebugLogger sets the debug logger for the fetcher.
+// This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
+func (h *HtmlFetcher) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		h.debugLogger = debug.NewNoOpLogger()
+		return
+	}
+	h.debugLogger = logger
 }
 
 func (h *HtmlFetcher) Fetch(
@@ -176,7 +190,7 @@ func (h *HtmlFetcher) fetchWithRetry(
 		return h.performFetch(ctx, fetchUrl, userAgent)
 	}
 
-	return retry.Retry(retryParam, fetchTask)
+	return retry.Retry(retryParam, h.debugLogger, fetchTask)
 }
 
 func (h *HtmlFetcher) performFetch(
@@ -198,6 +212,15 @@ func (h *HtmlFetcher) performFetch(
 		req.Header.Set(key, value)
 	}
 
+	// Log request creation if debug enabled
+	if h.debugLogger.Enabled() {
+		h.debugLogger.LogStep(ctx, "fetcher", "create_request", debug.FieldMap{
+			"url":        fetchUrl.String(),
+			"method":     http.MethodGet,
+			"user_agent": userAgent,
+		})
+	}
+
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		// Network/transport errors are retryable
@@ -207,6 +230,15 @@ func (h *HtmlFetcher) performFetch(
 		)
 	}
 	defer resp.Body.Close()
+
+	// Log response received if debug enabled
+	if h.debugLogger.Enabled() {
+		h.debugLogger.LogStep(ctx, "fetcher", "response_received", debug.FieldMap{
+			"status_code":    resp.StatusCode,
+			"content_type":   resp.Header.Get("Content-Type"),
+			"content_length": resp.Header.Get("Content-Length"),
+		})
+	}
 
 	// Handle HTTP status codes
 	switch {
@@ -263,6 +295,13 @@ func (h *HtmlFetcher) performFetch(
 			ErrCauseReadResponseBodyError,
 			fmt.Sprintf("failed to read response body: %v", err),
 		)
+	}
+
+	// Log body read if debug enabled
+	if h.debugLogger.Enabled() {
+		h.debugLogger.LogStep(ctx, "fetcher", "body_read", debug.FieldMap{
+			"body_size": len(body),
+		})
 	}
 
 	// Build response headers map

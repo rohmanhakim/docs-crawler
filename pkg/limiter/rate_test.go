@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
@@ -41,7 +43,9 @@ func TestNewConcurrentRateLimiter(t *testing.T) {
 }
 
 func TestRateLimiter_SetCrawlDelay(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetDebugLogger(mock)
 	rl.SetBaseDelay(1 * time.Second)
 	rl.SetJitter(100 * time.Millisecond)
 	rl.SetRandomSeed(42)
@@ -54,10 +58,33 @@ func TestRateLimiter_SetCrawlDelay(t *testing.T) {
 	if timing.CrawlDelay() != newDelay {
 		t.Errorf("crawlDelay = %v, want %v", timing.CrawlDelay(), newDelay)
 	}
+
+	// Debug logging assertions
+	if !mock.LogStepCalled {
+		t.Error("expected LogStep to be called")
+	}
+	entry := mock.LastStep()
+	if entry == nil {
+		t.Fatal("expected step entry to be recorded")
+	}
+	if entry.Stage != "rate_limiter" {
+		t.Errorf("expected stage='rate_limiter', got %s", entry.Stage)
+	}
+	if entry.Step != "crawl_delay_set" {
+		t.Errorf("expected step='crawl_delay_set', got %s", entry.Step)
+	}
+	if entry.Fields["host"] != host {
+		t.Errorf("expected fields[host]=%s, got %v", host, entry.Fields["host"])
+	}
+	if entry.Fields["crawl_delay_ms"] != newDelay.Milliseconds() {
+		t.Errorf("expected fields[crawl_delay_ms]=%d, got %v", newDelay.Milliseconds(), entry.Fields["crawl_delay_ms"])
+	}
 }
 
 func TestRateLimiter_Backoff(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetDebugLogger(mock)
 	rl.SetBaseDelay(1 * time.Second)
 	rl.SetJitter(0) // Disable jitter for predictable tests
 	rl.SetRandomSeed(42)
@@ -71,6 +98,27 @@ func TestRateLimiter_Backoff(t *testing.T) {
 	}
 	if timing1.BackOffDelay() != 1*time.Second {
 		t.Errorf("backoffDelay after first Backoff = %v, want 1s", timing1.BackOffDelay())
+	}
+
+	// Debug logging assertions for first backoff
+	if !mock.LogStepCalled {
+		t.Error("expected LogStep to be called")
+	}
+	entry1 := mock.LastStep()
+	if entry1 == nil {
+		t.Fatal("expected step entry for first backoff")
+	}
+	if entry1.Stage != "rate_limiter" {
+		t.Errorf("expected stage='rate_limiter', got %s", entry1.Stage)
+	}
+	if entry1.Step != "backoff_triggered" {
+		t.Errorf("expected step='backoff_triggered', got %s", entry1.Step)
+	}
+	if entry1.Fields["host"] != host {
+		t.Errorf("expected fields[host]=%s, got %v", host, entry1.Fields["host"])
+	}
+	if entry1.Fields["backoff_count"] != 1 {
+		t.Errorf("expected fields[backoff_count]=1, got %v", entry1.Fields["backoff_count"])
 	}
 
 	// Second backoff
@@ -95,6 +143,11 @@ func TestRateLimiter_Backoff(t *testing.T) {
 	expected3 := 4 * time.Second
 	if timing3.BackOffDelay() != expected3 {
 		t.Errorf("backoffDelay after third Backoff = %v, want %v", timing3.BackOffDelay(), expected3)
+	}
+
+	// Verify total log entries
+	if len(mock.StepEntries) != 3 {
+		t.Errorf("expected 3 step entries for 3 backoffs, got %d", len(mock.StepEntries))
 	}
 }
 
@@ -164,7 +217,9 @@ func TestRateLimiter_ResolveDelay_UnregisteredHost(t *testing.T) {
 }
 
 func TestRateLimiter_ResolveDelay_BaseDelayOnly(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetDebugLogger(mock)
 	rl.SetBaseDelay(500 * time.Millisecond)
 	rl.SetJitter(0)
 	rl.SetRandomSeed(42)
@@ -178,6 +233,21 @@ func TestRateLimiter_ResolveDelay_BaseDelayOnly(t *testing.T) {
 	// Allow small margin for elapsed time
 	if delay < 490*time.Millisecond || delay > 500*time.Millisecond {
 		t.Errorf("ResolveDelay = %v, want approximately 500ms", delay)
+	}
+
+	// Debug logging assertions
+	if !mock.LogRateLimitCalled {
+		t.Error("expected LogRateLimit to be called")
+	}
+	entry := mock.LastRateLimit()
+	if entry == nil {
+		t.Fatal("expected rate limit entry to be recorded")
+	}
+	if entry.Host != host {
+		t.Errorf("expected host=%s, got %s", host, entry.Host)
+	}
+	if entry.Reason != debug.RateLimitReasonBaseDelay {
+		t.Errorf("expected reason=RateLimitReasonBaseDelay, got %v", entry.Reason)
 	}
 }
 
@@ -283,7 +353,9 @@ func TestRateLimiter_ResolveDelay_ElapsedTime(t *testing.T) {
 }
 
 func TestRateLimiter_ResolveDelay_CrawlDelayOverridesBase(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetDebugLogger(mock)
 	rl.SetBaseDelay(100 * time.Millisecond)
 	rl.SetJitter(0)
 	rl.SetRandomSeed(42)
@@ -298,10 +370,24 @@ func TestRateLimiter_ResolveDelay_CrawlDelayOverridesBase(t *testing.T) {
 	if delay < 490*time.Millisecond {
 		t.Errorf("ResolveDelay = %v, want at least 490ms (crawlDelay should override)", delay)
 	}
+
+	// Debug logging assertions
+	if !mock.LogRateLimitCalled {
+		t.Error("expected LogRateLimit to be called")
+	}
+	entry := mock.LastRateLimit()
+	if entry == nil {
+		t.Fatal("expected rate limit entry to be recorded")
+	}
+	if entry.Reason != debug.RateLimitReasonCrawlDelay {
+		t.Errorf("expected reason=RateLimitReasonCrawlDelay, got %v", entry.Reason)
+	}
 }
 
 func TestRateLimiter_ResolveDelay_BackoffDelayTakesPrecedence(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
 	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetDebugLogger(mock)
 	rl.SetBaseDelay(100 * time.Millisecond)
 	rl.SetJitter(0)
 	rl.SetRandomSeed(42)
@@ -317,6 +403,18 @@ func TestRateLimiter_ResolveDelay_BackoffDelayTakesPrecedence(t *testing.T) {
 	// Should use backoffDelay (1s) as it's the maximum
 	if delay < 990*time.Millisecond {
 		t.Errorf("ResolveDelay = %v, want at least 990ms (backoffDelay should take precedence)", delay)
+	}
+
+	// Debug logging assertions
+	if !mock.LogRateLimitCalled {
+		t.Error("expected LogRateLimit to be called")
+	}
+	entry := mock.LastRateLimit()
+	if entry == nil {
+		t.Fatal("expected rate limit entry to be recorded")
+	}
+	if entry.Reason != debug.RateLimitReasonBackoff {
+		t.Errorf("expected reason=RateLimitReasonBackoff, got %v", entry.Reason)
 	}
 }
 
@@ -461,7 +559,9 @@ func TestRateLimiter_ResolveDelay_WithJitter(t *testing.T) {
 
 func TestRateLimiter_CompleteFlow(t *testing.T) {
 	// Integration test for complete flow
+	mock := debugtest.NewLoggerMock()
 	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetDebugLogger(mock)
 	rl.SetBaseDelay(100 * time.Millisecond)
 	rl.SetJitter(10 * time.Millisecond)
 	rl.SetRandomSeed(42)
@@ -500,6 +600,23 @@ func TestRateLimiter_CompleteFlow(t *testing.T) {
 	finalDelay := rl.ResolveDelay(host)
 	if finalDelay != 0 {
 		t.Errorf("Final delay after elapsed time = %v, want 0", finalDelay)
+	}
+
+	// Debug logging assertions - verify total calls
+	// Should have: 1 crawl_delay_set + 1 backoff_triggered + 4 resolve_delay calls
+	if !mock.LogStepCalled {
+		t.Error("expected LogStep to be called")
+	}
+	if !mock.LogRateLimitCalled {
+		t.Error("expected LogRateLimit to be called")
+	}
+	// At least 1 step entry for SetCrawlDelay and 1 for Backoff
+	if len(mock.StepEntries) < 2 {
+		t.Errorf("expected at least 2 step entries, got %d", len(mock.StepEntries))
+	}
+	// At least 4 rate limit entries for the 4 ResolveDelay calls
+	if len(mock.RateLimitEntries) < 4 {
+		t.Errorf("expected at least 4 rate limit entries, got %d", len(mock.RateLimitEntries))
 	}
 }
 
@@ -669,5 +786,42 @@ func TestRateLimiter_ResolveDelay_WithNilRng(t *testing.T) {
 	// Should return baseDelay approximately (since no crawlDelay/backoff)
 	if delay < 490*time.Millisecond || delay > 500*time.Millisecond {
 		t.Errorf("ResolveDelay = %v, want approximately 500ms", delay)
+	}
+}
+
+// TestRateLimiter_DisabledLogger verifies that no logging occurs when logger is disabled
+func TestRateLimiter_DisabledLogger(t *testing.T) {
+	mock := debugtest.NewLoggerMock()
+	mock.SetEnabled(false)
+
+	rl := limiter.NewConcurrentRateLimiter()
+	rl.SetDebugLogger(mock)
+	rl.SetBaseDelay(100 * time.Millisecond)
+	rl.SetJitter(0)
+	rl.SetRandomSeed(42)
+	host := "example.com"
+
+	// SetCrawlDelay - should not log
+	rl.SetCrawlDelay(host, 500*time.Millisecond)
+
+	// Backoff - should not log
+	rl.Backoff(host)
+
+	// ResolveDelay - should not log
+	rl.MarkLastFetchAsNow(host)
+	_ = rl.ResolveDelay(host)
+
+	// Debug logging assertions - disabled logger should not record any entries
+	if mock.LogStepCalled {
+		t.Error("expected LogStep NOT to be called when logger is disabled")
+	}
+	if mock.LogRateLimitCalled {
+		t.Error("expected LogRateLimit NOT to be called when logger is disabled")
+	}
+	if len(mock.StepEntries) != 0 {
+		t.Errorf("expected 0 step entries when logger disabled, got %d", len(mock.StepEntries))
+	}
+	if len(mock.RateLimitEntries) != 0 {
+		t.Errorf("expected 0 rate limit entries when logger disabled, got %d", len(mock.RateLimitEntries))
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots/cache"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 )
 
 /*
@@ -37,6 +38,7 @@ type CachedRobot struct {
 	metadataSink metadata.MetadataSink
 	fetcher      *RobotsFetcher
 	userAgent    string
+	debugLogger  debug.DebugLogger
 }
 
 // NewCachedRobot creates a new empty Robot instance.
@@ -44,6 +46,7 @@ type CachedRobot struct {
 func NewCachedRobot(metadataSink metadata.MetadataSink) CachedRobot {
 	return CachedRobot{
 		metadataSink: metadataSink,
+		debugLogger:  debug.NewNoOpLogger(),
 	}
 }
 
@@ -67,6 +70,17 @@ func (r *CachedRobot) InitWithCache(userAgent string, httpClient *http.Client, c
 
 	r.fetcher = fetcher
 	r.userAgent = userAgent
+}
+
+// SetDebugLogger sets the debug logger for the robot.
+// This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
+func (r *CachedRobot) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		r.debugLogger = debug.NewNoOpLogger()
+		return
+	}
+	r.debugLogger = logger
 }
 
 // Decide determines whether a URL is allowed to be crawled based on robots.txt rules.
@@ -106,11 +120,29 @@ func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 		))
 	}
 
+	// Log robots fetch if debug enabled
+	if r.debugLogger.Enabled() {
+		r.debugLogger.LogStep(context.TODO(), "robots", "robots_fetch", debug.FieldMap{
+			"host":        targetURL.Host,
+			"from_cache":  fetchResult.FromCache,
+			"http_status": fetchResult.HTTPStatus,
+		})
+	}
+
 	// Map the fetch result to a ruleSet for decision making
 	rs := MapResponseToRuleSet(fetchResult.Response, r.userAgent, fetchResult.FetchedAt)
 
+	// Log parse rules if debug enabled
+	if r.debugLogger.Enabled() {
+		r.debugLogger.LogStep(context.TODO(), "robots", "parse_rules", debug.FieldMap{
+			"allow_rules_count":    len(rs.allowRules),
+			"disallow_rules_count": len(rs.disallowRules),
+			"crawl_delay_ms":       rs.CrawlDelay().Milliseconds(),
+		})
+	}
+
 	// Make the decision using the private decide function
-	decision, decideErr := decide(rs, targetURL)
+	decision, decideErr := r.decide(rs, targetURL)
 	if decideErr != nil {
 		var robotsError *RobotsError
 		if errors.As(decideErr, &robotsError) {
@@ -145,7 +177,7 @@ func (r *CachedRobot) Decide(targetURL url.URL) (Decision, *RobotsError) {
 // - Allow rules take precedence over disallow rules of the same length
 // - Wildcards (*) match any sequence of characters
 // - The $ wildcard indicates the end of the URL
-func decide(rs ruleSet, targetURL url.URL) (Decision, *RobotsError) {
+func (r *CachedRobot) decide(rs ruleSet, targetURL url.URL) (Decision, *RobotsError) {
 	// Check if there are no rules at all (empty ruleSet means allow all)
 	if len(rs.allowRules) == 0 && len(rs.disallowRules) == 0 {
 		// Distinguish between:
@@ -155,12 +187,21 @@ func decide(rs ruleSet, targetURL url.URL) (Decision, *RobotsError) {
 		if rs.hasGroups && !rs.matchedGroup {
 			reason = UserAgentNotMatched
 		}
-		return Decision{
+		decision := Decision{
 			Url:        targetURL,
 			Allowed:    true,
 			Reason:     reason,
 			CrawlDelay: rs.CrawlDelay(),
-		}, nil
+		}
+		// Log decision made if debug enabled
+		if r.debugLogger.Enabled() {
+			r.debugLogger.LogStep(context.TODO(), "robots", "decision_made", debug.FieldMap{
+				"allowed":        decision.Allowed,
+				"reason":         string(decision.Reason),
+				"crawl_delay_ms": decision.CrawlDelay.Milliseconds(),
+			})
+		}
+		return decision, nil
 	}
 
 	path := targetURL.Path
@@ -198,6 +239,16 @@ func decide(rs ruleSet, targetURL url.URL) (Decision, *RobotsError) {
 				priority: priority,
 			}
 			hasMatch = true
+
+			// Log match_rules if debug enabled
+			if r.debugLogger.Enabled() {
+				r.debugLogger.LogStep(context.TODO(), "robots", "match_rules", debug.FieldMap{
+					"path":         path,
+					"matched_rule": rule.prefix,
+					"match_type":   matchTypeString(matchType),
+					"rule_type":    "allow",
+				})
+			}
 		}
 	}
 
@@ -223,17 +274,36 @@ func decide(rs ruleSet, targetURL url.URL) (Decision, *RobotsError) {
 				priority: priority,
 			}
 			hasMatch = true
+
+			// Log match_rules if debug enabled
+			if r.debugLogger.Enabled() {
+				r.debugLogger.LogStep(context.TODO(), "robots", "match_rules", debug.FieldMap{
+					"path":         path,
+					"matched_rule": rule.prefix,
+					"match_type":   matchTypeString(matchType),
+					"rule_type":    "disallow",
+				})
+			}
 		}
 	}
 
 	// If no rules matched, the URL is allowed (default allow)
 	if !hasMatch {
-		return Decision{
+		decision := Decision{
 			Url:        targetURL,
 			Allowed:    true,
 			Reason:     NoMatchingRules,
 			CrawlDelay: rs.CrawlDelay(),
-		}, nil
+		}
+		// Log decision made if debug enabled
+		if r.debugLogger.Enabled() {
+			r.debugLogger.LogStep(context.TODO(), "robots", "decision_made", debug.FieldMap{
+				"allowed":        decision.Allowed,
+				"reason":         string(decision.Reason),
+				"crawl_delay_ms": decision.CrawlDelay.Milliseconds(),
+			})
+		}
+		return decision, nil
 	}
 
 	// Determine the reason
@@ -244,12 +314,23 @@ func decide(rs ruleSet, targetURL url.URL) (Decision, *RobotsError) {
 		reason = DisallowedByRobots
 	}
 
-	return Decision{
+	decision := Decision{
 		Url:        targetURL,
 		Allowed:    bestMatch.isAllow,
 		Reason:     reason,
 		CrawlDelay: rs.CrawlDelay(),
-	}, nil
+	}
+
+	// Log decision made if debug enabled
+	if r.debugLogger.Enabled() {
+		r.debugLogger.LogStep(context.TODO(), "robots", "decision_made", debug.FieldMap{
+			"allowed":        decision.Allowed,
+			"reason":         string(decision.Reason),
+			"crawl_delay_ms": decision.CrawlDelay.Milliseconds(),
+		})
+	}
+
+	return decision, nil
 }
 
 // matchType represents the type of match found
@@ -266,6 +347,20 @@ type matchRule struct {
 	isAllow  bool
 	length   int
 	priority float64
+}
+
+// matchTypeString converts matchType to a string for logging
+func matchTypeString(mt matchType) string {
+	switch mt {
+	case noMatch:
+		return "no_match"
+	case prefixMatch:
+		return "prefix"
+	case exactMatch:
+		return "exact"
+	default:
+		return "unknown"
+	}
 }
 
 // matchesRule checks if a path matches a rule pattern.

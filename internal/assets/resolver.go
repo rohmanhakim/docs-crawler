@@ -16,6 +16,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/fileutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
@@ -58,6 +59,7 @@ type LocalResolver struct {
 	hashToPath    map[string]string // key: contentHash, value: localPath (only for files actually written)
 	httpClient    *http.Client
 	userAgent     string
+	debugLogger   debug.DebugLogger
 }
 
 func NewLocalResolver(
@@ -67,6 +69,7 @@ func NewLocalResolver(
 		metadataSink:  metadataSink,
 		writtenAssets: make(map[string]string),
 		hashToPath:    make(map[string]string),
+		debugLogger:   debug.NewNoOpLogger(),
 	}
 }
 
@@ -75,6 +78,17 @@ func NewLocalResolver(
 func (r *LocalResolver) Init(httpClient *http.Client, userAgent string) {
 	r.httpClient = httpClient
 	r.userAgent = userAgent
+}
+
+// SetDebugLogger sets the debug logger for the resolver.
+// This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
+func (r *LocalResolver) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		r.debugLogger = debug.NewNoOpLogger()
+		return
+	}
+	r.debugLogger = logger
 }
 
 func (r *LocalResolver) WrittenAssets() map[string]string {
@@ -224,8 +238,24 @@ func (r *LocalResolver) resolve(
 		}
 	}
 
+	// Log image URL extraction
+	if r.debugLogger.Enabled() {
+		r.debugLogger.LogStep(ctx, "assets", "extract_image_urls", debug.FieldMap{
+			"count":             len(imageURLs),
+			"unparseable_count": len(unparseableURLs),
+		})
+	}
+
 	// Mechanically deduplicate the asset URLs
 	deduplicatedAssetsUrls := r.mechanicalDeduplicate(imageURLs, host, scheme)
+
+	// Log deduplication result
+	if r.debugLogger.Enabled() {
+		r.debugLogger.LogStep(ctx, "assets", "deduplicate_assets", debug.FieldMap{
+			"input_count":  len(imageURLs),
+			"output_count": len(deduplicatedAssetsUrls),
+		})
+	}
 
 	// Track missing asset URLs for this call (with error cause)
 	missingAssetErrors := make(map[string]AssetsErrorCause)
@@ -244,12 +274,27 @@ func (r *LocalResolver) resolve(
 			canonicalAssetURL := urlutil.Canonicalize(assetURL)
 			canonicalKey := canonicalAssetURL.String()
 
+			// Log resolve_asset step
+			if r.debugLogger.Enabled() {
+				r.debugLogger.LogStep(ctx, "assets", "resolve_asset", debug.FieldMap{
+					"asset_url":     assetURL.String(),
+					"canonical_url": canonicalKey,
+				})
+			}
+
 			result := r.fetchAssetWithRetry(ctx, assetURL, r.userAgent, retryParam, resolveParam.MaxAssetSize())
 
 			// Calculate retry count (attempts - 1, since first try is not a retry)
 			retryCount := result.Attempts() - 1
 
 			if result.Err() != nil {
+				// Log asset_failed step
+				if r.debugLogger.Enabled() {
+					r.debugLogger.LogStep(ctx, "assets", "asset_failed", debug.FieldMap{
+						"asset_url": assetURL.String(),
+						"error":     result.Err().Error(),
+					})
+				}
 				// Record missing asset URL with error cause
 				var assetsErr *AssetsError
 				if errors.As(result.Err(), &assetsErr) {
@@ -266,6 +311,16 @@ func (r *LocalResolver) resolve(
 			fetchResult := result.Value()
 			fetchCallback(retryCount, fetchResult)
 
+			// Log asset_fetched step
+			if r.debugLogger.Enabled() {
+				r.debugLogger.LogStep(ctx, "assets", "asset_fetched", debug.FieldMap{
+					"asset_url":   assetURL.String(),
+					"status_code": fetchResult.Status(),
+					"size_bytes":  len(fetchResult.Data()),
+					"duration_ms": fetchResult.Duration().Milliseconds(),
+				})
+			}
+
 			// Hash the content using the configured hash algorithm
 			assetData := fetchResult.Data()
 			contentHash, hashErr := hashutil.HashBytes(assetData, resolveParam.HashAlgo())
@@ -280,6 +335,14 @@ func (r *LocalResolver) resolve(
 
 			// Check if content hash already exists (content-hash deduplication)
 			if existingPath := r.findPathByHash(contentHash); existingPath != "" {
+				// Log content-hash deduplication skip
+				if r.debugLogger.Enabled() {
+					r.debugLogger.LogStep(ctx, "assets", "asset_content_dedup", debug.FieldMap{
+						"asset_url":     assetURL.String(),
+						"content_hash":  contentHash[:7],
+						"existing_path": existingPath,
+					})
+				}
 				// Content already written from different URL, add new URL entry with same hash
 				// DON'T call assetCallback - no new write happened
 				// Store using canonical key (without query params) for consistent lookup
@@ -298,6 +361,16 @@ func (r *LocalResolver) resolve(
 					missingAssetErrors[assetURL.String()] = ErrCauseWriteFailure
 				}
 				continue
+			}
+
+			// Log asset_written step
+			if r.debugLogger.Enabled() {
+				r.debugLogger.LogStep(ctx, "assets", "asset_written", debug.FieldMap{
+					"asset_url":    assetURL.String(),
+					"local_path":   localPath,
+					"content_hash": contentHash[:7],
+					"size_bytes":   len(assetData),
+				})
 			}
 
 			// Record successfully written asset using canonical key (without query params)
@@ -383,7 +456,7 @@ func (r *LocalResolver) fetchAssetWithRetry(
 		return r.performFetch(ctx, fetchUrl, userAgent, maxAssetSize)
 	}
 
-	result := retry.Retry(retryParam, fetchTask)
+	result := retry.Retry(retryParam, r.debugLogger, fetchTask)
 
 	return result
 }

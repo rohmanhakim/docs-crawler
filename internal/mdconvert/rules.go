@@ -1,6 +1,7 @@
 package mdconvert
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/sanitizer"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"golang.org/x/net/html"
 )
@@ -44,19 +46,32 @@ var _ ConvertRule = (*StrictConversionRule)(nil)
 
 type StrictConversionRule struct {
 	metadataSink metadata.MetadataSink
+	debugLogger  debug.DebugLogger
 }
 
 func NewRule(metadataSink metadata.MetadataSink) *StrictConversionRule {
 	return &StrictConversionRule{
 		metadataSink: metadataSink,
+		debugLogger:  debug.NewNoOpLogger(),
 	}
+}
+
+// SetDebugLogger sets the debug logger for the converter.
+// This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
+func (s *StrictConversionRule) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		s.debugLogger = debug.NewNoOpLogger()
+		return
+	}
+	s.debugLogger = logger
 }
 
 func (s *StrictConversionRule) Convert(
 	sanitizedHTMLDoc sanitizer.SanitizedHTMLDoc,
 	pageURL string,
 ) (ConversionResult, failure.ClassifiedError) {
-	consversionResult, err := convert(sanitizedHTMLDoc.GetContentNode())
+	consversionResult, err := s.convert(sanitizedHTMLDoc.GetContentNode())
 	if err != nil {
 		var conversionError *ConversionError
 		errors.As(err, &conversionError)
@@ -84,16 +99,22 @@ func (s *StrictConversionRule) Convert(
 	return consversionResult, nil
 }
 
-// convert is a stateless pure function that transforms a sanitized HTML node
-// into a ConversionResult containing markdown content.
+// convert transforms a sanitized HTML node into a ConversionResult containing markdown content.
 // It uses the html-to-markdown/v2 library for deterministic, semantic conversion.
-func convert(htmlDoc *html.Node) (ConversionResult, *ConversionError) {
+func (s *StrictConversionRule) convert(htmlDoc *html.Node) (ConversionResult, *ConversionError) {
 	// Handle nil node gracefully
 	if htmlDoc == nil {
 		return ConversionResult{}, NewConversionError(
 			ErrCauseConversionFailure,
 			"cannot convert nil HTML node",
 		)
+	}
+
+	// Log converter creation if debug enabled
+	if s.debugLogger.Enabled() {
+		s.debugLogger.LogStep(context.TODO(), "mdconvert", "create_converter", debug.FieldMap{
+			"plugins": []string{"base", "commonmark", "table"},
+		})
 	}
 
 	// Create a converter with plugins for commonmark, base, and table support
@@ -116,6 +137,14 @@ func convert(htmlDoc *html.Node) (ConversionResult, *ConversionError) {
 
 	// Extract link refs from the HTML document using goquery
 	linkRefs := extractLinkRefs(htmlDoc)
+
+	// Log successful conversion if debug enabled
+	if s.debugLogger.Enabled() {
+		s.debugLogger.LogStep(context.TODO(), "mdconvert", "build_markdown", debug.FieldMap{
+			"output_size_bytes": len(markdown),
+			"links_count":       len(linkRefs),
+		})
+	}
 
 	return NewConversionResult(markdown, linkRefs), nil
 }

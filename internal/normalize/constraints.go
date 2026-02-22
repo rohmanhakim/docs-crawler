@@ -2,6 +2,7 @@ package normalize
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/gomarkdown/markdown/parser"
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
@@ -47,6 +49,7 @@ type Constraint interface {
 
 type MarkdownConstraint struct {
 	metadataSink metadata.MetadataSink
+	debugLogger  debug.DebugLogger
 }
 
 func NewMarkdownConstraint(
@@ -54,7 +57,19 @@ func NewMarkdownConstraint(
 ) MarkdownConstraint {
 	return MarkdownConstraint{
 		metadataSink: metadataSink,
+		debugLogger:  debug.NewNoOpLogger(),
 	}
+}
+
+// SetDebugLogger sets the debug logger for the constraint.
+// This is optional and defaults to NoOpLogger.
+// If logger is nil, NoOpLogger is used as a safe default.
+func (m *MarkdownConstraint) SetDebugLogger(logger debug.DebugLogger) {
+	if logger == nil {
+		m.debugLogger = debug.NewNoOpLogger()
+		return
+	}
+	m.debugLogger = logger
 }
 
 func (m *MarkdownConstraint) Normalize(
@@ -62,10 +77,29 @@ func (m *MarkdownConstraint) Normalize(
 	assetfulMarkdownDoc assets.AssetfulMarkdownDoc,
 	normalizeParam NormalizeParam,
 ) (NormalizedMarkdownDoc, failure.ClassifiedError) {
+	// Log normalization start
+	if m.debugLogger.Enabled() {
+		m.debugLogger.LogStep(context.TODO(), "normalize", "normalize_start", debug.FieldMap{
+			"url":         fetchUrl.String(),
+			"input_size":  len(assetfulMarkdownDoc.Content()),
+			"crawl_depth": normalizeParam.crawlDepth,
+			"hash_algo":   string(normalizeParam.hashAlgo),
+		})
+	}
+
 	normalizedMarkdown, err := normalize(fetchUrl, assetfulMarkdownDoc, normalizeParam)
 	if err != nil {
 		var normalizationError *NormalizationError
 		errors.As(err, &normalizationError)
+
+		// Log validation error
+		if m.debugLogger.Enabled() {
+			m.debugLogger.LogStep(context.TODO(), "normalize", "normalize_failed", debug.FieldMap{
+				"error_cause": string(normalizationError.Cause),
+				"error_msg":   normalizationError.Error(),
+			})
+		}
+
 		m.metadataSink.RecordError(
 			metadata.NewErrorRecord(
 				time.Now(),
@@ -80,6 +114,17 @@ func (m *MarkdownConstraint) Normalize(
 		)
 		return NormalizedMarkdownDoc{}, normalizationError
 	}
+
+	// Log normalization complete
+	if m.debugLogger.Enabled() {
+		m.debugLogger.LogStep(context.TODO(), "normalize", "normalize_complete", debug.FieldMap{
+			"doc_id":       normalizedMarkdown.Frontmatter().DocID(),
+			"content_hash": normalizedMarkdown.Frontmatter().ContentHash(),
+			"title":        normalizedMarkdown.Frontmatter().Title(),
+			"section":      normalizedMarkdown.Frontmatter().Section(),
+		})
+	}
+
 	m.metadataSink.RecordPipelineStage(
 		metadata.NewPipelineEvent(
 			metadata.StageNormalize,
