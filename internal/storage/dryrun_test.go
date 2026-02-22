@@ -9,6 +9,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/internal/storage"
+	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
 )
 
@@ -43,7 +44,9 @@ func TestDryRunSink_Write_Success(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup mock metadata sink
 			mockSink := &metadatatest.SinkMock{}
+			mockLogger := debugtest.NewLoggerMock()
 			sink := storage.NewDryRunSink(mockSink)
+			sink.SetDebugLogger(mockLogger)
 
 			// Create test document
 			doc := createTestNormalizedDoc(
@@ -126,6 +129,40 @@ func TestDryRunSink_Write_Success(t *testing.T) {
 			if mockSink.RecordErrorCalled {
 				t.Error("expected RecordError not to be called for successful write")
 			}
+
+			// Verify debug logging
+			if !mockLogger.LogStepCalled {
+				t.Error("expected LogStep to be called for debug logging")
+			}
+
+			// Verify compute_hash step was logged
+			computeHashSteps := mockLogger.StepsByName("compute_hash")
+			if len(computeHashSteps) == 0 {
+				t.Error("expected compute_hash step to be logged")
+			} else {
+				if computeHashSteps[0].Fields["canonical_url"] != tt.canonicalURL {
+					t.Errorf("expected canonical_url %s in compute_hash step, got %v", tt.canonicalURL, computeHashSteps[0].Fields["canonical_url"])
+				}
+				if computeHashSteps[0].Fields["hash_algo"] != string(tt.hashAlgo) {
+					t.Errorf("expected hash_algo %s in compute_hash step, got %v", tt.hashAlgo, computeHashSteps[0].Fields["hash_algo"])
+				}
+			}
+
+			// Verify dryrun_write step was logged
+			dryrunWriteSteps := mockLogger.StepsByName("dryrun_write")
+			if len(dryrunWriteSteps) == 0 {
+				t.Error("expected dryrun_write step to be logged")
+			} else {
+				if dryrunWriteSteps[0].Fields["file_path"] != expectedPath {
+					t.Errorf("expected file_path %s in dryrun_write step, got %v", expectedPath, dryrunWriteSteps[0].Fields["file_path"])
+				}
+				if dryrunWriteSteps[0].Fields["url_hash"] != expectedHash {
+					t.Errorf("expected url_hash %s in dryrun_write step, got %v", expectedHash, dryrunWriteSteps[0].Fields["url_hash"])
+				}
+				if dryrunWriteSteps[0].Fields["dry_run"] != true {
+					t.Errorf("expected dry_run=true in dryrun_write step, got %v", dryrunWriteSteps[0].Fields["dry_run"])
+				}
+			}
 		})
 	}
 }
@@ -191,7 +228,9 @@ func TestDryRunSink_Write_HashFailure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSink := &metadatatest.SinkMock{}
+			mockLogger := debugtest.NewLoggerMock()
 			sink := storage.NewDryRunSink(mockSink)
+			sink.SetDebugLogger(mockLogger)
 
 			doc := createTestNormalizedDoc(
 				"https://example.com/page",
@@ -236,6 +275,14 @@ func TestDryRunSink_Write_HashFailure(t *testing.T) {
 			}
 			if !tt.expectErrorRec && mockSink.RecordErrorCalled {
 				t.Error("expected RecordError NOT to be called")
+			}
+
+			// Verify debug logging for error case
+			if tt.expectedError {
+				writeFailedSteps := mockLogger.StepsByName("write_failed")
+				if len(writeFailedSteps) == 0 {
+					t.Error("expected write_failed step to be logged on error")
+				}
 			}
 		})
 	}
@@ -445,5 +492,34 @@ func TestDryRunSink_Constructor(t *testing.T) {
 
 	if !mockSink.RecordArtifactCalled {
 		t.Error("expected RecordArtifact to be called, indicating metadataSink was properly set")
+	}
+}
+
+func TestDryRunSink_Write_DebugLoggerDisabled(t *testing.T) {
+	// Setup mock with disabled logger
+	mockSink := &metadatatest.SinkMock{}
+	mockLogger := debugtest.NewLoggerMock()
+	mockLogger.SetEnabled(false) // Disable debug logging
+	sink := storage.NewDryRunSink(mockSink)
+	sink.SetDebugLogger(mockLogger)
+
+	doc := createTestNormalizedDoc(
+		"https://example.com/page",
+		"https://example.com/page",
+		"hash123",
+		[]byte("content"),
+	)
+
+	// Execute write
+	_, writeErr := sink.Write("", doc, hashutil.HashAlgoSHA256)
+
+	// Verify write succeeded
+	if writeErr != nil {
+		t.Errorf("expected no error, got: %v", writeErr)
+	}
+
+	// Verify no debug logging occurred (logger is disabled)
+	if mockLogger.LogStepCalled {
+		t.Error("expected LogStep not to be called when debug logger is disabled")
 	}
 }
