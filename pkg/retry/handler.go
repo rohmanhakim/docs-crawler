@@ -49,7 +49,7 @@ func Retry[T any](retryParam RetryParam, logger debug.DebugLogger, fn func() (T,
 		if err == nil {
 			// Log successful retry if debug enabled
 			if logger.Enabled() {
-				logger.LogRetry(context.Background(), attempt, retryParam.MaxAttempts, 0, nil)
+				logger.LogRetry(context.TODO(), attempt, retryParam.MaxAttempts, 0, nil)
 			}
 			return NewSuccessResult(result, attempt)
 		}
@@ -81,7 +81,7 @@ func Retry[T any](retryParam RetryParam, logger debug.DebugLogger, fn func() (T,
 
 		// Log retry attempt if debug enabled
 		if logger.Enabled() {
-			logger.LogRetry(context.Background(), attempt, retryParam.MaxAttempts, backoffDelay, err)
+			logger.LogRetry(context.TODO(), attempt, retryParam.MaxAttempts, backoffDelay, err)
 		}
 
 		// Sleep for the computed delay
@@ -90,7 +90,7 @@ func Retry[T any](retryParam RetryParam, logger debug.DebugLogger, fn func() (T,
 
 	// Log exhausted attempts if debug enabled
 	if logger.Enabled() {
-		logger.LogRetry(context.Background(), retryParam.MaxAttempts, retryParam.MaxAttempts, 0, lastErr)
+		logger.LogRetry(context.TODO(), retryParam.MaxAttempts, retryParam.MaxAttempts, 0, lastErr)
 	}
 
 	// Return failure result when max attempts are exhausted

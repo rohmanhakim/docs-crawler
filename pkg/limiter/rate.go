@@ -110,7 +110,7 @@ func (r *ConcurrentRateLimiter) SetCrawlDelay(host string, delay time.Duration) 
 
 	// Log crawl delay set if debug enabled
 	if r.debugLogger.Enabled() {
-		r.debugLogger.LogStep(context.Background(), "rate_limiter", "crawl_delay_set", debug.FieldMap{
+		r.debugLogger.LogStep(context.TODO(), "rate_limiter", "crawl_delay_set", debug.FieldMap{
 			"host":           host,
 			"crawl_delay_ms": delay.Milliseconds(),
 		})
@@ -152,7 +152,7 @@ func (r *ConcurrentRateLimiter) Backoff(host string) {
 
 	// Log backoff triggered if debug enabled
 	if r.debugLogger.Enabled() {
-		r.debugLogger.LogStep(context.Background(), "rate_limiter", "backoff_triggered", debug.FieldMap{
+		r.debugLogger.LogStep(context.TODO(), "rate_limiter", "backoff_triggered", debug.FieldMap{
 			"host":             host,
 			"backoff_count":    backoffCount,
 			"backoff_delay_ms": backoffDelay.Milliseconds(),
@@ -242,7 +242,7 @@ func (r *ConcurrentRateLimiter) ResolveDelay(host string) time.Duration {
 
 	// Log rate limit decision if debug enabled
 	if logger.Enabled() {
-		logger.LogRateLimit(context.Background(), host, remainingDelay, reason)
+		logger.LogRateLimit(context.TODO(), host, remainingDelay, reason)
 	}
 
 	return remainingDelay
