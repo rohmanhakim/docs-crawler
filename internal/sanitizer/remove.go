@@ -17,12 +17,6 @@ var PreH1ChromeKeywords = []string{
 	// Future: other pre-heading chrome keywords like "kicker", "overline", "section-label"
 }
 
-// removeEmptyNodesBottomUp performs a post-order traversal to remove empty nodes.
-// This ensures nested empty containers are fully cleaned (innermost first).
-func removeEmptyNodesBottomUp(node *html.Node) {
-	_ = removeEmptyNodesBottomUpWithCount(node)
-}
-
 // removeEmptyNodesBottomUpWithCount is like removeEmptyNodesBottomUp but returns the count of removed nodes.
 func removeEmptyNodesBottomUpWithCount(node *html.Node) int {
 	if node == nil {
@@ -82,59 +76,6 @@ func shouldRemoveEmptyElement(tag string) bool {
 	return true
 }
 
-// removePreH1Chrome removes elements with pre-H1 chrome keywords that appear before the first H1.
-// This implements the two-factor match: position (pre-H1) + keyword match.
-// Elements matching PreH1ChromeKeywords are removed only if they precede the first H1 heading.
-func removePreH1Chrome(root *html.Node) {
-	if root == nil {
-		return
-	}
-
-	// Find the first H1 element in the document
-	firstH1 := findFirstH1(root)
-	if firstH1 == nil {
-		// No H1 found, nothing to remove
-		return
-	}
-
-	// Collect all elements that precede the H1 and match chrome keywords
-	var nodesToRemove []*html.Node
-
-	var collectPreH1Chrome func(*html.Node, bool)
-	collectPreH1Chrome = func(node *html.Node, beforeH1 bool) {
-		if node == nil {
-			return
-		}
-
-		// Check if this node is the H1 - stop collecting after this
-		if node.Type == html.ElementNode && node.Data == "h1" && node == firstH1 {
-			return // Don't process this node or its siblings
-		}
-
-		// If we're before the H1, check if this node matches chrome keywords
-		if beforeH1 && node.Type == html.ElementNode {
-			if hasPreH1ChromeKeyword(node) {
-				nodesToRemove = append(nodesToRemove, node)
-			}
-		}
-
-		// Recurse into children (still before H1)
-		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			collectPreH1Chrome(child, beforeH1)
-		}
-	}
-
-	// Start collection from root
-	collectPreH1Chrome(root, true)
-
-	// Remove collected nodes
-	for _, node := range nodesToRemove {
-		if node.Parent != nil {
-			node.Parent.RemoveChild(node)
-		}
-	}
-}
-
 // findFirstH1 finds the first H1 element in the document using depth-first traversal.
 func findFirstH1(root *html.Node) *html.Node {
 	var find func(*html.Node) *html.Node
@@ -174,10 +115,14 @@ func hasPreH1ChromeKeyword(node *html.Node) bool {
 	return false
 }
 
-// removeDuplicateNodes removes duplicate structural nodes, keeping the first occurrence.
-// It uses a signature-based approach to detect structural duplicates.
-func removeDuplicateNodes(root *html.Node) {
-	_ = removeDuplicateNodesWithCount(root)
+// isInCodeBlock checks if a node is a descendant of pre or code elements.
+// Elements inside code blocks should never be deduplicated as they represent
+// literal content where repetition is meaningful (e.g., repeated code lines).
+func isInCodeBlock(node *html.Node) bool {
+	if node.Data == "pre" || node.Data == "code" {
+		return true
+	}
+	return false
 }
 
 // removeDuplicateNodesWithCount is like removeDuplicateNodes but returns the count of removed nodes.
@@ -201,8 +146,13 @@ func removeDuplicateNodesWithCount(root *html.Node) int {
 
 		// Process element nodes
 		if node.Type == html.ElementNode {
-			// Check if this element type should be considered for deduplication
-			if isMeaningfulElement(node.Data) {
+			// Skip elements inside pre/code blocks - they preserve literal content
+			// where repetition is meaningful (e.g., repeated lines in code examples)
+			if isInCodeBlock(node) {
+				// Don't deduplicate
+				return
+			} else if isMeaningfulElement(node.Data) {
+				// Check if this element type should be considered for deduplication
 				parent := node.Parent
 				if parent != nil {
 					// Initialize signature set for this parent if needed

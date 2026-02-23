@@ -110,63 +110,6 @@ func nodeContentHash(node *html.Node) uint64 {
 	return h.Sum64()
 }
 
-// nodesAreEqual compares two nodes for structural equality.
-// Returns true if they have the same tag, attributes, and content structure.
-func nodesAreEqual(a, b *html.Node) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-
-	// Must be same type
-	if a.Type != b.Type {
-		return false
-	}
-
-	// For element nodes, compare tag and attributes
-	if a.Type == html.ElementNode {
-		if a.Data != b.Data {
-			return false
-		}
-
-		// Compare attributes
-		if len(a.Attr) != len(b.Attr) {
-			return false
-		}
-
-		// Build attribute maps for comparison
-		attrMapA := make(map[string]string)
-		for _, attr := range a.Attr {
-			attrMapA[attr.Key] = attr.Val
-		}
-
-		for _, attr := range b.Attr {
-			if attrMapA[attr.Key] != attr.Val {
-				return false
-			}
-		}
-	}
-
-	// For text nodes, compare normalized content
-	if a.Type == html.TextNode {
-		return strings.TrimSpace(a.Data) == strings.TrimSpace(b.Data)
-	}
-
-	// Recursively compare children
-	childA := a.FirstChild
-	childB := b.FirstChild
-
-	for childA != nil && childB != nil {
-		if !nodesAreEqual(childA, childB) {
-			return false
-		}
-		childA = childA.NextSibling
-		childB = childB.NextSibling
-	}
-
-	// Both should have run out of children at the same time
-	return childA == nil && childB == nil
-}
-
 // isMeaningfulElement returns true if the element type should be considered
 // for deduplication. Some elements like headings are structural anchors
 // and should never be removed as duplicates.

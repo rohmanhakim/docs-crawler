@@ -329,48 +329,6 @@ func normalizeHeadingLevels(doc *html.Node) *html.Node {
 	return clonedDoc.Get(0)
 }
 
-// removeDuplicateAndEmptyNode removes empty containers and duplicate structural nodes.
-// It performs two passes:
-// 1. Remove empty nodes (bottom-up to handle nested empty containers)
-// 2. Remove duplicate nodes (keeping the first occurrence)
-//
-// This is structural repair only:
-// - Empty wrappers like <div></div> or <section></section> are removed
-// - Duplicate nodes with identical tag, attributes, and content are deduplicated
-// - Headings and structural anchors are preserved (not deduplicated)
-func removeDuplicateAndEmptyNode(doc *html.Node) *html.Node {
-	// Create a goquery document from the input for easier manipulation
-	docQuery := goquery.NewDocumentFromNode(doc)
-
-	// Clone the document to avoid mutating the original during iteration
-	clonedDoc := goquery.CloneDocument(docQuery)
-	rootNode := clonedDoc.Get(0)
-
-	// Phase 1: Remove empty nodes (bottom-up traversal)
-	// We traverse from leaves upward to handle nested empty containers
-	removeEmptyNodesBottomUp(rootNode)
-
-	// Phase 2: Remove duplicate nodes
-	// Keep track of seen node signatures to detect duplicates
-	removeDuplicateNodes(rootNode)
-
-	return rootNode
-}
-
-// extractUrl extracts all hyperlinks from the document.
-// It extracts URLs exactly as authored in the DOM without resolution.
-// Design:
-//   - Preserves relative URLs as-is (no resolution)
-//   - Extracts only HTTP(S) schemes
-//   - Skips empty and fragment-only hrefs
-//   - Deduplicates identical references
-//
-// This is called after removeDuplicateAndEmptyNode() returns a valid html.Node.
-func extractUrl(doc *html.Node) []url.URL {
-	urls, _ := extractUrlWithStats(doc)
-	return urls
-}
-
 // headingStats tracks statistics for heading normalization.
 type headingStats struct {
 	totalCount      int

@@ -544,3 +544,26 @@ func TestSanitize_Determinism(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitize_RepeatedElementsInsideCodeBlocks(t *testing.T) {
+	// Arrange
+	mockSink := &mockMetadataSink{}
+	s := sanitizer.NewHTMLSanitizer(mockSink)
+
+	fixtureBytes := loadFixture(t, "pass/code_blocks_with_duplicate_nodes.html")
+	expectedBytes := loadFixture(t, "expected/code_blocks_with_duplicate_nodes.html")
+
+	doc, err := html.Parse(strings.NewReader(string(fixtureBytes)))
+	require.NoError(t, err, "Failed to parse fixture HTML")
+
+	// Act
+	result, _ := s.Sanitize(doc)
+	var actualBuf strings.Builder
+	require.NoError(t, html.Render(&actualBuf, result.GetContentNode()))
+	actualHTML := strings.TrimSpace(actualBuf.String())
+
+	expectedHTML := strings.TrimSpace(string(expectedBytes))
+
+	assert.Equal(t, expectedHTML, actualHTML,
+		"ContentNode HTML should match expected extraction output")
+}
