@@ -297,7 +297,7 @@ func TestInitConfigWithPartialConfigFile(t *testing.T) {
 
 	// Partial config with seedUrls and some other fields
 	configContent := `{
-		"seedUrls": [{"Scheme": "https", "Host": "test-docs.com", "Path": "/docs"}],
+		"seedUrls": ["https://test-docs.com"],
 		"maxDepth": 10,
 		"concurrency": 5,
 		"outputDir": "test-output",
@@ -377,7 +377,7 @@ func TestInitConfigWithConfigFileOnly(t *testing.T) {
 
 	// Config with seedUrls
 	configContent := `{
-		"seedUrls": [{"Scheme": "https", "Host": "test-docs.com", "Path": "/docs"}],
+		"seedUrls": ["https://test-docs.com/docs"],
 		"maxDepth": 10,
 		"concurrency": 5,
 		"outputDir": "test-output"
