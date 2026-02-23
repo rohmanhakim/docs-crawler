@@ -146,9 +146,10 @@ producing high-quality Markdown suitable for embedding and retrieval.`,
 		var unsub func()
 		var rec *metadata.Recorder
 		var eventPrinter *EventPrinter
-		if cfg.DryRun() {
+		if cfg.DryRun() && !suppressOutput {
 			// GetMetadataRecorder returns MetadataSink, but we need the Recorder for Subscribe
 			// Do type assertion to get the underlying Recorder
+			// Only create EventPrinter if output is not suppressed
 			if r, ok := sched.GetMetadataRecorder().(*metadata.Recorder); ok {
 				rec = r
 				eventPrinter = NewEventPrinter(treeprinter.NewTreePrinter())
@@ -261,16 +262,12 @@ func InitConfig(seedUrls []url.URL) config.Config {
 // seedUrls can be empty if a config file is provided that contains seed URLs.
 // If both are provided, CLI flags override config file values.
 // This makes it easier to test error cases.
+// Note: This function does not print informational messages during config loading
+// because the final SuppressDefaultOutput() state is only known after the config is built.
 func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
-	// Check if output should be suppressed (debug mode without debug file)
-	suppressOutput := debug && debugFile == ""
-
 	var configBuilder *config.Config
 
 	if cfgFile != "" {
-		if !suppressOutput {
-			fmt.Printf("Initializing config from file: %s\n", cfgFile)
-		}
 		var err error
 		configBuilder, err = config.WithConfigFileBuilder(cfgFile)
 		if err != nil {
@@ -284,9 +281,6 @@ func InitConfigWithError(seedUrls []url.URL) (config.Config, error) {
 		// No config file - seed URLs must be provided via CLI
 		if len(seedUrls) == 0 {
 			return config.Config{}, fmt.Errorf("%w: either --seed-url or --config-file is required", config.ErrInvalidConfig)
-		}
-		if !suppressOutput {
-			fmt.Println("No config file specified. Using default flag values or environment variables")
 		}
 		configBuilder = config.WithDefault(seedUrls)
 	}

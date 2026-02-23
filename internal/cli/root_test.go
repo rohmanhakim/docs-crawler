@@ -1206,6 +1206,208 @@ func TestInitConfigWithConfigFileAndCLIOverride(t *testing.T) {
 	}
 }
 
+// TestSuppressDefaultOutput tests the SuppressDefaultOutput config method
+func TestSuppressDefaultOutput(t *testing.T) {
+	tests := []struct {
+		name           string
+		debug          bool
+		debugFile      string
+		expectSuppress bool
+	}{
+		{
+			name:           "debug=false, no debugFile - not suppressed",
+			debug:          false,
+			debugFile:      "",
+			expectSuppress: false,
+		},
+		{
+			name:           "debug=true, no debugFile - suppressed",
+			debug:          true,
+			debugFile:      "",
+			expectSuppress: true,
+		},
+		{
+			name:           "debug=true, debugFile set - not suppressed",
+			debug:          true,
+			debugFile:      "/tmp/debug.log",
+			expectSuppress: false,
+		},
+		{
+			name:           "debug=false, debugFile set - not suppressed",
+			debug:          false,
+			debugFile:      "/tmp/debug.log",
+			expectSuppress: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd.ResetFlags()
+			cmd.SetDebugForTest(tt.debug)
+			cmd.SetDebugFileForTest(tt.debugFile)
+
+			testURLs := defaultTestURLs()
+			cfg, err := cmd.InitConfigWithError(testURLs)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if cfg.SuppressDefaultOutput() != tt.expectSuppress {
+				t.Errorf("Expected SuppressDefaultOutput %t, got %t", tt.expectSuppress, cfg.SuppressDefaultOutput())
+			}
+		})
+	}
+}
+
+// TestSuppressDefaultOutputFromConfigFile tests that SuppressDefaultOutput works
+// correctly when debug settings come from config file
+func TestSuppressDefaultOutputFromConfigFile(t *testing.T) {
+	tests := []struct {
+		name           string
+		configContent  string
+		expectSuppress bool
+	}{
+		{
+			name: "debug=true from config, no debugFile - suppressed",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"debug": true
+			}`,
+			expectSuppress: true,
+		},
+		{
+			name: "debug=true from config, debugFile set - not suppressed",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"debug": true,
+				"debugFile": "/tmp/debug.log"
+			}`,
+			expectSuppress: false,
+		},
+		{
+			name: "debug=false from config - not suppressed",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"debug": false
+			}`,
+			expectSuppress: false,
+		},
+		{
+			name: "no debug setting from config - not suppressed",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"]
+			}`,
+			expectSuppress: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd.ResetFlags()
+
+			tmpDir := t.TempDir()
+			configFile := filepath.Join(tmpDir, "config.json")
+			err := os.WriteFile(configFile, []byte(tt.configContent), 0644)
+			if err != nil {
+				t.Fatalf("Failed to create test config file: %v", err)
+			}
+
+			cmd.SetConfigFileForTest(configFile)
+			// Do NOT set CLI debug flags - testing config file behavior
+
+			cfg, err := cmd.InitConfigWithError([]url.URL{})
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if cfg.SuppressDefaultOutput() != tt.expectSuppress {
+				t.Errorf("Expected SuppressDefaultOutput %t, got %t (debug=%t, debugFile=%q)",
+					tt.expectSuppress, cfg.SuppressDefaultOutput(), cfg.Debug(), cfg.DebugFile())
+			}
+		})
+	}
+}
+
+// TestCLIOverridesConfigDebugSettings tests that CLI flags override config file debug settings
+func TestCLIOverridesConfigDebugSettings(t *testing.T) {
+	tests := []struct {
+		name            string
+		configContent   string
+		cliDebug        bool
+		cliDebugFile    string
+		expectDebug     bool
+		expectDebugFile string
+	}{
+		{
+			name: "CLI debug=true overrides config debug=false",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"debug": false
+			}`,
+			cliDebug:        true,
+			cliDebugFile:    "",
+			expectDebug:     true,
+			expectDebugFile: "",
+		},
+		{
+			name: "CLI debugFile overrides config debugFile",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"debug": true,
+				"debugFile": "/config/debug.log"
+			}`,
+			cliDebug:        true,
+			cliDebugFile:    "/cli/debug.log",
+			expectDebug:     true,
+			expectDebugFile: "/cli/debug.log",
+		},
+		{
+			name: "CLI debug=false does not override config debug=true (CLI wins)",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"debug": true
+			}`,
+			cliDebug:        false,
+			cliDebugFile:    "",
+			expectDebug:     true, // Config value preserved since CLI didn't explicitly set
+			expectDebugFile: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd.ResetFlags()
+
+			tmpDir := t.TempDir()
+			configFile := filepath.Join(tmpDir, "config.json")
+			err := os.WriteFile(configFile, []byte(tt.configContent), 0644)
+			if err != nil {
+				t.Fatalf("Failed to create test config file: %v", err)
+			}
+
+			cmd.SetConfigFileForTest(configFile)
+			if tt.cliDebug {
+				cmd.SetDebugForTest(tt.cliDebug)
+			}
+			if tt.cliDebugFile != "" {
+				cmd.SetDebugFileForTest(tt.cliDebugFile)
+			}
+
+			cfg, err := cmd.InitConfigWithError([]url.URL{})
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if cfg.Debug() != tt.expectDebug {
+				t.Errorf("Expected Debug %t, got %t", tt.expectDebug, cfg.Debug())
+			}
+			if cfg.DebugFile() != tt.expectDebugFile {
+				t.Errorf("Expected DebugFile %q, got %q", tt.expectDebugFile, cfg.DebugFile())
+			}
+		})
+	}
+}
+
 // TestInitConfigCompleteIntegrationWithAllFlags tests a complete integration scenario with all new flags
 func TestInitConfigCompleteIntegrationWithAllFlags(t *testing.T) {
 
