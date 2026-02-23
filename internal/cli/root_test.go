@@ -1079,35 +1079,99 @@ func TestInitConfigAllowedHostsDefaultsToSeedUrls(t *testing.T) {
 
 // TestInitConfigWithConfigFileAndCLIDefaults tests that config file values
 // are preserved when CLI flags are not explicitly set (using Cobra defaults).
-// This is a regression test for a bug where Cobra's default flag value (5)
-// would overwrite the config file's maxDepth value.
+// This is a regression test for bugs where CLI default values would overwrite
+// config file values.
 func TestInitConfigWithConfigFileAndCLIDefaults(t *testing.T) {
-	cmd.ResetFlags()
-
-	// Create a config file with maxDepth = 1
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.json")
-	configContent := `{
-		"seedUrls": ["https://example.com/docs"],
-		"maxDepth": 1
-	}`
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create test config file: %v", err)
+	tests := []struct {
+		name          string
+		configContent string
+		checkFunc     func(config.Config, *testing.T)
+	}{
+		{
+			name: "maxDepth from config preserved",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"maxDepth": 1
+			}`,
+			checkFunc: func(cfg config.Config, t *testing.T) {
+				if cfg.MaxDepth() != 1 {
+					t.Errorf("Expected MaxDepth 1 from config file, got %d - CLI default overwrote config!", cfg.MaxDepth())
+				}
+			},
+		},
+		{
+			name: "debugFormat from config preserved",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"debug": true,
+				"debugFormat": "text"
+			}`,
+			checkFunc: func(cfg config.Config, t *testing.T) {
+				if cfg.DebugFormat() != "text" {
+					t.Errorf("Expected DebugFormat 'text' from config file, got %q - CLI default overwrote config!", cfg.DebugFormat())
+				}
+			},
+		},
+		{
+			name: "userAgent from config preserved",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"userAgent": "custom-agent/1.0"
+			}`,
+			checkFunc: func(cfg config.Config, t *testing.T) {
+				if cfg.UserAgent() != "custom-agent/1.0" {
+					t.Errorf("Expected UserAgent 'custom-agent/1.0' from config file, got %q - CLI default overwrote config!", cfg.UserAgent())
+				}
+			},
+		},
+		{
+			name: "timeout from config preserved",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"timeout": "45s"
+			}`,
+			checkFunc: func(cfg config.Config, t *testing.T) {
+				if cfg.Timeout() != 45*time.Second {
+					t.Errorf("Expected Timeout 45s from config file, got %v - CLI default overwrote config!", cfg.Timeout())
+				}
+			},
+		},
+		{
+			name: "outputDir from config preserved",
+			configContent: `{
+				"seedUrls": ["https://example.com/docs"],
+				"outputDir": "/custom/output"
+			}`,
+			checkFunc: func(cfg config.Config, t *testing.T) {
+				if cfg.OutputDir() != "/custom/output" {
+					t.Errorf("Expected OutputDir '/custom/output' from config file, got %q - CLI default overwrote config!", cfg.OutputDir())
+				}
+			},
+		},
 	}
 
-	cmd.SetConfigFileForTest(configFile)
-	// IMPORTANT: Do NOT call SetMaxDepthForTest() - we want to test
-	// that the Cobra default (0 after fix) does NOT override config file value (1)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd.ResetFlags()
 
-	cfg, err := cmd.InitConfigWithError([]url.URL{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+			tmpDir := t.TempDir()
+			configFile := filepath.Join(tmpDir, "config.json")
+			err := os.WriteFile(configFile, []byte(tt.configContent), 0644)
+			if err != nil {
+				t.Fatalf("Failed to create test config file: %v", err)
+			}
 
-	// Config file value (1) should be preserved when CLI flag is not explicitly set
-	if cfg.MaxDepth() != 1 {
-		t.Errorf("Expected MaxDepth 1 from config file, got %d - CLI default overwrote config!", cfg.MaxDepth())
+			cmd.SetConfigFileForTest(configFile)
+			// IMPORTANT: Do NOT set any other CLI flags - we want to test
+			// that CLI defaults do NOT override config file values
+
+			cfg, err := cmd.InitConfigWithError([]url.URL{})
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			tt.checkFunc(cfg, t)
+		})
 	}
 }
 

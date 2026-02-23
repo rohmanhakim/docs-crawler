@@ -243,7 +243,7 @@ func init() {
 	// Debug logging flags
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug logging")
 	rootCmd.PersistentFlags().StringVar(&debugFile, "debug-file", "", "file path for debug logs (stdout only if empty)")
-	rootCmd.PersistentFlags().StringVar(&debugFormat, "debug-format", "json", "debug output format: json or text")
+	rootCmd.PersistentFlags().StringVar(&debugFormat, "debug-format", "", "debug output format: json or text (default: json)")
 }
 
 // InitConfig reads in config file and ENV variables if set.
@@ -386,7 +386,7 @@ func ResetFlags() {
 	versionFlag = false
 	debug = false
 	debugFile = ""
-	debugFormat = "json"
+	debugFormat = ""
 }
 
 // Test helper functions to set flag values from tests
