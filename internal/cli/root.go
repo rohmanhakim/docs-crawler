@@ -226,7 +226,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&versionFlag, "version", "v", false, "print version information")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config-file", "", "config file path (e.g., /home/myuser/config.json)")
 	rootCmd.PersistentFlags().StringArrayVar(&seedURLs, "seed-url", []string{}, "one or more starting URLs (can be repeated)")
-	rootCmd.PersistentFlags().IntVar(&maxDepth, "max-depth", 5, "maximum link depth from seed URL")
+	rootCmd.PersistentFlags().IntVar(&maxDepth, "max-depth", 0, "maximum link depth from seed URL")
 	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 3, "number of concurrent fetch workers")
 	rootCmd.PersistentFlags().StringVar(&outputDir, "output-dir", "output", "root output directory for crawled content")
 	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "crawl without writing output")

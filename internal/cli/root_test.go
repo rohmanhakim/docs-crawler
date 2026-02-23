@@ -1077,6 +1077,71 @@ func TestInitConfigAllowedHostsDefaultsToSeedUrls(t *testing.T) {
 	}
 }
 
+// TestInitConfigWithConfigFileAndCLIDefaults tests that config file values
+// are preserved when CLI flags are not explicitly set (using Cobra defaults).
+// This is a regression test for a bug where Cobra's default flag value (5)
+// would overwrite the config file's maxDepth value.
+func TestInitConfigWithConfigFileAndCLIDefaults(t *testing.T) {
+	cmd.ResetFlags()
+
+	// Create a config file with maxDepth = 1
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+	configContent := `{
+		"seedUrls": ["https://example.com/docs"],
+		"maxDepth": 1
+	}`
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	cmd.SetConfigFileForTest(configFile)
+	// IMPORTANT: Do NOT call SetMaxDepthForTest() - we want to test
+	// that the Cobra default (0 after fix) does NOT override config file value (1)
+
+	cfg, err := cmd.InitConfigWithError([]url.URL{})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// Config file value (1) should be preserved when CLI flag is not explicitly set
+	if cfg.MaxDepth() != 1 {
+		t.Errorf("Expected MaxDepth 1 from config file, got %d - CLI default overwrote config!", cfg.MaxDepth())
+	}
+}
+
+// TestInitConfigWithConfigFileAndCLIOverride tests that explicit CLI flags
+// still override config file values when provided
+func TestInitConfigWithConfigFileAndCLIOverride(t *testing.T) {
+	cmd.ResetFlags()
+
+	// Create a config file with maxDepth = 1
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+	configContent := `{
+		"seedUrls": ["https://example.com/docs"],
+		"maxDepth": 1
+	}`
+	err := os.WriteFile(configFile, []byte(configContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	cmd.SetConfigFileForTest(configFile)
+	cmd.SetMaxDepthForTest(10) // CLI explicitly sets maxDepth to 10
+
+	cfg, err := cmd.InitConfigWithError([]url.URL{})
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// CLI value (10) should override config file value (1)
+	if cfg.MaxDepth() != 10 {
+		t.Errorf("Expected MaxDepth 10 from CLI override, got %d", cfg.MaxDepth())
+	}
+}
+
 // TestInitConfigCompleteIntegrationWithAllFlags tests a complete integration scenario with all new flags
 func TestInitConfigCompleteIntegrationWithAllFlags(t *testing.T) {
 
