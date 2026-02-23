@@ -109,6 +109,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
+	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -125,6 +126,9 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
+	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Clear default expectation and setup fetcher mock to capture the context
 	mockFetcher.ExpectedCalls = nil
@@ -149,7 +153,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		nil,
+		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -157,7 +161,7 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0,
 		"timeout": "5s"
 	}`
@@ -250,7 +254,7 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -335,7 +339,7 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 1
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -504,7 +508,7 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 1,
 		"maxPages": 10
 	}`
@@ -592,7 +596,7 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -681,7 +685,7 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			configPath := filepath.Join(tmpDir, "config.json")
 
 			configData := `{
-				"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+				"seedUrls": ["http://example.com"],
 				"maxDepth": 0
 			}`
 			err := os.WriteFile(configPath, []byte(configData), 0644)

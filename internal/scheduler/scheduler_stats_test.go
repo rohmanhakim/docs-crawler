@@ -78,7 +78,7 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 1,
 		"maxPages": 10
 	}`
@@ -189,7 +189,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}]
+		"seedUrls": ["https://example.com"]
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	if err != nil {
@@ -281,7 +281,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -458,7 +458,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}]
+		"seedUrls": ["https://example.com"]
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	if err != nil {
@@ -555,7 +555,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}]
+		"seedUrls": ["https://example.com"]
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	if err != nil {

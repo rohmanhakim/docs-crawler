@@ -103,7 +103,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -194,7 +194,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -287,7 +287,7 @@ func TestScheduler_Resolve_DiskFullError_ContinuesCrawl(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -376,7 +376,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -467,7 +467,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 
 	// Use maxDepth: 0 to process just one page
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -563,7 +563,7 @@ func TestScheduler_Resolve_DiskFullError_DoesNotPreventSubsequentCalls(t *testin
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)

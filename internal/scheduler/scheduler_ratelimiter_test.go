@@ -64,7 +64,7 @@ func TestRateLimiter_SetBaseDelay_Called(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -201,9 +201,9 @@ func TestRateLimiter_SetJitter_CalledWithConfigValue(t *testing.T) {
 
 	// Config with specific jitter value
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0,
-		"jitter": 500000000
+		"jitter": "500ms"
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
 	if err != nil {
@@ -276,7 +276,7 @@ func TestRateLimiter_SetRandomSeed_CalledWithConfigValue(t *testing.T) {
 
 	// Config with specific random seed
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0,
 		"randomSeed": 42
 	}`
@@ -543,7 +543,7 @@ func TestBackoff_Integration_ExecuteCrawling(t *testing.T) {
 
 	// Config pointing to our test server
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -750,7 +750,7 @@ func TestBackoff_Integration_ExecuteCrawling_ServerError(t *testing.T) {
 
 	// Config pointing to our test server
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -830,7 +830,7 @@ func TestSleeper_ResolveDelayAndSleepCalled(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)

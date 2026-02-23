@@ -67,7 +67,7 @@ func writeEventStreamConfig(t *testing.T, serverURL string, outputDir string) st
 	require.NoError(t, err, "failed to parse server URL")
 
 	configData := fmt.Sprintf(`{
-		"seedUrls": [{"Scheme": "%s", "Host": "%s", "Path": "/docs/guide"}],
+		"seedUrls": ["%s://%s/docs/guide"],
 		"outputDir": "%s",
 		"maxDepth": 0
 	}`, parsedURL.Scheme, parsedURL.Host, outputDir)

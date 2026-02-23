@@ -99,7 +99,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 
 	// Create config with only required fields - should use defaults for extraction params
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -205,7 +205,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 
 	// Create config with custom extraction parameters
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0,
 		"bodySpecificityBias": 0.85,
 		"linkDensityThreshold": 0.90,
@@ -336,7 +336,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 
 	// Create config with custom extraction parameters
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0,
 		"bodySpecificityBias": 0.60,
 		"thresholdMinNonWhitespace": 20,
@@ -503,7 +503,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0,
 		"thresholdMinNonWhitespace": 50
 	}`
@@ -608,7 +608,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)

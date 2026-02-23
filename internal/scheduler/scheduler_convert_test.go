@@ -96,7 +96,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -187,7 +187,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -277,7 +277,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)

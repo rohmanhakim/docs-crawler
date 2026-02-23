@@ -91,7 +91,7 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -184,7 +184,7 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -276,7 +276,7 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -391,7 +391,7 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -549,7 +549,7 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 1
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -641,7 +641,7 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -733,7 +733,7 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)

@@ -231,7 +231,7 @@ func TestIntegration_DebugLogging_FullPipeline_StageSequence(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -376,7 +376,7 @@ func TestIntegration_DebugLogging_Fetcher_StepSequence(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -531,7 +531,7 @@ func TestIntegration_DebugLogging_RetryScenario(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0,
 		"maxAttempt": 3
 	}`
@@ -663,7 +663,7 @@ func TestIntegration_DebugLogging_RateLimitScenario(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -800,7 +800,7 @@ func TestIntegration_DebugLogging_Frontier_SkipScenarios(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 1
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -917,7 +917,7 @@ func TestIntegration_DebugLogging_ErrorPath(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -1056,7 +1056,7 @@ func TestIntegration_DebugLogging_Disabled(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -1267,7 +1267,7 @@ func TestIntegration_DebugLogging_JSONLFileOutput(t *testing.T) {
 	// Create config file
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err = os.WriteFile(configPath, []byte(configData), 0644)

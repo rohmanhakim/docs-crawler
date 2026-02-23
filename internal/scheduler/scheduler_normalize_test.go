@@ -114,7 +114,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -211,7 +211,7 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -305,7 +305,7 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -399,7 +399,7 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 
 	// Use maxDepth: 0 to process just one page
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -512,7 +512,7 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 3,
 		"allowedPathPrefix": ["/docs", "/api"],
 		"hashAlgo": "sha256"
@@ -730,7 +730,7 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 3
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -846,7 +846,7 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 2,
 		"allowedPathPrefix": ["/blog", "/articles", "/docs"]
 	}`
@@ -962,7 +962,7 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "http", "Host": "example.com"}],
+		"seedUrls": ["http://example.com"],
 		"maxDepth": 2,
 		"hashAlgo": "sha256"
 	}`

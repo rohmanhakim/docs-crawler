@@ -73,7 +73,7 @@ func TestInitializeCrawling_Success_ReturnsInitialization(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 5
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -309,7 +309,7 @@ func TestExecuteCrawlingWithState_Success_ReturnsExecutionResult(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -394,7 +394,7 @@ func TestExecuteCrawlingWithState_EmptyFrontier_Completes(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -485,7 +485,7 @@ func TestExecuteCrawlingWithState_RecordsStatsCorrectly(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -586,7 +586,7 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 0
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)
@@ -643,7 +643,7 @@ func TestInitializeCrawling_SetsFileJournalPath(t *testing.T) {
 
 	// Write config pointing seed URL at the test server, with a known output dir
 	configData := fmt.Sprintf(`{
-		"seedUrls": [{"Scheme": "http", "Host": "%s"}],
+		"seedUrls": ["http://%s"],
 		"outputDir": "%s"
 	}`, serverHost, outputDir)
 	err = os.WriteFile(configPath, []byte(configData), 0644)
@@ -710,7 +710,7 @@ func TestInitializeCrawling_InjectedJournalNotReplaced(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.json")
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"outputDir": "/some/output"
 	}`
 	err := os.WriteFile(configPath, []byte(configData), 0644)

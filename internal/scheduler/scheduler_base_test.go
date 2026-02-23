@@ -76,7 +76,7 @@ func TestScheduler_ConfigurationImmutability(t *testing.T) {
 
 	// Create a valid config
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 3,
 		"maxPages": 50
 	}`
@@ -246,7 +246,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 
 	// First execution
 	config1 := filepath.Join(tmpDir, "config1.json")
-	err := os.WriteFile(config1, []byte(`{"seedUrls": [{"Scheme": "https", "Host": "example1.com"}], "maxDepth": 0}`), 0644)
+	err := os.WriteFile(config1, []byte(`{"seedUrls": ["https://example1.com"], "maxDepth": 0}`), 0644)
 	if err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestScheduler_MultipleExecutions_Sequential(t *testing.T) {
 
 	// Second execution
 	config2 := filepath.Join(tmpDir, "config2.json")
-	err = os.WriteFile(config2, []byte(`{"seedUrls": [{"Scheme": "https", "Host": "example2.com"}], "maxDepth": 0}`), 0644)
+	err = os.WriteFile(config2, []byte(`{"seedUrls": ["https://example2.com"], "maxDepth": 0}`), 0644)
 	if err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
@@ -414,7 +414,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 
 	// Create a valid config with seed URL
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 1,
 		"maxPages": 50
 	}`
@@ -518,7 +518,7 @@ func TestScheduler_URLResolutionAndFiltering_OnlyExternalURLs(t *testing.T) {
 
 	// Create a valid config with seed URL
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 1,
 		"maxPages": 50
 	}`
@@ -627,7 +627,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 
 	// Create a valid config with seed URL
 	configData := `{
-		"seedUrls": [{"Scheme": "https", "Host": "example.com"}],
+		"seedUrls": ["https://example.com"],
 		"maxDepth": 1,
 		"maxPages": 50
 	}`
