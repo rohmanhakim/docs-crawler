@@ -186,6 +186,15 @@ func (h *HtmlSanitizer) sanitize(doc *html.Node) (SanitizedHTMLDoc, *Sanitizatio
 		})
 	}
 
+	// Step 4.5: Remove aria-hidden elements
+	// This removes elements with aria-hidden="true" attribute (accessibility hidden content)
+	removedAriaHiddenCount := removeAriaHiddenElementsWithCount(normalizedDoc)
+	if h.debugLogger.Enabled() {
+		h.debugLogger.LogStep(context.TODO(), "sanitizer", "remove_aria_hidden", debug.FieldMap{
+			"removed_count": removedAriaHiddenCount,
+		})
+	}
+
 	// Step 5: Remove duplicate and empty nodes (Invariant S4)
 	// This performs structural cleanup: removes empty wrappers and deduplicates identical nodes
 	cleanedDoc, removalStats := removeDuplicateAndEmptyNodeWithStats(normalizedDoc)

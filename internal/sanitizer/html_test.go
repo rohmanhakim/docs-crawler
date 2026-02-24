@@ -629,3 +629,49 @@ func TestSanitize_RepeatedElementsInsideCodeBlocks(t *testing.T) {
 	assert.Equal(t, expectedHTML, actualHTML,
 		"ContentNode HTML should match expected extraction output")
 }
+
+// TestSanitize_AriaHiddenRemoval verifies that elements with aria-hidden="true"
+// are removed during sanitization, including inside pre/code blocks.
+// Elements with aria-hidden="false" or without the attribute should be preserved.
+func TestSanitize_AriaHiddenRemoval(t *testing.T) {
+	// Arrange
+	mockSink := &mockMetadataSink{}
+	s := sanitizer.NewHTMLSanitizer(mockSink)
+
+	fixtureBytes := loadFixture(t, "pass/aria-hidden.html")
+
+	doc, err := html.Parse(strings.NewReader(string(fixtureBytes)))
+	require.NoError(t, err, "Failed to parse fixture HTML")
+
+	// Act
+	result, sanitizationErr := s.Sanitize(doc)
+
+	// Assert
+	require.NoError(t, sanitizationErr, "Sanitize should not return error for aria-hidden fixture")
+	require.NotNil(t, result.GetContentNode(), "Result should have a non-nil content node")
+
+	actualHTML := renderHtmlForTest(result.GetContentNode())
+
+	// Verify aria-hidden="true" elements are removed
+	assert.NotContains(t, actualHTML, `aria-hidden="true"`, "aria-hidden=\"true\" elements should be removed")
+
+	// Verify aria-hidden="false" elements are preserved
+	assert.Contains(t, actualHTML, `aria-hidden="false"`, "aria-hidden=\"false\" elements should be preserved")
+	assert.Contains(t, actualHTML, "This heading should not be removed", "aria-hidden=\"false\" heading should be preserved")
+	assert.Contains(t, actualHTML, "This paragraph should not be removed", "aria-hidden=\"false\" paragraph should be preserved")
+
+	// Verify the specific removed elements are gone
+	assert.NotContains(t, actualHTML, "This heading should be removed", "aria-hidden=\"true\" heading should be removed")
+	assert.NotContains(t, actualHTML, "This paragraph should be removed", "aria-hidden=\"true\" paragraph should be removed")
+
+	// Verify structure is preserved
+	assert.Contains(t, actualHTML, "<h1>Documentation Title</h1>", "H1 should be preserved")
+	assert.Contains(t, actualHTML, "<h2>Introduction</h2>", "Introduction heading should be preserved")
+	assert.Contains(t, actualHTML, "<h2>Getting Started</h2>", "Getting Started heading should be preserved")
+	assert.Contains(t, actualHTML, "<h3>Installation</h3>", "Installation heading should be preserved")
+	assert.Contains(t, actualHTML, "<h3>Configuration</h3>", "Configuration heading should be preserved")
+	assert.Contains(t, actualHTML, "<h2>API Reference</h2>", "API Reference heading should be preserved")
+
+	// Verify escaped HTML content inside pre/code is preserved (as HTML entities)
+	assert.Contains(t, actualHTML, "aria-hidden", "Escaped HTML content should be preserved")
+}

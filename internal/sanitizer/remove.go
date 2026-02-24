@@ -124,6 +124,49 @@ func isInCodeBlock(node *html.Node) bool {
 	return false
 }
 
+// hasAriaHiddenTrue checks if a node has aria-hidden="true" attribute.
+// This uses exact string match for the value "true" (case-sensitive per HTML spec).
+func hasAriaHiddenTrue(node *html.Node) bool {
+	for _, attr := range node.Attr {
+		if attr.Key == "aria-hidden" && attr.Val == "true" {
+			return true
+		}
+	}
+	return false
+}
+
+// removeAriaHiddenElementsWithCount removes elements with aria-hidden="true" attribute.
+// Returns the count of removed elements for debug logging.
+// This removes the entire element including its children.
+func removeAriaHiddenElementsWithCount(root *html.Node) int {
+	if root == nil {
+		return 0
+	}
+
+	removedCount := 0
+
+	// Collect children first because we'll modify the linked list during iteration
+	var children []*html.Node
+	for child := root.FirstChild; child != nil; child = child.NextSibling {
+		children = append(children, child)
+	}
+
+	// Process children (depth-first traversal)
+	for _, child := range children {
+		// If this child has aria-hidden="true", remove it entirely
+		if child.Type == html.ElementNode && hasAriaHiddenTrue(child) {
+			root.RemoveChild(child)
+			removedCount++
+			continue // Skip traversing children of removed node
+		}
+
+		// Recursively process this child's subtree
+		removedCount += removeAriaHiddenElementsWithCount(child)
+	}
+
+	return removedCount
+}
+
 // removeDuplicateNodesWithCount is like removeDuplicateNodes but returns the count of removed nodes.
 func removeDuplicateNodesWithCount(root *html.Node) int {
 	if root == nil {
