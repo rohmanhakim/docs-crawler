@@ -20,6 +20,8 @@ func TestSanitize_SuccessCases(t *testing.T) {
 		"pass/h3_structural_anchors_without_h1.html",
 		"pass/s4_duplicate_nodes_identical.html",
 		"pass/s4_repairable_malformed_dom.html",
+		"pass/tab_container.html",
+		"pass/nested_tab_container.html",
 	}
 
 	for _, fixture := range passFixtures {
@@ -457,6 +459,58 @@ func TestSanitize_PreH1ChromeRemoval(t *testing.T) {
 	assert.Contains(t, actualHTML, "This is the main content", "Main content should be preserved")
 }
 
+// TestSanitize_TabContainersLinearization verifies the precise algorithm and HTML output
+// mapping for tab components into sequence headings.
+func TestSanitize_TabContainersLinearization(t *testing.T) {
+	tabFixtures := []struct {
+		name         string
+		passFixture  string
+		expectedPath string
+	}{
+		{
+			name:         "Standard Tab Container",
+			passFixture:  "pass/tab_container.html",
+			expectedPath: "expected/tab_container.html",
+		},
+		{
+			name:         "Nested Tab Container",
+			passFixture:  "pass/nested_tab_container.html",
+			expectedPath: "expected/nested_tab_container.html",
+		},
+	}
+
+	for _, tc := range tabFixtures {
+		t.Run(tc.name, func(t *testing.T) {
+			mockSink := &mockMetadataSink{}
+			s := sanitizer.NewHTMLSanitizer(mockSink)
+
+			fixtureBytes := loadFixture(t, tc.passFixture)
+
+			doc, err := html.Parse(strings.NewReader(string(fixtureBytes)))
+			require.NoError(t, err, "Failed to parse fixture HTML")
+
+			result, sanitizationErr := s.Sanitize(doc)
+
+			require.NoError(t, sanitizationErr, "Sanitize should not return error for tab container fixture")
+			require.NotNil(t, result.GetContentNode(), "Result should have a non-nil content node")
+
+			actualHTML := renderHtmlForTest(result.GetContentNode())
+
+			// Parse the expected HTML specifically to ensure Go implicitly adds standard
+			// Document wrappers (like <html><body>) matching the output of the Sanitizer logic.
+			expectedBytes := loadFixture(t, tc.expectedPath)
+			expectedDoc, err := html.Parse(strings.NewReader(string(expectedBytes)))
+			require.NoError(t, err, "Failed to parse expected fixture HTML")
+			expectedHTML := renderHtmlForTest(expectedDoc)
+
+			actualNormalized := normalizeHtmlForTest(actualHTML)
+			expectedNormalized := normalizeHtmlForTest(expectedHTML)
+
+			assert.Equal(t, expectedNormalized, actualNormalized, "Linearized output must exactly match expected fixture layout")
+		})
+	}
+}
+
 func TestSanitize_Determinism(t *testing.T) {
 	determinismFixtures := []struct {
 		name    string
@@ -485,6 +539,14 @@ func TestSanitize_Determinism(t *testing.T) {
 		{
 			name:    "pre_h1_chrome_eyebrow",
 			fixture: "pass/pre_h1_chrome_eyebrow.html",
+		},
+		{
+			name:    "tab_container",
+			fixture: "pass/tab_container.html",
+		},
+		{
+			name:    "nested_tab_container",
+			fixture: "pass/nested_tab_container.html",
 		},
 	}
 

@@ -115,12 +115,11 @@ func hasPreH1ChromeKeyword(node *html.Node) bool {
 	return false
 }
 
-// isInCodeBlock checks if a node is a descendant of pre or code elements.
-// Elements inside code blocks should never be deduplicated as they represent
-// literal content where repetition is meaningful (e.g., repeated code lines).
 func isInCodeBlock(node *html.Node) bool {
-	if node.Data == "pre" || node.Data == "code" {
-		return true
+	for n := node; n != nil; n = n.Parent {
+		if n.Type == html.ElementNode && (n.Data == "pre" || n.Data == "code") {
+			return true
+		}
 	}
 	return false
 }

@@ -163,9 +163,13 @@ func (h *HtmlSanitizer) sanitize(doc *html.Node) (SanitizedHTMLDoc, *Sanitizatio
 		})
 	}
 
+	// Step 2.5: Linearize Tab Containers
+	// Transforms tabbed UI components into linearized, deterministic document structures
+	linearizedDoc := linearizeTabContainers(doc)
+
 	// Step 3: Normalize heading levels (Invariant H1)
 	// This renumbers headings to fix skipped levels without reordering nodes
-	normalizedDoc, headingStats := normalizeHeadingLevelsWithStats(doc)
+	normalizedDoc, headingStats := normalizeHeadingLevelsWithStats(linearizedDoc)
 	if h.debugLogger.Enabled() {
 		h.debugLogger.LogStep(context.TODO(), "sanitizer", "normalize_headings", debug.FieldMap{
 			"headings_count":   headingStats.totalCount,
@@ -264,69 +268,6 @@ func isParseable(doc *html.Node) bool {
 	}
 
 	return true
-}
-
-// normalizeHeadingLevels renumbers heading levels to fix skipped levels.
-// Headings should not skip more than one level.
-// For example: h1 -> h3 becomes h1 -> h2 (h3 is renumbered to h2).
-// Going backward (e.g., h4 -> h2) is allowed as it establishes a new section.
-// This function creates a copy of the input document and modifies the copy,
-// leaving the original input unchanged.
-func normalizeHeadingLevels(doc *html.Node) *html.Node {
-	// Create a goquery document from the input
-	docQuery := goquery.NewDocumentFromNode(doc)
-
-	// Clone the document to avoid mutating the original
-	clonedDoc := goquery.CloneDocument(docQuery)
-
-	// Find all headings in DOM order using a single selector
-	// This ensures we process headings in their actual document order
-	var headings []*html.Node
-	clonedDoc.Find("h1, h2, h3, h4, h5, h6").Each(func(i int, s *goquery.Selection) {
-		if node := s.Get(0); node != nil {
-			headings = append(headings, node)
-		}
-	})
-
-	if len(headings) == 0 {
-		return clonedDoc.Get(0)
-	}
-
-	// Track the previous heading level (effective level after renumbering)
-	prevEffectiveLevel := 0
-
-	for _, node := range headings {
-		// Get current level from the node tag name
-		currentLevel := 0
-		if len(node.Data) == 2 && node.Data[0] == 'h' {
-			currentLevel = int(node.Data[1] - '0')
-		}
-		if currentLevel < 1 || currentLevel > 6 {
-			continue
-		}
-
-		// Determine effective level after potential renumbering
-		effectiveLevel := currentLevel
-
-		// If this is the first heading or we're going deeper
-		if prevEffectiveLevel == 0 || currentLevel > prevEffectiveLevel {
-			// Check if we're skipping more than one level
-			if currentLevel > prevEffectiveLevel+1 {
-				// Renumber to prevEffectiveLevel + 1
-				newLevel := prevEffectiveLevel + 1
-				if newLevel >= 1 && newLevel <= 6 {
-					node.Data = fmt.Sprintf("h%d", newLevel)
-					effectiveLevel = newLevel
-				}
-			}
-		}
-		// If going backward (currentLevel <= prevEffectiveLevel), keep as-is
-		// This establishes a new section at a higher level
-
-		prevEffectiveLevel = effectiveLevel
-	}
-
-	return clonedDoc.Get(0)
 }
 
 // headingStats tracks statistics for heading normalization.
