@@ -37,7 +37,7 @@ func TestDryRunResolver_Resolve_NoNetworkRequests(t *testing.T) {
 
 	// Execute
 	resolveParam := assets.NewResolveParam(tempDir, 0, hashutil.HashAlgoSHA256)
-	result, err := resolver.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryParam())
+	result, err := resolver.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryOptions())
 
 	// Verify
 	assert.NoError(t, err)
@@ -80,7 +80,7 @@ func TestDryRunResolver_Resolve_DeduplicatesIdenticalURLs(t *testing.T) {
 
 	// Execute
 	resolveParam := assets.NewResolveParam(tempDir, 0, hashutil.HashAlgoSHA256)
-	result, err := resolver.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryParam())
+	result, err := resolver.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryOptions())
 
 	// Verify
 	assert.NoError(t, err)
@@ -112,7 +112,7 @@ func TestDryRunResolver_Resolve_RelativeURLs(t *testing.T) {
 
 	// Execute
 	resolveParam := assets.NewResolveParam(tempDir, 0, hashutil.HashAlgoSHA256)
-	result, err := resolver.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryParam())
+	result, err := resolver.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryOptions())
 
 	// Verify
 	assert.NoError(t, err)
@@ -137,7 +137,7 @@ func TestDryRunResolver_Resolve_MultiplePages_ShareAssetCache(t *testing.T) {
 	inputMarkdown1 := "![shared](" + imageURL + ")"
 	conversionResult1 := mdconvert.NewConversionResult([]byte(inputMarkdown1), linkRefs1)
 	pageURL1 := url.URL{Scheme: "https", Host: "example.com", Path: "/docs/page1"}
-	result1, err := resolver.Resolve(context.Background(), pageURL1, conversionResult1, resolveParam, testRetryParam())
+	result1, err := resolver.Resolve(context.Background(), pageURL1, conversionResult1, resolveParam, testRetryOptions())
 	assert.NoError(t, err)
 
 	// Second page with same image
@@ -147,7 +147,7 @@ func TestDryRunResolver_Resolve_MultiplePages_ShareAssetCache(t *testing.T) {
 	inputMarkdown2 := "![shared](" + imageURL + ")"
 	conversionResult2 := mdconvert.NewConversionResult([]byte(inputMarkdown2), linkRefs2)
 	pageURL2 := url.URL{Scheme: "https", Host: "example.com", Path: "/docs/page2"}
-	result2, err := resolver.Resolve(context.Background(), pageURL2, conversionResult2, resolveParam, testRetryParam())
+	result2, err := resolver.Resolve(context.Background(), pageURL2, conversionResult2, resolveParam, testRetryOptions())
 	assert.NoError(t, err)
 
 	// Both should have 1 local asset
@@ -180,7 +180,7 @@ func TestDryRunResolver_Resolve_UnparseableURLs(t *testing.T) {
 
 	// Execute
 	resolveParam := assets.NewResolveParam(tempDir, 0, hashutil.HashAlgoSHA256)
-	result, err := resolver.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryParam())
+	result, err := resolver.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryOptions())
 
 	// Verify
 	assert.NoError(t, err)
@@ -211,8 +211,8 @@ func TestDryRunResolver_Resolve_DeterministicPaths(t *testing.T) {
 	resolveParam := assets.NewResolveParam(tempDir, 0, hashutil.HashAlgoSHA256)
 
 	// Execute both resolvers
-	result1, _ := resolver1.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryParam())
-	result2, _ := resolver2.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryParam())
+	result1, _ := resolver1.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryOptions())
+	result2, _ := resolver2.Resolve(context.Background(), pageURL, conversionResult, resolveParam, testRetryOptions())
 
 	// Verify paths are identical
 	assert.Equal(t, result1.LocalAssets()[0], result2.LocalAssets()[0],

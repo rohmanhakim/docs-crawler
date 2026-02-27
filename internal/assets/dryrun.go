@@ -12,8 +12,8 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
-	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
+	"github.com/rohmanhakim/retrier"
 )
 
 /*
@@ -65,7 +65,7 @@ func (r *DryRunResolver) Resolve(
 	pageUrl url.URL,
 	conversionResult mdconvert.ConversionResult,
 	resolveParam ResolveParam,
-	_ retry.RetryParam, // unused in dry-run - no retries needed
+	_ []retrier.RetryOption, // unused in dry-run - no retries needed
 ) (AssetfulMarkdownDoc, failure.ClassifiedError) {
 	// Derive host and scheme from pageUrl for resolving relative asset URLs
 	host := pageUrl.Host

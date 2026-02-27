@@ -11,8 +11,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
-	"github.com/rohmanhakim/docs-crawler/pkg/retry"
-	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
+	"github.com/rohmanhakim/retrier"
 )
 
 // buildExpectedPath builds the expected asset path using the format:
@@ -23,15 +22,15 @@ func buildExpectedPath(originalName string, contentHash string, ext string) stri
 	return "assets/images/" + originalName + "-" + shortHash + "." + ext
 }
 
-// testRetryParam returns a retry param with minimal delays for testing
-func testRetryParam() retry.RetryParam {
-	return retry.NewRetryParam(
-		10*time.Millisecond,
-		5*time.Millisecond,
-		42,
-		2,
-		timeutil.NewBackoffParam(10*time.Millisecond, 2.0, 100*time.Millisecond),
-	)
+// testRetryOptions returns retry options with minimal delays for testing
+func testRetryOptions() []retrier.RetryOption {
+	return []retrier.RetryOption{
+		retrier.WithMaxAttempts(2),
+		retrier.WithInitialDuration(10 * time.Millisecond),
+		retrier.WithJitter(5 * time.Millisecond),
+		retrier.WithMultiplier(2.0),
+		retrier.WithMaxDuration(100 * time.Millisecond),
+	}
 }
 
 // newTestResolver creates a LocalResolver with test dependencies
@@ -58,5 +57,5 @@ func resolveWithTestParams(
 	outputDir string,
 ) (assets.AssetfulMarkdownDoc, error) {
 	resolveParam := assets.NewResolveParam(outputDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	return resolver.Resolve(ctx, pageUrl, conversionResult, resolveParam, testRetryParam())
+	return resolver.Resolve(ctx, pageUrl, conversionResult, resolveParam, testRetryOptions())
 }

@@ -9,7 +9,7 @@ import (
 
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
-	"github.com/rohmanhakim/docs-crawler/pkg/retry"
+	"github.com/rohmanhakim/retrier"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -26,9 +26,9 @@ func (f *fetcherMock) Fetch(
 	ctx context.Context,
 	crawlDepth int,
 	fetchUrl url.URL,
-	retryParam retry.RetryParam,
+	retryOptions []retrier.RetryOption,
 ) (fetcher.FetchResult, failure.ClassifiedError) {
-	args := f.Called(ctx, crawlDepth, fetchUrl, retryParam)
+	args := f.Called(ctx, crawlDepth, fetchUrl, retryOptions)
 	result := args.Get(0).(fetcher.FetchResult)
 	var err failure.ClassifiedError
 	if args.Get(1) != nil {

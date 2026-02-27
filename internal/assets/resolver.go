@@ -20,8 +20,8 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/fileutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/hashutil"
-	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
+	"github.com/rohmanhakim/retrier"
 )
 
 // imageRegex matches markdown image syntax: ![alt](url)
@@ -47,7 +47,7 @@ type Resolver interface {
 		pageUrl url.URL,
 		conversionResult mdconvert.ConversionResult,
 		resolveParam ResolveParam,
-		retryParam retry.RetryParam,
+		retryOptions []retrier.RetryOption,
 	) (AssetfulMarkdownDoc, failure.ClassifiedError)
 
 	Init(httpClient *http.Client, userAgent string)
@@ -100,7 +100,7 @@ func (r *LocalResolver) Resolve(
 	pageUrl url.URL,
 	conversionResult mdconvert.ConversionResult,
 	resolveParam ResolveParam,
-	retryParam retry.RetryParam,
+	retryOptions []retrier.RetryOption,
 ) (AssetfulMarkdownDoc, failure.ClassifiedError) {
 	// Derive host and scheme from pageUrl for resolving relative asset URLs
 	host := pageUrl.Host
@@ -141,7 +141,7 @@ func (r *LocalResolver) Resolve(
 		resolveParam,
 		host,
 		scheme,
-		retryParam,
+		retryOptions,
 		fetchEventCallback,
 		assetCallback,
 	)
@@ -181,7 +181,7 @@ func (r *LocalResolver) Resolve(
 		var cause metadata.ErrorCause
 		var details string
 
-		var retryErr *retry.RetryError
+		var retryErr *retrier.RetryError
 		var assetsErr *AssetsError
 
 		switch {
@@ -219,7 +219,7 @@ func (r *LocalResolver) resolve(
 	resolveParam ResolveParam,
 	host string,
 	scheme string,
-	retryParam retry.RetryParam,
+	retryOptions []retrier.RetryOption,
 	fetchCallback func(int, AssetFetchResult),
 	assetCallback func(localPath string, assetURL string, contentHash string, bytes int64),
 ) (AssetfulMarkdownDoc, failure.ClassifiedError) {
@@ -282,7 +282,7 @@ func (r *LocalResolver) resolve(
 				})
 			}
 
-			result := r.fetchAssetWithRetry(ctx, assetURL, r.userAgent, retryParam, resolveParam.MaxAssetSize())
+			result := r.fetchAssetWithRetry(ctx, assetURL, r.userAgent, retryOptions, resolveParam.MaxAssetSize())
 
 			// Calculate retry count (attempts - 1, since first try is not a retry)
 			retryCount := result.Attempts() - 1
@@ -449,16 +449,18 @@ func (r *LocalResolver) fetchAssetWithRetry(
 	ctx context.Context,
 	fetchUrl url.URL,
 	userAgent string,
-	retryParam retry.RetryParam,
+	retryOptions []retrier.RetryOption,
 	maxAssetSize int64,
-) retry.Result[AssetFetchResult] {
-	fetchTask := func() (AssetFetchResult, failure.ClassifiedError) {
-		return r.performFetch(ctx, fetchUrl, userAgent, maxAssetSize)
+) retrier.Result[AssetFetchResult] {
+	fetchTask := func() (AssetFetchResult, error) {
+		result, err := r.performFetch(ctx, fetchUrl, userAgent, maxAssetSize)
+		if err != nil {
+			return result, err
+		}
+		return result, nil
 	}
 
-	result := retry.Retry(retryParam, r.debugLogger, fetchTask)
-
-	return result
+	return retrier.Retry(ctx, debug.AsRetryLogger(r.debugLogger), fetchTask, retryOptions...)
 }
 
 func (r *LocalResolver) performFetch(ctx context.Context, fetchUrl url.URL, userAgent string, maxAssetSize int64) (AssetFetchResult, failure.ClassifiedError) {

@@ -9,7 +9,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
 	"github.com/rohmanhakim/docs-crawler/internal/mdconvert"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
-	"github.com/rohmanhakim/docs-crawler/pkg/retry"
+	"github.com/rohmanhakim/retrier"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -29,9 +29,9 @@ func (r *resolverMock) Resolve(
 	pageUrl url.URL,
 	conversionResult mdconvert.ConversionResult,
 	resolveParam assets.ResolveParam,
-	retryParam retry.RetryParam,
+	retryOptions []retrier.RetryOption,
 ) (assets.AssetfulMarkdownDoc, failure.ClassifiedError) {
-	args := r.Called(ctx, pageUrl, conversionResult, resolveParam, retryParam)
+	args := r.Called(ctx, pageUrl, conversionResult, resolveParam, retryOptions)
 	doc := args.Get(0).(assets.AssetfulMarkdownDoc)
 	var err failure.ClassifiedError
 	if args.Get(1) != nil {

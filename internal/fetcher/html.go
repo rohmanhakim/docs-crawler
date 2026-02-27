@@ -13,7 +13,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
-	"github.com/rohmanhakim/docs-crawler/pkg/retry"
+	"github.com/rohmanhakim/retrier"
 )
 
 /*
@@ -39,7 +39,7 @@ type Fetcher interface {
 		ctx context.Context,
 		crawlDepth int,
 		fetchUrl url.URL,
-		retryParam retry.RetryParam,
+		retryOptions []retrier.RetryOption,
 	) (FetchResult, failure.ClassifiedError)
 }
 
@@ -82,12 +82,12 @@ func (h *HtmlFetcher) Fetch(
 	ctx context.Context,
 	crawlDepth int,
 	fetchUrl url.URL,
-	retryParam retry.RetryParam,
+	retryOptions []retrier.RetryOption,
 ) (FetchResult, failure.ClassifiedError) {
 	callerMethod := "HtmlFetcher.Fetch"
 	startTime := time.Now()
 
-	retryResult := h.fetchWithRetry(ctx, fetchUrl, h.userAgent, retryParam)
+	retryResult := h.fetchWithRetry(ctx, fetchUrl, h.userAgent, retryOptions)
 	result := retryResult.Value()
 	err := retryResult.Err()
 
@@ -119,16 +119,45 @@ func (h *HtmlFetcher) Fetch(
 	))
 
 	if err != nil {
-		// Use errors.Is to decide between FetchError or RetryError
-		if errors.Is(err, &retry.RetryError{}) {
-			// It's a RetryError
-			h.recordRetryError(callerMethod, fetchUrl, err)
-		} else {
-			// It's a FetchError
-			h.recordFetchError(callerMethod, fetchUrl, err)
+		// Check if it's a RetryError (retries exhausted)
+		var retryErr *retrier.RetryError
+		if errors.As(err, &retryErr) {
+			// Extract the underlying ClassifiedError from the RetryableErrorAdapter
+			var classifiedErr failure.ClassifiedError
+			var adapter *failure.RetryableErrorAdapter
+			if errors.As(err, &adapter) {
+				classifiedErr = adapter.ClassifiedError
+			} else {
+				// Fallback: create a generic error
+				classifiedErr = &FetchError{
+					Message: retryErr.Error(),
+					Cause:   ErrCauseNetworkFailure,
+					policy:  failure.RetryPolicyManual,
+					impact:  failure.ImpactLevelContinue,
+				}
+			}
+
+			// Wrap in RetryExhaustedError to preserve full error chain
+			wrappedErr := failure.AsRetryExhaustedError(retryErr, classifiedErr)
+			h.recordRetryError(callerMethod, fetchUrl, wrappedErr)
+			return FetchResult{}, wrappedErr
 		}
 
-		return FetchResult{}, err
+		// It's a direct error (no retry happened)
+		var classifiedErr failure.ClassifiedError
+		if adapter, ok := err.(*failure.RetryableErrorAdapter); ok {
+			classifiedErr = adapter.ClassifiedError
+		} else {
+			classifiedErr = &FetchError{
+				Message: err.Error(),
+				Cause:   ErrCauseNetworkFailure,
+				policy:  failure.RetryPolicyManual,
+				impact:  failure.ImpactLevelContinue,
+			}
+		}
+
+		h.recordFetchError(callerMethod, fetchUrl, classifiedErr)
+		return FetchResult{}, classifiedErr
 	}
 
 	return result, nil
@@ -161,7 +190,7 @@ func (h *HtmlFetcher) recordFetchError(callerMethod string, fetchUrl url.URL, er
 }
 
 func (h *HtmlFetcher) recordRetryError(callerMethod string, fetchUrl url.URL, err failure.ClassifiedError) {
-	var retryError *retry.RetryError
+	var retryError *retrier.RetryError
 	if errors.As(err, &retryError) {
 		// record retry error event
 		h.metadataSink.RecordError(
@@ -184,13 +213,17 @@ func (h *HtmlFetcher) fetchWithRetry(
 	ctx context.Context,
 	fetchUrl url.URL,
 	userAgent string,
-	retryParam retry.RetryParam,
-) retry.Result[FetchResult] {
-	fetchTask := func() (FetchResult, failure.ClassifiedError) {
-		return h.performFetch(ctx, fetchUrl, userAgent)
+	retryOptions []retrier.RetryOption,
+) retrier.Result[FetchResult] {
+	fetchTask := func() (FetchResult, error) {
+		result, err := h.performFetch(ctx, fetchUrl, userAgent)
+		if err != nil {
+			return result, err
+		}
+		return result, nil
 	}
 
-	return retry.Retry(retryParam, h.debugLogger, fetchTask)
+	return retrier.Retry(ctx, debug.AsRetryLogger(h.debugLogger), fetchTask, retryOptions...)
 }
 
 func (h *HtmlFetcher) performFetch(

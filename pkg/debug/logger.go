@@ -3,6 +3,8 @@ package debug
 import (
 	"context"
 	"time"
+
+	"github.com/rohmanhakim/retrier"
 )
 
 // DebugLogger provides structured debug logging capabilities.
@@ -88,3 +90,26 @@ const (
 
 // FieldMap is a map of structured field names to values.
 type FieldMap map[string]any
+
+// RetryLoggerAdapter wraps DebugLogger to implement retrier.DebugLogger.
+// This allows DebugLogger types to be used with the external retry package.
+type RetryLoggerAdapter struct {
+	DebugLogger
+}
+
+// AsRetryLogger wraps a DebugLogger to implement retrier.DebugLogger.
+// Returns a NoOpRetryLogger if the logger is nil.
+func AsRetryLogger(logger DebugLogger) *RetryLoggerAdapter {
+	if logger == nil {
+		return &RetryLoggerAdapter{NewNoOpLogger()}
+	}
+	return &RetryLoggerAdapter{DebugLogger: logger}
+}
+
+// LogRetry implements retrier.DebugLogger.LogRetry by delegating to DebugLogger.Logretrier.
+func (a *RetryLoggerAdapter) LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, err error) {
+	a.DebugLogger.LogRetry(ctx, attempt, maxAttempts, backoff, err)
+}
+
+// Ensure RetryLoggerAdapter implements retrier.DebugLogger at compile time.
+var _ retrier.DebugLogger = (*RetryLoggerAdapter)(nil)

@@ -26,9 +26,9 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
-	"github.com/rohmanhakim/docs-crawler/pkg/retry"
 	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
+	"github.com/rohmanhakim/retrier"
 )
 
 /*
@@ -435,7 +435,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			URL:  urlStr,
 		})
 
-		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryParam(cfg))
+		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryOptions(cfg))
 		if err != nil {
 			if err.Impact() == failure.ImpactLevelAbort {
 				return CrawlingExecution{}, err
@@ -553,7 +553,7 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			fetchResult.URL(),
 			markdownDoc,
 			resolveParam,
-			RetryParam(cfg),
+			RetryOptions(cfg),
 		)
 		if err != nil {
 			if err.Impact() == failure.ImpactLevelAbort {
@@ -682,18 +682,14 @@ func (s *Scheduler) recordRobotsErrorAndBackoff(robotsErr *robots.RobotsError, t
 	}
 }
 
-func RetryParam(cfg config.Config) retry.RetryParam {
-	return retry.NewRetryParam(
-		cfg.BaseDelay(),
-		cfg.Jitter(),
-		cfg.RandomSeed(),
-		cfg.MaxAttempt(),
-		timeutil.NewBackoffParam(
-			cfg.BackoffInitialDuration(),
-			cfg.BackoffMultiplier(),
-			cfg.BackoffMaxDuration(),
-		),
-	)
+func RetryOptions(cfg config.Config) []retrier.RetryOption {
+	return []retrier.RetryOption{
+		retrier.WithMaxAttempts(cfg.MaxAttempt()),
+		retrier.WithInitialDuration(cfg.BackoffInitialDuration()),
+		retrier.WithJitter(cfg.Jitter()),
+		retrier.WithMultiplier(cfg.BackoffMultiplier()),
+		retrier.WithMaxDuration(cfg.BackoffMaxDuration()),
+	}
 }
 
 // ---------------------------------------------------------------------------

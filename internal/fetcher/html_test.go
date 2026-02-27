@@ -18,8 +18,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/metadata/metadatatest"
 	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
-	"github.com/rohmanhakim/docs-crawler/pkg/retry"
-	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
+	"github.com/rohmanhakim/retrier"
 )
 
 // mockMetadataSink is an alias to the shared mock in metadatatest package.
@@ -27,19 +26,15 @@ type mockMetadataSink = metadatatest.SinkMock
 
 var _ metadata.MetadataSink = (*mockMetadataSink)(nil)
 
-// createTestRetryParam creates retry parameters for testing
-func createTestRetryParam(maxAttempts int) retry.RetryParam {
-	return retry.NewRetryParam(
-		100*time.Millisecond, // baseDelay
-		50*time.Millisecond,  // jitter
-		42,                   // randomSeed
-		maxAttempts,          // maxAttempts
-		timeutil.NewBackoffParam(
-			100*time.Millisecond,
-			2.0,
-			1*time.Second,
-		),
-	)
+// createTestRetryOptions creates retry options for testing
+func createTestRetryOptions(maxAttempts int) []retrier.RetryOption {
+	return []retrier.RetryOption{
+		retrier.WithMaxAttempts(maxAttempts),
+		retrier.WithInitialDuration(100 * time.Millisecond),
+		retrier.WithJitter(50 * time.Millisecond),
+		retrier.WithMaxDuration(1 * time.Second),
+		retrier.WithMultiplier(2.0),
+	}
 }
 
 func TestHtmlFetcher_Fetch_Success(t *testing.T) {
@@ -58,9 +53,9 @@ func TestHtmlFetcher_Fetch_Success(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(3)
+	retryOptions := createTestRetryOptions(3)
 
-	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -162,9 +157,9 @@ func TestHtmlFetcher_Fetch_NonHTMLContent(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(3)
+	retryOptions := createTestRetryOptions(3)
 
-	_, err := f.Fetch(context.Background(), 1, *fetchUrl, retryParam)
+	_, err := f.Fetch(context.Background(), 1, *fetchUrl, retryOptions)
 
 	if err == nil {
 		t.Fatal("expected error for non-HTML content, got nil")
@@ -209,9 +204,9 @@ func TestHtmlFetcher_Fetch_HTTP404(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(3)
+	retryOptions := createTestRetryOptions(3)
 
-	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err == nil {
 		t.Fatal("expected error for 404, got nil")
@@ -241,9 +236,9 @@ func TestHtmlFetcher_Fetch_HTTP403(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(3)
+	retryOptions := createTestRetryOptions(3)
 
-	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err == nil {
 		t.Fatal("expected error for 403, got nil")
@@ -277,9 +272,9 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(2)
+	retryOptions := createTestRetryOptions(2)
 
-	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err == nil {
 		t.Fatal("expected error after retries exhausted, got nil")
@@ -291,7 +286,7 @@ func TestHtmlFetcher_Fetch_HTTP500_Retryable(t *testing.T) {
 	}
 
 	// Verify it's a RetryError after retries exhausted
-	var retryErr *retry.RetryError
+	var retryErr *retrier.RetryError
 	if !errors.As(err, &retryErr) {
 		t.Fatalf("expected RetryError after exhausted retries, got %T", err)
 	}
@@ -353,9 +348,9 @@ func TestHtmlFetcher_Fetch_HTTP429_Retryable(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(2)
+	retryOptions := createTestRetryOptions(2)
 
-	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err == nil {
 		t.Fatal("expected error after retries exhausted, got nil")
@@ -367,7 +362,7 @@ func TestHtmlFetcher_Fetch_HTTP429_Retryable(t *testing.T) {
 	}
 
 	// Verify it's a RetryError after retries exhausted
-	var retryErr *retry.RetryError
+	var retryErr *retrier.RetryError
 	if !errors.As(err, &retryErr) {
 		t.Fatalf("expected RetryError after exhausted retries, got %T", err)
 	}
@@ -395,9 +390,9 @@ func TestHtmlFetcher_Fetch_SuccessAfterRetry(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(3)
+	retryOptions := createTestRetryOptions(3)
 
-	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err != nil {
 		t.Fatalf("expected success after retry, got error: %v", err)
@@ -463,9 +458,9 @@ func TestHtmlFetcher_FetchResult_Accessors(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(3)
+	retryOptions := createTestRetryOptions(3)
 
-	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -573,9 +568,9 @@ func TestFetchError_Classification(t *testing.T) {
 			f.Init(&http.Client{}, "test-user-agent")
 
 			fetchUrl, _ := url.Parse(server.URL)
-			retryParam := createTestRetryParam(1) // Single attempt to test classification
+			retryOptions := createTestRetryOptions(1) // Single attempt to test classification
 
-			_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+			_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 			if err == nil {
 				t.Fatal("expected error")
@@ -638,10 +633,10 @@ func TestHtmlFetcher_NoMetadataSinkPanics(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(3)
+	retryOptions := createTestRetryOptions(3)
 
 	// Should not panic
-	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -685,9 +680,9 @@ func TestHtmlFetcher_Fetch_ReadResponseBodyError(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(1) // single attempt; since error is retryable, exhaustion yields RetryError
+	retryOptions := createTestRetryOptions(1) // single attempt; since error is retryable, exhaustion yields RetryError
 
-	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	_, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err == nil {
 		t.Fatal("expected error for read response body failure, got nil")
@@ -695,7 +690,7 @@ func TestHtmlFetcher_Fetch_ReadResponseBodyError(t *testing.T) {
 
 	// Because the underlying FetchError is retryable, the retry wrapper will
 	// return a RetryError after exhaustion (even with maxAttempts=1).
-	var retryErr *retry.RetryError
+	var retryErr *retrier.RetryError
 	if !errors.As(err, &retryErr) {
 		t.Fatalf("expected RetryError, got %T", err)
 	}
@@ -762,9 +757,9 @@ func TestHtmlFetcher_Fetch_GzippedResponse(t *testing.T) {
 	f.Init(&http.Client{}, "test-user-agent")
 
 	fetchUrl, _ := url.Parse(server.URL)
-	retryParam := createTestRetryParam(3)
+	retryOptions := createTestRetryOptions(3)
 
-	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryParam)
+	result, err := f.Fetch(context.Background(), 0, *fetchUrl, retryOptions)
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)

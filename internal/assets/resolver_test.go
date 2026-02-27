@@ -47,7 +47,7 @@ func TestResolve_Success_WithAssets(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error should be returned when fetching succeeds
 	assert.NoError(t, err)
@@ -98,7 +98,7 @@ func TestResolve_Success_NoAssets(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error should be returned when there are no assets to process
 	assert.NoError(t, err)
@@ -130,7 +130,7 @@ func TestResolve_Error_CreateAssetDirFails(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(invalidDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - error should be returned when createAssetDir fails
 	assert.Error(t, err)
@@ -178,7 +178,7 @@ func TestResolve_AssetFetchFails_PreservesOriginalURL(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error should be returned from Resolve (missing assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -246,7 +246,7 @@ func TestResolve_MixedSuccessAndFailure(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert
 	assert.NoError(t, err)
@@ -308,7 +308,7 @@ func TestResolve_MechanicalDeduplication_SinglePage(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert
 	assert.NoError(t, err)
@@ -354,7 +354,7 @@ func TestResolve_CrossCallDeduplication(t *testing.T) {
 
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	_, err := resolver.Resolve(ctx, *pageUrl1, conversionResult1, resolveParam, testRetryParam())
+	_, err := resolver.Resolve(ctx, *pageUrl1, conversionResult1, resolveParam, testRetryOptions())
 	assert.NoError(t, err)
 
 	// Assert first call has artifact record
@@ -373,7 +373,7 @@ func TestResolve_CrossCallDeduplication(t *testing.T) {
 	pageUrl2, _ := url.Parse(server.URL + "/page2")
 
 	// Act
-	doc2, err := resolver.Resolve(ctx, *pageUrl2, conversionResult2, resolveParam, testRetryParam())
+	doc2, err := resolver.Resolve(ctx, *pageUrl2, conversionResult2, resolveParam, testRetryOptions())
 
 	// Assert
 	assert.NoError(t, err)
@@ -423,7 +423,7 @@ func TestResolve_NonImageLinksIgnored(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert
 	assert.NoError(t, err)
@@ -469,7 +469,7 @@ func TestResolve_ContentHashDeduplication_DifferentURLs(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert
 	assert.NoError(t, err)
@@ -520,7 +520,7 @@ func TestResolve_RelativeURLsResolved(t *testing.T) {
 	// Act - use server's scheme and host so relative URL resolves correctly
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert
 	assert.NoError(t, err)
@@ -583,7 +583,7 @@ func TestResolve_ContentHashDeduplication_DeterministicPath(t *testing.T) {
 		// Act
 		ctx := context.Background()
 		resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-		doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+		doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 		// Assert
 		assert.NoError(t, err)
@@ -630,7 +630,7 @@ func TestResolve_AssetTooLarge_ContentLengthHeader(t *testing.T) {
 	// Act - use maxAssetSize of 512 bytes (less than Content-Length of 1024)
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 512, hashutil.HashAlgoSHA256) // 512 bytes limit
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -680,7 +680,7 @@ func TestResolve_AssetTooLarge_UnknownContentLength(t *testing.T) {
 	// Act - use maxAssetSize of 512 bytes (less than streamed body of 1024)
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 512, hashutil.HashAlgoSHA256) // 512 bytes limit
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -731,7 +731,7 @@ func TestResolve_AssetTooLarge_LyingContentLength(t *testing.T) {
 	// Act - use maxAssetSize of 512 bytes (less than actual body of 1024)
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 512, hashutil.HashAlgoSHA256) // 512 bytes limit
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error should be returned from Resolve (large assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -812,7 +812,7 @@ func TestResolve_AssetAtSizeBoundary(t *testing.T) {
 			// Act
 			ctx := context.Background()
 			resolveParam := assets.NewResolveParam(tempDir, tc.maxAssetSize, hashutil.HashAlgoSHA256)
-			doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+			doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 			// Assert
 			assert.NoError(t, err) // Resolve never returns error for asset failures
@@ -906,7 +906,7 @@ func TestResolve_MaxAssetSizeZero_Unlimited(t *testing.T) {
 			// Act - use maxAssetSize of 0 (should mean unlimited)
 			ctx := context.Background()
 			resolveParam := assets.NewResolveParam(tempDir, tc.maxAssetSize, hashutil.HashAlgoSHA256)
-			doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+			doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 			// Assert - no error from Resolve
 			assert.NoError(t, err)
@@ -969,7 +969,7 @@ func TestResolve_QueryParamsPreserved(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error
 	assert.NoError(t, err)
@@ -1025,7 +1025,7 @@ func TestResolve_DebugLogging_SuccessfulFetch(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error
 	assert.NoError(t, err)
@@ -1089,7 +1089,7 @@ func TestResolve_DebugLogging_FailedFetch(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error from Resolve (missing assets are reported, not fatal)
 	assert.NoError(t, err)
@@ -1130,7 +1130,7 @@ func TestResolve_DebugLogging_ContentHashDedup(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	_, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error
 	assert.NoError(t, err)
@@ -1173,7 +1173,7 @@ func TestResolve_QueryParamsDeduplication(t *testing.T) {
 	// Act
 	ctx := context.Background()
 	resolveParam := assets.NewResolveParam(tempDir, 10*1024*1024, hashutil.HashAlgoSHA256)
-	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryParam())
+	doc, err := resolver.Resolve(ctx, *pageUrl, conversionResult, resolveParam, testRetryOptions())
 
 	// Assert - no error
 	assert.NoError(t, err)
