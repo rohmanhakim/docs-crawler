@@ -1078,14 +1078,11 @@ func TestIntegration_DebugLogging_Disabled(t *testing.T) {
 // Test 8: JSONL File Output (validates full SlogLogger output)
 // =============================================================================
 
-// JSONLEntry represents a parsed JSONL log entry matching the design document structure.
+// JSONLEntry represents a parsed JSONL log entry matching dlog's Logstash format.
 type JSONLEntry struct {
 	Timestamp     string `json:"@timestamp"`
-	Version       string `json:"@version"`
-	Level         string `json:"level"`
-	LoggerName    string `json:"logger_name"`
+	LogLevel      string `json:"log.level"`
 	Message       string `json:"message"`
-	ThreadName    string `json:"thread_name"`
 	Stage         string `json:"stage,omitempty"`
 	EventType     string `json:"event_type,omitempty"`
 	URL           string `json:"url,omitempty"`
@@ -1136,17 +1133,14 @@ func trimWhitespace(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// assertValidJSONLFields validates required fields per the design document.
+// assertValidJSONLFields validates required fields per dlog's Logstash format.
 func assertValidJSONLFields(t *testing.T, entry JSONLEntry) {
 	t.Helper()
 
-	// Required fields per design document section 6.1
+	// Required fields per dlog's Logstash format
 	assert.NotEmpty(t, entry.Timestamp, "@timestamp should be present")
-	assert.Equal(t, "1", entry.Version, "@version should be '1'")
-	assert.Equal(t, "DEBUG", entry.Level, "level should be 'DEBUG'")
-	assert.Equal(t, "docs-crawler", entry.LoggerName, "logger_name should be 'docs-crawler'")
+	assert.Equal(t, "DEBUG", entry.LogLevel, "log.level should be 'DEBUG'")
 	assert.NotEmpty(t, entry.Message, "message should be present")
-	assert.Equal(t, "main", entry.ThreadName, "thread_name should be 'main'")
 
 	// Validate timestamp format (RFC3339Nano)
 	_, err := time.Parse(time.RFC3339Nano, entry.Timestamp)
@@ -1162,8 +1156,8 @@ func TestIntegration_DebugLogging_JSONLFileOutput(t *testing.T) {
 	tmpDir := t.TempDir()
 	debugFilePath := filepath.Join(tmpDir, "debug.jsonl")
 
-	// Create SlogLogger with file output
-	debugConfig, err := debug.NewDebugConfig(true, debugFilePath, "json")
+	// Create SlogLogger with file output (use logstash format for Logstash-compatible field names)
+	debugConfig, err := debug.NewDebugConfig(true, debugFilePath, "logstash")
 	require.NoError(t, err, "failed to create debug config")
 
 	debugLogger, err := debug.NewSlogLogger(debugConfig)
