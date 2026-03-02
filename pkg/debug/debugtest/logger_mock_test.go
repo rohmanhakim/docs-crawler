@@ -61,7 +61,7 @@ func TestLoggerMock_LogRetry(t *testing.T) {
 	ctx := context.Background()
 	testErr := errors.New("timeout")
 
-	mock.LogRetry(ctx, 2, 10, 100*time.Millisecond, testErr)
+	mock.LogRetry(ctx, 2, 10, 100*time.Millisecond, testErr, debug.FieldMap{"url": "https://example.com", "stage": "fetcher"})
 
 	if !mock.LogRetryCalled {
 		t.Error("LogRetryCalled should be true")
@@ -211,7 +211,7 @@ func TestLoggerMock_Reset(t *testing.T) {
 
 	// Record some events
 	mock.LogStage(ctx, "fetcher", debug.StageEvent{Type: debug.EventTypeStart})
-	mock.LogRetry(ctx, 1, 10, 100*time.Millisecond, errors.New("test"))
+	mock.LogRetry(ctx, 1, 10, 100*time.Millisecond, errors.New("test"), nil)
 	mock.LogRateLimit(ctx, "example.com", 1*time.Second, debug.RateLimitReasonBaseDelay)
 	mock.LogStep(ctx, "fetcher", "test", nil)
 	mock.LogError(ctx, "fetcher", errors.New("test"), nil)
@@ -276,8 +276,8 @@ func TestLoggerMock_LastMethods(t *testing.T) {
 	mock.LogStage(ctx, "fetcher", debug.StageEvent{Type: debug.EventTypeStart})
 	mock.LogStage(ctx, "extractor", debug.StageEvent{Type: debug.EventTypeStart})
 
-	mock.LogRetry(ctx, 1, 10, 100*time.Millisecond, nil)
-	mock.LogRetry(ctx, 2, 10, 200*time.Millisecond, nil)
+	mock.LogRetry(ctx, 1, 10, 100*time.Millisecond, nil, nil)
+	mock.LogRetry(ctx, 2, 10, 200*time.Millisecond, nil, nil)
 
 	mock.LogRateLimit(ctx, "a.com", 1*time.Second, debug.RateLimitReasonBaseDelay)
 	mock.LogRateLimit(ctx, "b.com", 2*time.Second, debug.RateLimitReasonCrawlDelay)
@@ -312,7 +312,7 @@ func TestLoggerMock_GetMethods(t *testing.T) {
 
 	// Add entries
 	mock.LogStage(ctx, "fetcher", debug.StageEvent{Type: debug.EventTypeStart})
-	mock.LogRetry(ctx, 1, 10, 100*time.Millisecond, nil)
+	mock.LogRetry(ctx, 1, 10, 100*time.Millisecond, nil, nil)
 	mock.LogRateLimit(ctx, "a.com", 1*time.Second, debug.RateLimitReasonBaseDelay)
 	mock.LogStep(ctx, "fetcher", "step1", nil)
 	mock.LogError(ctx, "fetcher", errors.New("err"), nil)
@@ -401,7 +401,7 @@ func TestLoggerMock_TotalCalls(t *testing.T) {
 	}
 
 	mock.LogStage(ctx, "fetcher", debug.StageEvent{})
-	mock.LogRetry(ctx, 1, 10, 0, nil)
+	mock.LogRetry(ctx, 1, 10, 0, nil, nil)
 	mock.LogRateLimit(ctx, "a.com", 0, debug.RateLimitReasonBaseDelay)
 	mock.LogStep(ctx, "fetcher", "step", nil)
 	mock.LogError(ctx, "fetcher", errors.New("err"), nil)

@@ -58,6 +58,7 @@ type RetryEntry struct {
 	MaxAttempts int
 	Backoff     time.Duration
 	Err         error
+	Attrs       debug.FieldMap
 }
 
 // RateLimitEntry represents a recorded LogRateLimit call.
@@ -117,7 +118,7 @@ func (m *LoggerMock) LogStage(_ context.Context, stage string, event debug.Stage
 }
 
 // LogRetry records a retry event.
-func (m *LoggerMock) LogRetry(_ context.Context, attempt int, maxAttempts int, backoff time.Duration, err error) {
+func (m *LoggerMock) LogRetry(_ context.Context, attempt int, maxAttempts int, backoff time.Duration, err error, attrs debug.FieldMap) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.LogRetryCalled = true
@@ -126,6 +127,7 @@ func (m *LoggerMock) LogRetry(_ context.Context, attempt int, maxAttempts int, b
 		MaxAttempts: maxAttempts,
 		Backoff:     backoff,
 		Err:         err,
+		Attrs:       attrs,
 	})
 }
 

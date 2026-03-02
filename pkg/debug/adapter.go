@@ -57,11 +57,19 @@ func (d *DomainLogger) LogStage(ctx context.Context, stage string, event StageEv
 }
 
 // LogRetry logs retry attempts with backoff information.
-func (d *DomainLogger) LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, err error) {
+// The attrs parameter allows passing additional context like URL and stage.
+func (d *DomainLogger) LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, err error, attrs FieldMap) {
 	fields := dlog.FieldMap{
 		"attempt":      attempt,
 		"max_attempts": maxAttempts,
 		"backoff_ms":   backoff.Milliseconds(),
+	}
+
+	// Merge additional attributes
+	if len(attrs) > 0 {
+		for k, v := range attrs {
+			fields[k] = v
+		}
 	}
 
 	if err != nil {
@@ -160,8 +168,18 @@ func AsRetryLogger(logger DebugLogger) *RetryLoggerAdapter {
 }
 
 // LogRetry implements retrier.DebugLogger.LogRetry by delegating to DebugLogger.LogRetry.
-func (a *RetryLoggerAdapter) LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, err error) {
-	a.DebugLogger.LogRetry(ctx, attempt, maxAttempts, backoff, err)
+// The attrs parameter is converted to FieldMap for the underlying logger.
+func (a *RetryLoggerAdapter) LogRetry(ctx context.Context, attempt int, maxAttempts int, backoff time.Duration, err error, attrs ...any) {
+	// Convert attrs to FieldMap
+	fieldMap := FieldMap{}
+	for i := 0; i < len(attrs); i += 2 {
+		if i+1 < len(attrs) {
+			if key, ok := attrs[i].(string); ok {
+				fieldMap[key] = attrs[i+1]
+			}
+		}
+	}
+	a.DebugLogger.LogRetry(ctx, attempt, maxAttempts, backoff, err, fieldMap)
 }
 
 // Ensure RetryLoggerAdapter implements retrier.DebugLogger at compile time.
