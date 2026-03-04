@@ -32,7 +32,7 @@ func TestInitializeCrawling_Success_ReturnsInitialization(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -48,7 +48,6 @@ func TestInitializeCrawling_Success_ReturnsInitialization(t *testing.T) {
 	mockLimiter.On("SetJitter", mock.Anything).Return()
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Use helper function to create scheduler with real extractor/sanitizer
 	s := createSchedulerForTest(
@@ -65,7 +64,6 @@ func TestInitializeCrawling_Success_ReturnsInitialization(t *testing.T) {
 		nil, // nil = create convert mock
 		nil, // nil = create normalize mock
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -103,7 +101,7 @@ func TestInitializeCrawling_ConfigFileNotFound_ReturnsError(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -122,7 +120,6 @@ func TestInitializeCrawling_ConfigFileNotFound_ReturnsError(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -151,7 +148,7 @@ func TestInitializeCrawling_InvalidConfigJSON_ReturnsError(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -170,7 +167,6 @@ func TestInitializeCrawling_InvalidConfigJSON_ReturnsError(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -201,7 +197,7 @@ func TestInitializeCrawling_EmptySeedURLs_ReturnsError(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -220,7 +216,6 @@ func TestInitializeCrawling_EmptySeedURLs_ReturnsError(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -257,7 +252,7 @@ func TestExecuteCrawlingWithState_Success_ReturnsExecutionResult(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -283,7 +278,7 @@ func TestExecuteCrawlingWithState_Success_ReturnsExecutionResult(t *testing.T) {
 	mockLimiter.On("SetJitter", mock.Anything).Return()
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	// Use helper function
@@ -301,7 +296,6 @@ func TestExecuteCrawlingWithState_Success_ReturnsExecutionResult(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -344,7 +338,7 @@ func TestExecuteCrawlingWithState_EmptyFrontier_Completes(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -369,7 +363,6 @@ func TestExecuteCrawlingWithState_EmptyFrontier_Completes(t *testing.T) {
 	mockLimiter.On("SetJitter", mock.Anything).Return()
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Use helper function
 	s := createSchedulerForTest(
@@ -386,7 +379,6 @@ func TestExecuteCrawlingWithState_EmptyFrontier_Completes(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -435,7 +427,7 @@ func TestExecuteCrawlingWithState_RecordsStatsCorrectly(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -460,7 +452,7 @@ func TestExecuteCrawlingWithState_RecordsStatsCorrectly(t *testing.T) {
 	mockLimiter.On("SetJitter", mock.Anything).Return()
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	// Use helper function
@@ -478,7 +470,6 @@ func TestExecuteCrawlingWithState_RecordsStatsCorrectly(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -536,7 +527,7 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -561,7 +552,7 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 	mockLimiter.On("SetJitter", mock.Anything).Return()
 	mockLimiter.On("SetRandomSeed", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
 	// Use helper function
@@ -579,7 +570,6 @@ func TestSplit_InitThenExecute_WorksEndToEnd(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -672,7 +662,7 @@ func TestInitializeCrawling_InjectedJournalNotReplaced(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -682,7 +672,6 @@ func TestInitializeCrawling_InjectedJournalNotReplaced(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Inject a real FileJournal at a sentinel path. Since Path() is a concrete method
 	// (not a mock), it reliably returns the injected path regardless of other defaults.
@@ -703,7 +692,6 @@ func TestInitializeCrawling_InjectedJournalNotReplaced(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		injectedJournal,
 	)
 
@@ -734,7 +722,7 @@ func TestSplit_InitFailure_RecordsStats(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -753,7 +741,6 @@ func TestSplit_InitFailure_RecordsStats(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 

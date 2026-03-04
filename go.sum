@@ -24,8 +24,12 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rohmanhakim/dlog v1.0.0 h1:sI7tLgIxQO97wNEccrA55Wu7WZCAwxa92fUbH0fPDo8=
 github.com/rohmanhakim/dlog v1.0.0/go.mod h1:xnzoJCalbW2cELqwRNZQD2w8R16TYmb7maJ9bLMLIgY=
-github.com/rohmanhakim/retrier v1.0.1 h1:M73MDnAw0bjynaeJtMlqERtmjCbnQJOdM4HTAiF3xqM=
-github.com/rohmanhakim/retrier v1.0.1/go.mod h1:xQYDdAw+XMMdnL4DhStzXjLO7fd6mAVj6cBW94uIyZQ=
+github.com/rohmanhakim/exponential-backoff v1.0.0 h1:w91rYHOAli5RASyrDxe2uN159xXyTtuo/zTUhUtxVcs=
+github.com/rohmanhakim/exponential-backoff v1.0.0/go.mod h1:8U8ryC5VsQ1gD29EnQ6d3CPNmFXI2I13SuiISzb4THY=
+github.com/rohmanhakim/rate-limiter v1.0.0 h1:daa3s/IK+xfuCGvsS/2PiyAhLgwctu58LAlwNFw0WKs=
+github.com/rohmanhakim/rate-limiter v1.0.0/go.mod h1:A4wT0c3gday5B04r8WvkZY1LNib7lnOTDjC+LIVu2d8=
+github.com/rohmanhakim/retrier v1.0.2 h1:8Ko35XLhaxwNiS9eKzU6DZmK8BaENESw4DNfoIhpZzk=
+github.com/rohmanhakim/retrier v1.0.2/go.mod h1:xQYDdAw+XMMdnL4DhStzXjLO7fd6mAVj6cBW94uIyZQ=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sebdah/goldie/v2 v2.8.0 h1:dZb9wR8q5++oplmEiJT+U/5KyotVD+HNGCAc5gNr8rc=
 github.com/sebdah/goldie/v2 v2.8.0/go.mod h1:oZ9fp0+se1eapSRjfYbsV/0Hqhbuu3bJVvKI/NNtssI=

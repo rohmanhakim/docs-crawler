@@ -34,7 +34,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -65,7 +65,6 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default fetcher expectation and setup for no fetch calls
@@ -90,7 +89,6 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -127,7 +125,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
@@ -173,7 +171,6 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default fetcher expectation
@@ -196,7 +193,6 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -237,7 +233,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
@@ -293,7 +289,6 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
 
@@ -327,7 +322,6 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -397,7 +391,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
@@ -437,7 +431,6 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockConvert := newConvertMockForTest(t)
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -493,7 +486,6 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),
@@ -531,7 +523,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockExtractor := newExtractorMockForTest(t)
 	mockResolver := newResolverMockForTest(t)
@@ -556,7 +548,6 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup fetcher with invalid HTML (plain text instead of HTML)
@@ -598,7 +589,6 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),

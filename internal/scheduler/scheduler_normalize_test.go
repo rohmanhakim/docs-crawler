@@ -39,7 +39,7 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -55,7 +55,6 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -106,7 +105,6 @@ func TestScheduler_Normalize_CalledWithResolverResult(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -143,7 +141,7 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -159,7 +157,6 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -203,7 +200,6 @@ func TestScheduler_Normalize_SuccessfulNormalization_ProceedsToWrite(t *testing.
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -241,7 +237,7 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -257,7 +253,6 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -297,7 +292,6 @@ func TestScheduler_Normalize_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -333,7 +327,7 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -350,7 +344,6 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 		CrawlDelay: 0,
 	}, nil).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -390,7 +383,6 @@ func TestScheduler_Normalize_ErrorDoesNotPreventWriteForRecoverable(t *testing.T
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -438,7 +430,6 @@ func createSchedulerWithAllMocksAndNormalize(
 	mockResolver assets.Resolver,
 	mockNormalize *normalizeMock,
 	mockStorage *storageMock,
-	mockSleeper *sleeperMock,
 	mockFailureJournal failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
@@ -474,7 +465,6 @@ func createSchedulerWithAllMocksAndNormalize(
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),
@@ -526,7 +516,7 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -554,7 +544,7 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	// Setup sleeper and limiter
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 
@@ -603,7 +593,6 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 		mockConvert,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -643,7 +632,7 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -672,7 +661,6 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 	// Second dequeue: exit loop
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 
@@ -722,7 +710,6 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 		mockConvert,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")
@@ -762,7 +749,7 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -787,7 +774,6 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 
@@ -837,7 +823,6 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 		mockConvert,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")
@@ -878,7 +863,7 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -903,7 +888,6 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 
@@ -953,7 +937,6 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 		mockConvert,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 	s.SetCurrentHost("example.com")

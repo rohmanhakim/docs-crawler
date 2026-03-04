@@ -16,7 +16,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/stagedump"
 	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
-	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
+	ratelimiter "github.com/rohmanhakim/rate-limiter"
 )
 
 // createSchedulerForTest creates a scheduler with test-specific initialization
@@ -31,7 +31,7 @@ func createSchedulerForTest(
 	ctx context.Context,
 	mockFinalizer *mockFinalizer,
 	metadataSink metadata.MetadataSink,
-	mockLimiter *rateLimiterMock,
+	mockLimiter ratelimiter.RateLimiter,
 	mockFrontier *frontierMock,
 	mockRobot *robotsMock,
 	mockFetcher *fetcherMock,
@@ -40,7 +40,6 @@ func createSchedulerForTest(
 	mockConvert mdconvert.ConvertRule,
 	mockNormalize *normalizeMock,
 	mockStorage *storageMock,
-	mockSleeper timeutil.Sleeper,
 	mockFailureJournal failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
@@ -82,7 +81,6 @@ func createSchedulerForTest(
 		resolverMock,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),

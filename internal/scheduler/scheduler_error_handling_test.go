@@ -29,7 +29,7 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	// Setup robot to allow
@@ -53,7 +53,6 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock to return 403 error
@@ -83,7 +82,6 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -126,7 +124,7 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -147,7 +145,6 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup fetcher with error that has RetryPolicyManual
@@ -176,7 +173,6 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -218,7 +214,7 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -239,7 +235,6 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	// Note: No second Dequeue because crawl should abort
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup fetcher to return error with ImpactAbort (simulating systemic failure)
@@ -268,7 +263,6 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -311,7 +305,7 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -332,7 +326,6 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup fetcher to return success (need to get to storage stage)
@@ -383,7 +376,6 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -426,7 +418,7 @@ func TestScheduler_ErrorHandling_ConfigError_AbortsCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	s := createSchedulerForTest(
@@ -443,7 +435,6 @@ func TestScheduler_ErrorHandling_ConfigError_AbortsCrawl(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -477,7 +468,7 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -524,7 +515,6 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 	mockFrontier.OnDequeue(token2, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return().Maybe()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 
 	s := createSchedulerForTest(
@@ -541,7 +531,6 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -583,7 +572,7 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -604,7 +593,6 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup fetcher to return error with RetryPolicyAuto (recoverable)
@@ -633,7 +621,6 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -675,7 +662,7 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
@@ -696,7 +683,6 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Setup fetcher to return error with RetryPolicyNever (permanent failure)
@@ -725,7 +711,6 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 

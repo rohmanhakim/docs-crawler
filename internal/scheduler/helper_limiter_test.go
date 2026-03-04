@@ -1,13 +1,16 @@
 package scheduler_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	ratelimiter "github.com/rohmanhakim/rate-limiter"
 	"github.com/stretchr/testify/mock"
 )
 
-// rateLimiterMock is a testify mock for the RateLimiter
+// rateLimiterMock is a testify mock for the RateLimiter interface from
+// github.com/rohmanhakim/rate-limiter
 type rateLimiterMock struct {
 	mock.Mock
 }
@@ -19,12 +22,10 @@ func newRateLimiterMockForTest(t *testing.T) *rateLimiterMock {
 	// Set up default expectations for crawl tests
 	m.On("SetBaseDelay", mock.Anything).Return()
 	m.On("SetJitter", mock.Anything).Return()
-	m.On("SetRandomSeed", mock.Anything).Return()
-	m.On("SetCrawlDelay", mock.Anything, mock.Anything).Return()
-	m.On("Backoff", mock.Anything).Return()
+	m.On("SetResourceDelay", mock.Anything, mock.Anything).Return()
+	m.On("Backoff", mock.Anything, mock.Anything).Return()
 	m.On("ResetBackoff", mock.Anything).Return()
-	// Note: ResolveDelay expectation is not set here because different tests
-	// need different return values. Each test should set its own expectation.
+	m.On("Wait", mock.Anything, mock.Anything).Return(nil)
 	return m
 }
 
@@ -36,52 +37,28 @@ func (m *rateLimiterMock) SetJitter(jitter time.Duration) {
 	m.Called(jitter)
 }
 
-func (m *rateLimiterMock) SetRandomSeed(randomSeed int64) {
-	m.Called(randomSeed)
+func (m *rateLimiterMock) SetResourceDelay(resource string, delay time.Duration) {
+	m.Called(resource, delay)
 }
 
-func (m *rateLimiterMock) SetCrawlDelay(host string, delay time.Duration) {
-	m.Called(host, delay)
+func (m *rateLimiterMock) Backoff(ctx context.Context, resource string, opts ...ratelimiter.BackoffOptions) {
+	m.Called(ctx, resource)
 }
 
-func (m *rateLimiterMock) Backoff(host string) {
-	m.Called(host)
+func (m *rateLimiterMock) ResetBackoff(resource string) {
+	m.Called(resource)
 }
 
-func (m *rateLimiterMock) ResetBackoff(host string) {
-	m.Called(host)
+func (m *rateLimiterMock) Wait(ctx context.Context, resource string) error {
+	args := m.Called(ctx, resource)
+	return args.Error(0)
 }
 
-func (m *rateLimiterMock) MarkLastFetchAsNow(host string) {
-	m.Called(host)
-}
-
-func (m *rateLimiterMock) Jitter(base time.Duration) time.Duration {
-	args := m.Called(base)
+func (m *rateLimiterMock) ResolveDelay(ctx context.Context, resource string) time.Duration {
+	args := m.Called(ctx, resource)
 	return args.Get(0).(time.Duration)
 }
 
-func (m *rateLimiterMock) SetRNG(rng interface{}) {
-	m.Called(rng)
-}
-
-func (m *rateLimiterMock) ResolveDelay(host string) time.Duration {
-	args := m.Called(host)
-	return args.Get(0).(time.Duration)
-}
-
-// sleeperMock is a testify mock for the Sleeper interface
-type sleeperMock struct {
-	mock.Mock
-}
-
-// newSleeperMock creates a new sleeper mock
-func newSleeperMock(t *testing.T) *sleeperMock {
-	t.Helper()
-	m := new(sleeperMock)
-	return m
-}
-
-func (m *sleeperMock) Sleep(duration time.Duration) {
-	m.Called(duration)
+func (m *rateLimiterMock) SetDebugLogger(logger ratelimiter.DebugLogger) {
+	m.Called(logger)
 }

@@ -27,7 +27,7 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -50,7 +50,6 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -88,7 +87,6 @@ func TestScheduler_Convert_CalledWithSanitizedHTMLDoc(t *testing.T) {
 		mockConvert,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -125,7 +123,7 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -148,7 +146,6 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -179,7 +176,6 @@ func TestScheduler_Convert_SuccessfulConversion_ProceedsToAssetResolution(t *tes
 		mockConvert,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -217,7 +213,7 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -240,7 +236,6 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -269,7 +264,6 @@ func TestScheduler_Convert_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockConvert,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 

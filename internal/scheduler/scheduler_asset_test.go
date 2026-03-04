@@ -35,7 +35,7 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -52,7 +52,6 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor to return a valid content node
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -95,7 +94,6 @@ func TestScheduler_Resolve_CalledWithConversionResult(t *testing.T) {
 		mockConvert,
 		mockResolver,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -132,7 +130,7 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -149,7 +147,6 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -186,7 +183,6 @@ func TestScheduler_Resolve_SuccessfulResolution_ProceedsToNormalization(t *testi
 		mockConvert,
 		mockResolver,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -225,7 +221,7 @@ func TestScheduler_Resolve_DiskFullError_ContinuesCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -242,7 +238,6 @@ func TestScheduler_Resolve_DiskFullError_ContinuesCrawl(t *testing.T) {
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -279,7 +274,6 @@ func TestScheduler_Resolve_DiskFullError_ContinuesCrawl(t *testing.T) {
 		mockConvert,
 		mockResolver,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -315,7 +309,7 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -332,7 +326,6 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -368,7 +361,6 @@ func TestScheduler_Resolve_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockConvert,
 		mockResolver,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -404,7 +396,7 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -422,7 +414,6 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -458,7 +449,6 @@ func TestScheduler_Resolve_ErrorDoesNotPreventWriteForRecoverable(t *testing.T) 
 		mockConvert,
 		mockResolver,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -501,7 +491,7 @@ func TestScheduler_Resolve_DiskFullError_DoesNotPreventSubsequentCalls(t *testin
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -518,7 +508,6 @@ func TestScheduler_Resolve_DiskFullError_DoesNotPreventSubsequentCalls(t *testin
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Setup extractor
 	contentNode := &html.Node{Type: html.ElementNode, Data: "div"}
@@ -555,7 +544,6 @@ func TestScheduler_Resolve_DiskFullError_DoesNotPreventSubsequentCalls(t *testin
 		mockConvert,
 		mockResolver,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -599,7 +587,6 @@ func createSchedulerWithAllMocks(
 	mockConvert mdconvert.ConvertRule,
 	mockResolver assets.Resolver,
 	mockStorage *storageMock,
-	mockSleeper *sleeperMock,
 	mockFailureJournal failurejournal.Journal,
 ) *scheduler.Scheduler {
 	t.Helper()
@@ -645,7 +632,6 @@ func createSchedulerWithAllMocks(
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),

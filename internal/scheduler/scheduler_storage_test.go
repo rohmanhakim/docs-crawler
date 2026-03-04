@@ -31,7 +31,7 @@ func TestScheduler_Write_CalledWithNormalizedDoc(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -55,7 +55,6 @@ func TestScheduler_Write_CalledWithNormalizedDoc(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -101,7 +100,6 @@ func TestScheduler_Write_CalledWithNormalizedDoc(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -140,7 +138,7 @@ func TestScheduler_Write_SuccessfulWrite_ReturnsWriteResult(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -164,7 +162,6 @@ func TestScheduler_Write_SuccessfulWrite_ReturnsWriteResult(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -205,7 +202,6 @@ func TestScheduler_Write_SuccessfulWrite_ReturnsWriteResult(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -252,7 +248,7 @@ func TestScheduler_Write_WriteFailure_ContinuesCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -276,7 +272,6 @@ func TestScheduler_Write_WriteFailure_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -324,7 +319,6 @@ func TestScheduler_Write_WriteFailure_ContinuesCrawl(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -363,7 +357,7 @@ func TestScheduler_Write_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -387,7 +381,6 @@ func TestScheduler_Write_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -432,7 +425,6 @@ func TestScheduler_Write_RecoverableError_ContinuesCrawl(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -471,7 +463,7 @@ func TestScheduler_Write_MethodCallOrder(t *testing.T) {
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -495,7 +487,6 @@ func TestScheduler_Write_MethodCallOrder(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -571,7 +562,6 @@ func TestScheduler_Write_MethodCallOrder(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -653,7 +643,7 @@ func TestScheduler_Write_CalledExactlyOncePerPage(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -677,7 +667,6 @@ func TestScheduler_Write_CalledExactlyOncePerPage(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -717,7 +706,6 @@ func TestScheduler_Write_CalledExactlyOncePerPage(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -755,7 +743,7 @@ func TestScheduler_Write_CalledWithCorrectOutputDir(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -779,7 +767,6 @@ func TestScheduler_Write_CalledWithCorrectOutputDir(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -824,7 +811,6 @@ func TestScheduler_Write_CalledWithCorrectOutputDir(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -865,7 +851,7 @@ func TestScheduler_Write_CalledWithCorrectHashAlgo(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -889,7 +875,6 @@ func TestScheduler_Write_CalledWithCorrectHashAlgo(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -933,7 +918,6 @@ func TestScheduler_Write_CalledWithCorrectHashAlgo(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -978,7 +962,7 @@ func TestScheduler_Write_MultiplePages_MultipleWriteResults(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -1007,7 +991,6 @@ func TestScheduler_Write_MultiplePages_MultipleWriteResults(t *testing.T) {
 	mockFrontier.OnDequeue(token2, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -1051,7 +1034,6 @@ func TestScheduler_Write_MultiplePages_MultipleWriteResults(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 

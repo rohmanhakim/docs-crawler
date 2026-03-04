@@ -55,7 +55,6 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -80,8 +79,8 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 		t.Errorf("Expected frontier to have 1 URL, got: %d", s.FrontierVisitedCount())
 	}
 
-	// AND: limiter SetCrawlDelay should not have been called
-	mockLimiter.AssertNotCalled(t, "SetCrawlDelay", testURL.Host)
+	// AND: limiter SetResourceDelay should not have been called
+	mockLimiter.AssertNotCalled(t, "SetResourceDelay", testURL.Host)
 }
 
 // TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier verifies that when
@@ -117,7 +116,6 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -141,8 +139,8 @@ func TestSubmitUrlForAdmission_RobotsDisallowed_DoesNotSubmitToFrontier(t *testi
 		t.Errorf("Expected frontier to have 0 URLs (disallowed), got: %d", s.FrontierVisitedCount())
 	}
 
-	// AND: limiter SetCrawlDelay should not have been called
-	mockLimiter.AssertNotCalled(t, "SetCrawlDelay", testURL.Host)
+	// AND: limiter SetResourceDelay should not have been called
+	mockLimiter.AssertNotCalled(t, "SetResourceDelay", testURL.Host)
 }
 
 // TestSubmitUrlForAdmission_RobotsError_ReturnsError verifies that when robots
@@ -176,7 +174,6 @@ func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -200,12 +197,12 @@ func TestSubmitUrlForAdmission_RobotsError_ReturnsError(t *testing.T) {
 		t.Errorf("Expected frontier to have 0 URLs (error case), got: %d", s.FrontierVisitedCount())
 	}
 
-	// AND: limiter SetCrawlDelay should not have been called
-	mockLimiter.AssertNotCalled(t, "SetCrawlDelay", testURL.Host)
+	// AND: limiter SetResourceDelay should not have been called
+	mockLimiter.AssertNotCalled(t, "SetResourceDelay", testURL.Host)
 }
 
 // TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings verifies that when
-// robots returns a positive crawl delay, SetCrawlDelay is called.
+// robots returns a positive crawl delay, SetResourceDelay is called.
 func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.T) {
 	// GIVEN: a robots.txt with crawl delay
 	fiveSeconds := 5 * time.Second
@@ -238,7 +235,6 @@ func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -258,8 +254,8 @@ func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.
 		t.Errorf("Expected no error, got: %v", submitErr)
 	}
 
-	// AND: SetCrawlDelay should have been called with the correct delay
-	mockLimiter.AssertCalled(t, "SetCrawlDelay", host, 5*time.Second)
+	// AND: SetResourceDelay should have been called with the correct delay
+	mockLimiter.AssertCalled(t, "SetResourceDelay", host, 5*time.Second)
 
 	// AND: URL should be in frontier
 	if s.FrontierVisitedCount() != 1 {
@@ -267,9 +263,9 @@ func TestSubmitUrlForAdmission_CrawlDelayPositive_UpdatesHostTimings(t *testing.
 	}
 }
 
-// TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay verifies that when
-// robots returns zero crawl delay, SetCrawlDelay is NOT called.
-func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay(t *testing.T) {
+// TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetResourceDelay verifies that when
+// robots returns zero crawl delay, SetResourceDelay is NOT called.
+func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetResourceDelay(t *testing.T) {
 	// GIVEN: a robots.txt with no crawl delay (implicit 0)
 	mockRobot := NewRobotsMockForTest(t)
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -311,7 +307,6 @@ func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay(t *testin
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -336,12 +331,12 @@ func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetCrawlDelay(t *testin
 		t.Errorf("Expected frontier to have 1 URL, got: %d", s.FrontierVisitedCount())
 	}
 
-	// AND: SetCrawlDelay should NOT have been called (since crawl-delay is 0)
-	mockLimiter.AssertNotCalled(t, "SetCrawlDelay", mock.Anything, mock.Anything)
+	// AND: SetResourceDelay should NOT have been called (since crawl-delay is 0)
+	mockLimiter.AssertNotCalled(t, "SetResourceDelay", mock.Anything, mock.Anything)
 }
 
 // TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost verifies that when
-// a host already exists, SetCrawlDelay is still called with the new value.
+// a host already exists, SetResourceDelay is still called with the new value.
 func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
 	// GIVEN: a robots.txt with crawl delay
 	tenSeconds := 10 * time.Second
@@ -384,7 +379,6 @@ func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -414,8 +408,8 @@ func TestSubmitUrlForAdmission_CrawlDelayUpdatesExistingHost(t *testing.T) {
 		t.Errorf("Expected frontier to have 2 URLs, got: %d", s.FrontierVisitedCount())
 	}
 
-	// AND: SetCrawlDelay should have been called twice (once per submission)
-	mockLimiter.AssertNumberOfCalls(t, "SetCrawlDelay", 2)
+	// AND: SetResourceDelay should have been called twice (once per submission)
+	mockLimiter.AssertNumberOfCalls(t, "SetResourceDelay", 2)
 }
 
 // TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays verifies that
@@ -466,7 +460,6 @@ func TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -484,9 +477,9 @@ func TestSubmitUrlForAdmission_MultipleHosts_DifferentDelays(t *testing.T) {
 		t.Fatalf("Second host submission failed: %v", err2)
 	}
 
-	// THEN: SetCrawlDelay should have been called for both hosts with correct delays
-	mockLimiter.AssertCalled(t, "SetCrawlDelay", host1, 3*time.Second)
-	mockLimiter.AssertCalled(t, "SetCrawlDelay", host2, 7*time.Second)
+	// THEN: SetResourceDelay should have been called for both hosts with correct delays
+	mockLimiter.AssertCalled(t, "SetResourceDelay", host1, 3*time.Second)
+	mockLimiter.AssertCalled(t, "SetResourceDelay", host2, 7*time.Second)
 
 	// AND: both URLs should be in frontier
 	if s.FrontierVisitedCount() != 2 {
@@ -528,7 +521,6 @@ func TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -553,8 +545,8 @@ func TestSubmitUrlForAdmission_DisallowedURL_WithCrawlDelay(t *testing.T) {
 		t.Errorf("Expected frontier to have 0 URLs (disallowed), got: %d", s.FrontierVisitedCount())
 	}
 
-	// AND: SetCrawlDelay should still be called for the host
-	mockLimiter.AssertCalled(t, "SetCrawlDelay", host, 5*time.Second)
+	// AND: SetResourceDelay should still be called for the host
+	mockLimiter.AssertCalled(t, "SetResourceDelay", host, 5*time.Second)
 }
 
 // TestSubmitUrlForAdmission_PreservesSourceContextAndDepth verifies that
@@ -593,7 +585,6 @@ func TestSubmitUrlForAdmission_PreservesSourceContextAndDepth(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -623,8 +614,8 @@ func TestSubmitUrlForAdmission_PreservesSourceContextAndDepth(t *testing.T) {
 		t.Error("Expected to dequeue a token from frontier")
 	}
 
-	// AND: limiter SetCrawlDelay should not have been called
-	mockLimiter.AssertNotCalled(t, "SetCrawlDelay", testURL.Host)
+	// AND: limiter SetResourceDelay should not have been called
+	mockLimiter.AssertNotCalled(t, "SetResourceDelay", testURL.Host)
 }
 
 // TestSubmitUrlForAdmission_SpecificPathRules verifies that specific path
@@ -702,15 +693,14 @@ func TestSubmitUrlForAdmission_SpecificPathRules(t *testing.T) {
 				nil,
 				nil,
 				mockStorage,
-				nil,
 				mockFailureJournal,
 			)
 
 			s.SetCurrentHost(testURL.Host)
 
-			// Verify limiter SetCrawlDelay should not have been called if crawlDelay is 0
+			// Verify limiter SetResourceDelay should not have been called if crawlDelay is 0
 			if tc.crawlDelay == 0 {
-				mockLimiter.AssertNotCalled(t, "SetCrawlDelay", testURL.Host)
+				mockLimiter.AssertNotCalled(t, "SetResourceDelay", testURL.Host)
 			}
 
 			err := s.SubmitUrlForAdmission(*testURL, frontier.SourceCrawl, 1)
@@ -816,7 +806,6 @@ func TestSubmitUrlForAdmission_CanonicalizesBeforeRobotsCheck(t *testing.T) {
 				nil,
 				nil,
 				mockStorage,
-				nil,
 				mockFailureJournal,
 			)
 
@@ -896,7 +885,6 @@ func TestSubmitUrlForAdmission_EquivalentURLsTreatedAsSame(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 

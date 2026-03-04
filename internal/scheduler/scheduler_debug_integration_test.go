@@ -24,7 +24,6 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/debug/debugtest"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
-	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,7 +53,6 @@ func createSchedulerWithDebugLogger(
 	mockResolver *resolverMock,
 	mockNormalize *normalizeMock,
 	mockStorage *storageMock,
-	mockSleeper timeutil.Sleeper,
 	mockFailureJournal failurejournal.Journal,
 ) (*scheduler.Scheduler, *debugtest.LoggerMock) {
 	t.Helper()
@@ -76,7 +74,6 @@ func createSchedulerWithDebugLogger(
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		mockLogger,
@@ -155,7 +152,7 @@ func TestIntegration_DebugLogging_FullPipeline_StageSequence(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -182,7 +179,7 @@ func TestIntegration_DebugLogging_FullPipeline_StageSequence(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	// Setup other mocks
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -223,7 +220,6 @@ func TestIntegration_DebugLogging_FullPipeline_StageSequence(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -288,7 +284,7 @@ func TestIntegration_DebugLogging_Fetcher_StepSequence(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -313,7 +309,7 @@ func TestIntegration_DebugLogging_Fetcher_StepSequence(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 
 	// Setup other mocks
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -368,7 +364,6 @@ func TestIntegration_DebugLogging_Fetcher_StepSequence(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -420,7 +415,7 @@ func TestIntegration_DebugLogging_RetryScenario(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -445,7 +440,7 @@ func TestIntegration_DebugLogging_RetryScenario(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 
 	// Setup other mocks
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -523,7 +518,6 @@ func TestIntegration_DebugLogging_RetryScenario(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -573,7 +567,7 @@ func TestIntegration_DebugLogging_RateLimitScenario(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -598,7 +592,7 @@ func TestIntegration_DebugLogging_RateLimitScenario(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 
 	// Setup mocks with rate limiting
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 
 	// Configure rate limiter to return a delay
@@ -655,7 +649,6 @@ func TestIntegration_DebugLogging_RateLimitScenario(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -705,7 +698,7 @@ func TestIntegration_DebugLogging_Frontier_SkipScenarios(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -733,7 +726,7 @@ func TestIntegration_DebugLogging_Frontier_SkipScenarios(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	// Setup other mocks
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -792,7 +785,6 @@ func TestIntegration_DebugLogging_Frontier_SkipScenarios(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -842,7 +834,7 @@ func TestIntegration_DebugLogging_ErrorPath(t *testing.T) {
 	mockFetcher := new(fetcherMock)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -869,7 +861,7 @@ func TestIntegration_DebugLogging_ErrorPath(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	// Setup other mocks
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -909,7 +901,6 @@ func TestIntegration_DebugLogging_ErrorPath(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -967,7 +958,7 @@ func TestIntegration_DebugLogging_Disabled(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -992,7 +983,7 @@ func TestIntegration_DebugLogging_Disabled(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe()
 
 	// Setup other mocks
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -1046,7 +1037,6 @@ func TestIntegration_DebugLogging_Disabled(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),
@@ -1171,7 +1161,7 @@ func TestIntegration_DebugLogging_JSONLFileOutput(t *testing.T) {
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
 	mockFrontier := newFrontierMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockExtractor := newExtractorMockForTest(t)
 	mockSanitizer := newSanitizerMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -1198,7 +1188,7 @@ func TestIntegration_DebugLogging_JSONLFileOutput(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	// Setup other mocks
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -1252,7 +1242,6 @@ func TestIntegration_DebugLogging_JSONLFileOutput(t *testing.T) {
 		mockResolver,
 		mockNormalize,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		debugLogger,

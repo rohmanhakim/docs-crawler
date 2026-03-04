@@ -30,7 +30,7 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -50,7 +50,6 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -69,7 +68,6 @@ func TestScheduler_FinalStats_RecordsExactlyOnce(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -123,7 +121,7 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 	mockConvert := newConvertMockForTest(t)
@@ -144,7 +142,6 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -179,7 +176,6 @@ func TestScheduler_StatsAccuracy_AssetsTracked(t *testing.T) {
 		resolverMock,
 		normalizeMock,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),
@@ -234,7 +230,7 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -254,7 +250,6 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -273,7 +268,6 @@ func TestScheduler_FinalStatsContract_CalledAfterTermination(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -326,7 +320,7 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -348,7 +342,7 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 
 	// Set up limiter mock to handle ResolveDelay calls
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil).Maybe()
 
 	s := createSchedulerForTest(
@@ -365,7 +359,6 @@ func TestScheduler_GracefulShutdown_StatsRecordedDespiteErrors(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -411,7 +404,7 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -431,7 +424,6 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -450,7 +442,6 @@ func TestScheduler_StatsConsistency_AllFieldsNonNegative(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -509,7 +500,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	mockFrontier := newFrontierMockForTest(t)
 	mockFetcher := newFetcherMockForTest(t)
 	mockRobot := NewRobotsMockForTest(t)
-	mockSleeper := newSleeperMock(t)
+
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
 
@@ -528,7 +519,7 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
-	mockSleeper.On("Sleep", mock.Anything).Return()
+
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -547,7 +538,6 @@ func TestScheduler_ErrorCounting_ConsistentWithMetadata(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 

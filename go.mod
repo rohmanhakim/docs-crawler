@@ -7,7 +7,8 @@ require (
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
 	github.com/rohmanhakim/dlog v1.0.0
-	github.com/rohmanhakim/retrier v1.0.1
+	github.com/rohmanhakim/rate-limiter v1.0.0
+	github.com/rohmanhakim/retrier v1.0.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.49.0
@@ -22,6 +23,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/rohmanhakim/exponential-backoff v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

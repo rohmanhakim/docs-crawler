@@ -25,9 +25,8 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/debug"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
-	"github.com/rohmanhakim/docs-crawler/pkg/limiter"
-	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
+	ratelimiter "github.com/rohmanhakim/rate-limiter"
 	"github.com/rohmanhakim/retrier"
 )
 
@@ -80,8 +79,7 @@ type Scheduler struct {
 	storageSink            storage.Sink
 	writeResults           []storage.WriteResult
 	currentHost            string
-	rateLimiter            limiter.RateLimiter
-	sleeper                timeutil.Sleeper
+	rateLimiter            ratelimiter.RateLimiter
 	stageDumper            stagedump.Dumper
 	debugLogger            debug.DebugLogger
 }
@@ -97,8 +95,7 @@ func NewScheduler() Scheduler {
 	resolver := assets.NewLocalResolver(&recorder)
 	markdownConstraint := normalize.NewMarkdownConstraint(&recorder)
 	storageSink := storage.NewLocalSink(&recorder)
-	rateLimiter := limiter.NewConcurrentRateLimiter()
-	sleeper := timeutil.NewRealSleeper()
+	rateLimiter := ratelimiter.NewConcurrentRateLimiter()
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
@@ -112,7 +109,6 @@ func NewScheduler() Scheduler {
 		markdownConstraint:     &markdownConstraint,
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
-		sleeper:                &sleeper,
 	}
 }
 
@@ -124,7 +120,7 @@ func NewSchedulerWithDeps(
 	ctx context.Context,
 	crawlFinalizer metadata.CrawlFinalizer,
 	metadataSink metadata.MetadataSink,
-	rateLimiter limiter.RateLimiter,
+	rateLimiter ratelimiter.RateLimiter,
 	frontier frontier.Frontier,
 	fetcher fetcher.Fetcher,
 	robot robots.Robot,
@@ -134,7 +130,6 @@ func NewSchedulerWithDeps(
 	resolver assets.Resolver,
 	constraint normalize.Constraint,
 	storageSink storage.Sink,
-	sleeper timeutil.Sleeper,
 	failureJournal failurejournal.Journal,
 	stageDumper stagedump.Dumper,
 	debugLogger debug.DebugLogger,
@@ -154,7 +149,6 @@ func NewSchedulerWithDeps(
 		markdownConstraint:     constraint,
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
-		sleeper:                sleeper,
 		stageDumper:            stageDumper,
 		debugLogger:            debugLogger,
 	}
@@ -195,7 +189,7 @@ func (s *Scheduler) SubmitUrlForAdmission(
 	}
 
 	if robotsDecision.CrawlDelay > 0 && s.rateLimiter != nil {
-		s.rateLimiter.SetCrawlDelay(s.currentHost, robotsDecision.CrawlDelay)
+		s.rateLimiter.SetResourceDelay(s.currentHost, robotsDecision.CrawlDelay)
 	}
 
 	// Robots explicitly disallowed -> normal, terminal outcome
@@ -316,7 +310,6 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 	// 1.2 Initialize rate limiter
 	s.rateLimiter.SetBaseDelay(cfg.BaseDelay())
 	s.rateLimiter.SetJitter(cfg.Jitter())
-	s.rateLimiter.SetRandomSeed(cfg.RandomSeed())
 
 	// 1.3 Initialize Robots and Frontier
 	s.robot.Init(cfg.UserAgent(), s.httpClient)
@@ -361,9 +354,10 @@ func (s *Scheduler) InitializeCrawling(configPath string) (init *CrawlInitializa
 		return nil, err
 	}
 
-	// Apply rate limiting delay after successful robots check
-	delay := s.rateLimiter.ResolveDelay(s.currentHost)
-	s.sleeper.Sleep(delay)
+	// Apply rate limiting delay after successful robots check using Wait
+	if err := s.rateLimiter.Wait(s.ctx, s.currentHost); err != nil {
+		return nil, err
+	}
 
 	// Return the initialization state
 	return &CrawlInitialization{
@@ -627,9 +621,11 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 		}
 		s.writeResults = append(s.writeResults, writeResult)
 
-		// Apply rate limiting delay at the end of the crawl loop
-		delay := s.rateLimiter.ResolveDelay(s.currentHost)
-		s.sleeper.Sleep(delay)
+		// Apply rate limiting delay at the end of the crawl loop using Wait
+		if err := s.rateLimiter.Wait(s.ctx, s.currentHost); err != nil {
+			// Context cancelled, exit the loop
+			return CrawlingExecution{}, err
+		}
 	}
 
 	// Stats are recorded by defer - return successful execution result
@@ -677,7 +673,7 @@ func (s *Scheduler) recordRobotsErrorAndBackoff(robotsErr *robots.RobotsError, t
 			},
 		))
 		if s.rateLimiter != nil {
-			s.rateLimiter.Backoff(targetURL.Host)
+			s.rateLimiter.Backoff(s.ctx, targetURL.Host)
 		}
 	}
 }
@@ -702,7 +698,6 @@ func RetryOptions(cfg config.Config) []retrier.RetryOption {
 // This is a test helper method to simulate the host context.
 func (s *Scheduler) SetCurrentHost(host string) {
 	s.currentHost = host
-	// s.rateLimiter.RegisterHost(host)
 }
 
 // FrontierVisitedCount returns the number of URLs in the frontier's visited set.
@@ -761,8 +756,13 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 		storageSink = storage.NewLocalSink(&recorder)
 	}
 
-	rateLimiter := limiter.NewConcurrentRateLimiter()
-	sleeper := timeutil.NewRealSleeper()
+	// Create rate limiter with config values
+	rateLimiter := ratelimiter.NewConcurrentRateLimiter(
+		ratelimiter.WithJitter(cfg.Jitter()),
+		ratelimiter.WithInitialDuration(cfg.BackoffInitialDuration()),
+		ratelimiter.WithMultiplier(cfg.BackoffMultiplier()),
+		ratelimiter.WithMaxDuration(cfg.BackoffMaxDuration()),
+	)
 
 	// Initialize stage dumper based on config
 	var stageDumper stagedump.Dumper = stagedump.NewNoOpDumper()
@@ -789,7 +789,6 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 	sanitizer.SetDebugLogger(debugLogger)
 	cachedRobot.SetDebugLogger(debugLogger)
 	frontier.SetDebugLogger(debugLogger)
-	rateLimiter.SetDebugLogger(debugLogger)
 	conversionRule.SetDebugLogger(debugLogger)
 	markdownConstraint.SetDebugLogger(debugLogger)
 
@@ -805,6 +804,9 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 		s.SetDebugLogger(debugLogger)
 	}
 
+	// Set base delay on rate limiter
+	rateLimiter.SetBaseDelay(cfg.BaseDelay())
+
 	return Scheduler{
 		metadataSink:           &recorder,
 		crawlFinalizer:         &recorder,
@@ -818,7 +820,6 @@ func NewSchedulerWithConfig(cfg config.Config) Scheduler {
 		markdownConstraint:     &markdownConstraint,
 		storageSink:            storageSink,
 		rateLimiter:            rateLimiter,
-		sleeper:                &sleeper,
 		stageDumper:            stageDumper,
 		debugLogger:            debugLogger,
 	}
@@ -882,7 +883,6 @@ func (s *Scheduler) InitializeWithConfig(cfg config.Config) (init *CrawlInitiali
 	// Initialize rate limiter
 	s.rateLimiter.SetBaseDelay(cfg.BaseDelay())
 	s.rateLimiter.SetJitter(cfg.Jitter())
-	s.rateLimiter.SetRandomSeed(cfg.RandomSeed())
 
 	// Initialize Robots and Frontier
 	s.robot.Init(cfg.UserAgent(), s.httpClient)
@@ -926,9 +926,10 @@ func (s *Scheduler) InitializeWithConfig(cfg config.Config) (init *CrawlInitiali
 		return nil, err
 	}
 
-	// Apply rate limiting delay after successful robots check
-	delay := s.rateLimiter.ResolveDelay(s.currentHost)
-	s.sleeper.Sleep(delay)
+	// Apply rate limiting delay after successful robots check using Wait
+	if err := s.rateLimiter.Wait(s.ctx, s.currentHost); err != nil {
+		return nil, err
+	}
 
 	return &CrawlInitialization{
 		config:              cfg,

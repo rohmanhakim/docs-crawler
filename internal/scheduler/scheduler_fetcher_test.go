@@ -82,7 +82,6 @@ Allow: /`
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 	s.SetCurrentHost(testURL.Host)
@@ -109,7 +108,6 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
-	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -128,7 +126,6 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
-	mockSleeper.On("Sleep", mock.Anything).Return()
 
 	// Clear default expectation and setup fetcher mock to capture the context
 	mockFetcher.ExpectedCalls = nil
@@ -153,7 +150,6 @@ func TestScheduler_Fetcher_ReceivesContext(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -200,7 +196,6 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
-	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -218,7 +213,6 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -246,7 +240,6 @@ func TestScheduler_Fetcher_RecoverableError_ContinuesCrawl(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -284,7 +277,6 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
-	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -302,7 +294,6 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -331,7 +322,6 @@ func TestScheduler_Fetcher_FatalError_AbortsCrawl(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -415,7 +405,6 @@ Allow: /`
 		nil,
 		nil,
 		mockStorage,
-		nil,
 		mockFailureJournal,
 	)
 
@@ -442,7 +431,6 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
-	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -460,7 +448,6 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -500,7 +487,6 @@ func TestScheduler_Fetcher_FetchResultProcessing(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -537,7 +523,6 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockRobot := NewRobotsMockForTest(t)
 	mockStorage := newStorageMockForTest(t)
 	mockFailureJournal := newFailureJournalMockForTest(t)
-	mockSleeper := newSleeperMock(t)
 
 	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 	mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -555,7 +540,6 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 	mockFrontier.OnDequeue(seedToken, true).Once()
 	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
-	mockSleeper.On("Sleep", mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 	// Clear default expectation and setup fetcher mock with non-HTML response
@@ -588,7 +572,6 @@ func TestScheduler_Fetcher_NonHTMLContentType_Handled(t *testing.T) {
 		nil,
 		nil,
 		mockStorage,
-		mockSleeper,
 		mockFailureJournal,
 	)
 
@@ -636,7 +619,6 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 			mockRobot := NewRobotsMockForTest(t)
 			mockStorage := newStorageMockForTest(t)
 			mockFailureJournal := newFailureJournalMockForTest(t)
-			mockSleeper := newSleeperMock(t)
 
 			mockRobot.On("Init", mock.Anything, mock.Anything).Return()
 			mockRobot.OnDecide(mock.Anything, robots.Decision{
@@ -645,7 +627,6 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 				CrawlDelay: 0,
 			}, nil).Once()
 
-			mockSleeper.On("Sleep", mock.Anything).Return()
 			mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
 			// Clear default expectation and setup fetcher mock with HTTP error response
@@ -677,7 +658,6 @@ func TestScheduler_Fetcher_HTTPErrorCodes_Handled(t *testing.T) {
 				nil,
 				nil,
 				mockStorage,
-				mockSleeper,
 				mockFailureJournal,
 			)
 

@@ -65,9 +65,6 @@ func TestEventStream_FullPipelineExecution(t *testing.T) {
 	rateLimiter := newRateLimiterMockForTest(t)
 	rateLimiter.On("ResolveDelay", mock.AnythingOfType("string")).Return(time.Duration(0)).Maybe()
 
-	sleeper := newSleeperMock(t)
-	sleeper.On("Sleep", mock.AnythingOfType("time.Duration")).Return()
-
 	failureJournal := newFailureJournalMockForTest(t)
 
 	// Build scheduler with real pipeline stages
@@ -86,7 +83,6 @@ func TestEventStream_FullPipelineExecution(t *testing.T) {
 		&assetResolver,
 		&markdownConstraint,
 		storageSink,
-		sleeper,
 		failureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),
@@ -327,9 +323,6 @@ func TestEventStream_RobotsDisallowed_EmitsSkipEvent(t *testing.T) {
 	rateLimiter.On("ResolveDelay", mock.AnythingOfType("string")).Return(time.Duration(0)).Maybe()
 	rateLimiter.On("ResetBackoff", mock.AnythingOfType("string")).Return().Maybe()
 
-	sleeper := newSleeperMock(t)
-	sleeper.On("Sleep", mock.AnythingOfType("time.Duration")).Return()
-
 	failureJournal := newFailureJournalMockForTest(t)
 
 	// Build scheduler with real robots
@@ -348,7 +341,6 @@ func TestEventStream_RobotsDisallowed_EmitsSkipEvent(t *testing.T) {
 		nil, // assetResolver - not used
 		nil, // markdownConstraint - not used
 		nil, // storageSink - not used
-		sleeper,
 		failureJournal,
 		stagedump.NewNoOpDumper(),
 		debug.NewNoOpLogger(),
