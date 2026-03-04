@@ -14,7 +14,6 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
 	robotscache "github.com/rohmanhakim/docs-crawler/internal/robots/cache"
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
-	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
 // mockMetadataSink is a test implementation of metadata.MetadataSink.
@@ -131,10 +130,10 @@ Sitemap: https://example.com/sitemap.xml
 		t.Errorf("expected 1 allow rule, got %d", len(group1.Allows))
 	}
 
-	if group1.CrawlDelay == nil {
+	if group1.CrawlDelay == 0 {
 		t.Error("expected crawl delay to be set")
-	} else if *group1.CrawlDelay != 5*time.Second {
-		t.Errorf("expected crawl delay 5s, got %v", *group1.CrawlDelay)
+	} else if group1.CrawlDelay != 5*time.Second {
+		t.Errorf("expected crawl delay 5s, got %v", group1.CrawlDelay)
 	}
 
 	// Check second group (Googlebot)
@@ -421,7 +420,7 @@ Disallow: /`,
 					{
 						UserAgents: []string{"*"},
 						Disallows:  []robots.PathRule{{Path: "/"}},
-						CrawlDelay: timeutil.DurationPtr(10 * time.Second),
+						CrawlDelay: 10 * time.Second,
 					},
 				},
 			},
@@ -522,12 +521,8 @@ Allow: /public/`,
 				expectedDelay := tt.expected.UserAgents[0].CrawlDelay
 				actualDelay := result.UserAgents[0].CrawlDelay
 
-				if expectedDelay == nil && actualDelay != nil {
-					t.Errorf("expected no crawl delay, got %v", *actualDelay)
-				} else if expectedDelay != nil && actualDelay == nil {
-					t.Errorf("expected crawl delay %v, got nil", *expectedDelay)
-				} else if expectedDelay != nil && actualDelay != nil && *expectedDelay != *actualDelay {
-					t.Errorf("expected crawl delay %v, got %v", *expectedDelay, actualDelay)
+				if expectedDelay != actualDelay {
+					t.Errorf("expected crawl delay %v, got %v", expectedDelay, actualDelay)
 				}
 			}
 		})

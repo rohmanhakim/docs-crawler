@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/rohmanhakim/docs-crawler/pkg/timeutil"
 )
 
 func TestMapResponseToRuleSet(t *testing.T) {
@@ -70,7 +68,7 @@ func TestMapResponseToRuleSet(t *testing.T) {
 					{
 						UserAgents: []string{"*"},
 						Disallows:  []PathRule{{Path: "/admin/"}},
-						CrawlDelay: timeutil.DurationPtr(5 * time.Second),
+						CrawlDelay: 5 * time.Second,
 					},
 				},
 			},
@@ -305,7 +303,7 @@ func TestRuleSetImmutability(t *testing.T) {
 				UserAgents: []string{"*"},
 				Allows:     []PathRule{{Path: "/public/"}},
 				Disallows:  []PathRule{{Path: "/private/"}},
-				CrawlDelay: timeutil.DurationPtr(10 * time.Second),
+				CrawlDelay: 10 * time.Second,
 			},
 		},
 	}

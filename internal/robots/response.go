@@ -30,8 +30,8 @@ type UserAgentGroup struct {
 	// Disallow rules (paths that may not be crawled)
 	Disallows []PathRule
 
-	// Optional crawl delay
-	CrawlDelay *time.Duration
+	// Crawl delay if specified (zero value means no delay)
+	CrawlDelay time.Duration
 }
 
 // PathRule represents a single allow or disallow rule.

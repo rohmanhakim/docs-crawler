@@ -305,7 +305,7 @@ func ParseRobotsTxt(content, hostname string) RobotsResponse {
 					Allows:     []PathRule{},
 					Disallows:  []PathRule{},
 				}
-			} else if len(currentGroup.Allows) == 0 && len(currentGroup.Disallows) == 0 && currentGroup.CrawlDelay == nil {
+			} else if len(currentGroup.Allows) == 0 && len(currentGroup.Disallows) == 0 && currentGroup.CrawlDelay == 0 {
 				// No rules yet, add to current group (multiple user-agents for same rules)
 				currentGroup.UserAgents = append(currentGroup.UserAgents, value)
 			} else {
@@ -345,8 +345,7 @@ func ParseRobotsTxt(content, hostname string) RobotsResponse {
 				// Parse as seconds (integer or float)
 				var seconds float64
 				if _, err := fmt.Sscanf(value, "%f", &seconds); err == nil && seconds >= 0 {
-					delay := time.Duration(seconds * float64(time.Second))
-					currentGroup.CrawlDelay = &delay
+					currentGroup.CrawlDelay = time.Duration(seconds * float64(time.Second))
 				}
 			}
 
@@ -360,7 +359,7 @@ func ParseRobotsTxt(content, hostname string) RobotsResponse {
 
 	// Don't forget the last group
 	if currentGroup != nil {
-		if len(currentGroup.Allows) > 0 || len(currentGroup.Disallows) > 0 || currentGroup.CrawlDelay != nil || len(currentGroup.UserAgents) > 0 {
+		if len(currentGroup.Allows) > 0 || len(currentGroup.Disallows) > 0 || currentGroup.CrawlDelay > 0 || len(currentGroup.UserAgents) > 0 {
 			response.UserAgents = append(response.UserAgents, *currentGroup)
 		}
 	}

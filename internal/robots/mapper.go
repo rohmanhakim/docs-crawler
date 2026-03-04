@@ -47,9 +47,8 @@ func MapResponseToRuleSet(response RobotsResponse, targetUserAgent string, fetch
 		}
 
 		// Map crawl delay
-		if group.CrawlDelay != nil {
-			delay := *group.CrawlDelay
-			rs.crawlDelay = &delay
+		if group.CrawlDelay > 0 {
+			rs.crawlDelay = &group.CrawlDelay
 		}
 	}
 
