@@ -2,6 +2,9 @@ package failure
 
 import (
 	"testing"
+
+	gopipeline "github.com/rohmanhakim/gopipeline"
+	"github.com/rohmanhakim/retrier"
 )
 
 // TestRetryPolicyValues verifies that RetryPolicy constants have expected values
@@ -100,6 +103,97 @@ func (e *mockError) Severity() Severity {
 // TestClassifiedErrorInterface verifies that mockError implements ClassifiedError
 func TestClassifiedErrorInterface(t *testing.T) {
 	var _ ClassifiedError = &mockError{}
+}
+
+// TestClassifiedErrorSatisfiesStageError verifies ClassifiedError satisfies gopipeline.StageError.
+func TestClassifiedErrorSatisfiesStageError(t *testing.T) {
+	// Compile-time interface check: ClassifiedError must satisfy gopipeline.StageError.
+	// gopipeline.StageError is just `interface{ error }`, so any error type satisfies it.
+	// This test documents and locks in that guarantee.
+	var _ gopipeline.StageError = &mockError{}
+}
+
+// TestAsRetryableErrorSatisfiesGopipelineRetryableError verifies the adapter
+// satisfies gopipeline.RetryableError (which is retrier.RetryableError).
+func TestAsRetryableErrorSatisfiesGopipelineRetryableError(t *testing.T) {
+	err := &mockError{err: "test", retryPolicy: RetryPolicyAuto, impactLevel: ImpactLevelContinue}
+	adapter := AsRetryableError(err)
+
+	// Compile-time interface check
+	var _ gopipeline.RetryableError = adapter
+}
+
+// TestRetryableErrorAdapterNilReturnsNil verifies nil safety.
+func TestRetryableErrorAdapterNilReturnsNil(t *testing.T) {
+	adapter := AsRetryableError(nil)
+	if adapter != nil {
+		t.Error("AsRetryableError(nil) should return nil")
+	}
+}
+
+// TestRetryableErrorAdapterRetryPolicyMapping verifies failure.RetryPolicy maps correctly
+// to retrier.RetryPolicy (and by extension gopipeline.RetryableError).
+func TestRetryableErrorAdapterRetryPolicyMapping(t *testing.T) {
+	tests := []struct {
+		name           string
+		failurePolicy  RetryPolicy
+		wantRetrier    retrier.RetryPolicy
+		wantGopipeline gopipeline.RetryPolicy
+	}{
+		{
+			name:           "Auto maps to retrier Auto and gopipeline Auto",
+			failurePolicy:  RetryPolicyAuto,
+			wantRetrier:    retrier.RetryPolicyAuto,
+			wantGopipeline: gopipeline.RetryPolicyAuto,
+		},
+		{
+			name:           "Manual maps to retrier Manual and gopipeline Manual",
+			failurePolicy:  RetryPolicyManual,
+			wantRetrier:    retrier.RetryPolicyManual,
+			wantGopipeline: gopipeline.RetryPolicyManual,
+		},
+		{
+			name:           "Never maps to retrier Never and gopipeline Never",
+			failurePolicy:  RetryPolicyNever,
+			wantRetrier:    retrier.RetryPolicyNever,
+			wantGopipeline: gopipeline.RetryPolicyNever,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := &mockError{
+				err:         "test",
+				retryPolicy: tt.failurePolicy,
+				impactLevel: ImpactLevelContinue,
+			}
+			adapter := AsRetryableError(err)
+
+			// Verify retrier.RetryPolicy mapping
+			if got := adapter.RetryPolicy(); got != tt.wantRetrier {
+				t.Errorf("RetryPolicy() = %v, want %v", got, tt.wantRetrier)
+			}
+
+			// Verify gopipeline.RetryPolicy mapping (same underlying type)
+			if got := gopipeline.RetryPolicy(adapter.RetryPolicy()); got != tt.wantGopipeline {
+				t.Errorf("gopipeline.RetryPolicy() = %v, want %v", got, tt.wantGopipeline)
+			}
+		})
+	}
+}
+
+// TestRetryableErrorAdapterErrorAndUnwrap verifies Error() and Unwrap() delegation.
+func TestRetryableErrorAdapterErrorAndUnwrap(t *testing.T) {
+	original := &mockError{err: "original error", retryPolicy: RetryPolicyNever, impactLevel: ImpactLevelAbort}
+	adapter := AsRetryableError(original)
+
+	if adapter.Error() != "original error" {
+		t.Errorf("Error() = %q, want %q", adapter.Error(), "original error")
+	}
+
+	if adapter.Unwrap() != original {
+		t.Error("Unwrap() should return the original ClassifiedError")
+	}
 }
 
 // TestClassifiedErrorImplementations tests various implementations of ClassifiedError
