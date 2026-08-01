@@ -33,20 +33,7 @@ type CrawlResult struct {
 	URL string
 }
 
-// buildCrawlTask returns a CrawlTaskFunc that processes a single URL through the full crawl pipeline.
-// The returned closure captures the scheduler's dependencies and the initialization config.
-//
-// The pipeline stages are:
-// Fetch → Extract → Sanitize → [link discovery] → Convert → Resolve → Normalize → Write
-//
-// Error handling follows the existing classification model:
-//   - Abort errors stop the pipeline immediately
-//   - Recoverable errors allow the pipeline to continue to subsequent stages
-//   - Manual-retry errors are recorded to the failure journal
-//
-// Link discovery (URL submission to frontier) happens between Sanitize and Convert,
-// as this is a scheduler concern (admission control), not a pipeline stage.
-func (s *Scheduler) buildCrawlTask(cfg config.Config, seedScheme string) CrawlTaskFunc {
+func (s *Scheduler) BuildCrawlTask(cfg config.Config, seedScheme string) CrawlTaskFunc {
 	return func(ctx context.Context, runner *gopipeline.StageRunner, idx int, token frontier.CrawlToken, stageName string) gopipeline.StageResult[CrawlResult] {
 		urlStr := getURLString(token.URL())
 
