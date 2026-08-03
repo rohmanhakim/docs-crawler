@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/rohmanhakim/docs-crawler/internal/assets"
-	"github.com/rohmanhakim/docs-crawler/internal/build"
 	"github.com/rohmanhakim/docs-crawler/internal/config"
 	"github.com/rohmanhakim/docs-crawler/internal/extractor"
 	"github.com/rohmanhakim/docs-crawler/internal/fetcher"
@@ -419,6 +418,10 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	cfg := init.config
 	seedScheme := init.seedScheme
 
+	// Build the crawl task closure that processes a single URL through the full pipeline.
+	// This closure captures the scheduler's dependencies and initialization config.
+	crawlTask := s.BuildCrawlTask(cfg, seedScheme)
+
 	// If frontier still has URL to be crawl...
 	for {
 		nextCrawlToken, ok := s.frontier.Dequeue()
@@ -434,213 +437,33 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 			URL:  urlStr,
 		})
 
-		// 3. Fetch Page URL
-		fetchStartTime := time.Now()
-		s.debugLogger.LogStage(s.ctx, "fetcher", debug.StageEvent{
-			Type: debug.EventTypeStart,
-			URL:  urlStr,
-		})
-
-		fetchResult, err := s.htmlFetcher.Fetch(s.ctx, nextCrawlToken.Depth(), nextCrawlToken.URL(), RetryOptions(cfg))
-		if err != nil {
-			if err.Impact() == failure.ImpactLevelAbort {
-				return CrawlingExecution{}, err
-			}
-			// Log fetcher error
-			s.debugLogger.LogStage(s.ctx, "fetcher", debug.StageEvent{
-				Type:     debug.EventTypeError,
-				URL:      urlStr,
-				Duration: time.Since(fetchStartTime),
+		// Execute the pipeline using gopipeline
+		stageName := fmt.Sprintf("crawl-%s", urlStr)
+		result := gopipeline.Process(s.ctx, s.stageRunner, stageName,
+			func(progress gopipeline.ProgressFunc) gopipeline.StageResult[CrawlResult] {
+				return crawlTask(s.ctx, s.stageRunner, 0, nextCrawlToken, stageName)
 			})
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageFetch,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
-			// recoverable → log already done → count error
-			totalErrors++
-			continue
-		}
 
-		// Log fetcher completion
-		s.debugLogger.LogStage(s.ctx, "fetcher", debug.StageEvent{
-			Type:     debug.EventTypeComplete,
-			URL:      getURLString(fetchResult.URL()),
-			Duration: time.Since(fetchStartTime),
-			Fields: debug.FieldMap{
-				"status_code": fetchResult.Code(),
-			},
-		})
-
-		// Dump fetched HTML
-		s.stageDumper.DumpFetcherOutput(urlStr, fetchResult.Body())
-
-		// 4. Extract HTML DOM
-		extractionResult, err := s.domExtractor.Extract(fetchResult.URL(), fetchResult.Body())
+		// Handle the result
+		output, err := result.Decompose()
 		if err != nil {
-			if err.Impact() == failure.ImpactLevelAbort {
-				return CrawlingExecution{}, err
-			}
-			// Note: Extraction errors are deterministic (content invalid).
-			// Do NOT record to failure journal - retrying the same content yields the same error.
-			totalErrors++
-			continue
-		}
-
-		// Dump extraction result
-		s.stageDumper.DumpExtractorOutput(urlStr, extractionResult.ContentNode)
-
-		// 5. Sanitize extracted HTML
-		sanitizedHtml, err := s.htmlSanitizer.Sanitize(extractionResult.ContentNode)
-		if err != nil {
-			if err.Impact() == failure.ImpactLevelAbort {
-				return CrawlingExecution{}, err
-			}
-			// Note: Sanitization errors are deterministic (invariant violations).
-			// Do NOT record to failure journal - retrying the same content yields the same error.
-			totalErrors++
-			continue
-		}
-
-		// Dump sanitization result
-		s.stageDumper.DumpSanitizerOutput(urlStr, sanitizedHtml.GetContentNode())
-
-		// 5.2 Resolve relative URLs to absolute URLs and filter by host
-		discoveredURLs := sanitizedHtml.GetDiscoveredURLs()
-
-		// 5.3 Resolve all URLs to absolute form using the seed scheme and current host
-		resolvedURLs := make([]url.URL, 0, len(discoveredURLs))
-		for _, u := range discoveredURLs {
-			resolved := urlutil.Resolve(u, seedScheme, s.currentHost)
-			resolvedURLs = append(resolvedURLs, resolved)
-		}
-
-		// 5.4 Filter to only keep URLs from the current host
-		filteredURLs := urlutil.FilterByHost(s.currentHost, resolvedURLs)
-
-		// 5.5 submit all discovered links through robots checking to frontier
-		for _, discoveredurl := range filteredURLs {
-			submissionErr := s.SubmitUrlForAdmission(discoveredurl, frontier.SourceCrawl, nextCrawlToken.Depth()+1)
-			if submissionErr != nil {
-				// Check if this is a robots error that requires backoff
-				if robotsErr, ok := submissionErr.(*robots.RobotsError); ok {
-					s.recordRobotsErrorAndBackoff(robotsErr, discoveredurl)
+			// Check for abort errors — scheduler retains control authority
+			if classifiedErr, ok := err.(failure.ClassifiedError); ok {
+				if classifiedErr.Impact() == failure.ImpactLevelAbort {
+					return CrawlingExecution{}, err
 				}
-				// Submission errors are scheduler-level errors, count them
-				totalErrors++
-				// Continue processing other URLs, don't abort the crawl
 			}
-		}
-
-		// 6. HTML → Markdown Conversion
-		markdownDoc, err := s.markdownConversionRule.Convert(sanitizedHtml, getURLString(fetchResult.URL()))
-		if err != nil {
-			if err.Impact() == failure.ImpactLevelAbort {
-				return CrawlingExecution{}, err
-			}
-			// Note: Conversion errors are deterministic (conversion failures).
-			// Do NOT record to failure journal - retrying the same content yields the same error.
+			// Recoverable error -> count and continue to next URL
 			totalErrors++
 			continue
 		}
 
-		// Dump markdown conversion result
-		s.stageDumper.DumpMDConvertOutput(urlStr, markdownDoc.GetMarkdownContent())
-
-		// 7. Assets Resolution
-		resolveParam := assets.NewResolveParam(cfg.OutputDir(), cfg.MaxAssetSize(), cfg.HashAlgo())
-		assetfulMarkdown, err := s.assetResolver.Resolve(
-			s.ctx,
-			fetchResult.URL(),
-			markdownDoc,
-			resolveParam,
-			RetryOptions(cfg),
-		)
-		if err != nil {
-			if err.Impact() == failure.ImpactLevelAbort {
-				return CrawlingExecution{}, err
-			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageAsset,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
-			totalErrors++
-			// Continue to process the markdown even if asset resolution had errors
-		}
-		// Count assets processed - use the actual count of successfully resolved local assets
-		totalAssets += len(assetfulMarkdown.LocalAssets())
-
-		// Dump asset resolving result
-		s.stageDumper.DumpAssetResolverOutput(urlStr, assetfulMarkdown.Content())
-
-		// 8. Markdown Normalization
-		normalizeParam := normalize.NewNormalizeParam(
-			build.FullVersion(),
-			fetchResult.FetchedAt(),
-			cfg.HashAlgo(),
-			nextCrawlToken.Depth(),
-			cfg.AllowedPathPrefix(),
-		)
-		normalizedMarkdown, err := s.markdownConstraint.Normalize(
-			fetchResult.URL(),
-			assetfulMarkdown,
-			normalizeParam,
-		)
-		if err != nil {
-			if err.Impact() == failure.ImpactLevelAbort {
-				return CrawlingExecution{}, err
-			}
-			// Note: Normalization errors are deterministic (invariant violations).
-			// Do NOT record to failure journal - retrying the same content yields the same error.
-			totalErrors++
-			continue
-		}
-
-		// 9. Write Artifact
-		writeResult, err := s.storageSink.Write(
-			cfg.OutputDir(),
-			normalizedMarkdown,
-			cfg.HashAlgo(),
-		)
-		if err != nil {
-			if err.Impact() == failure.ImpactLevelAbort {
-				return CrawlingExecution{}, err
-			}
-			// Track for manual retry if eligible
-			if err.RetryPolicy() == failure.RetryPolicyManual {
-				s.failureJournal.Record(failurejournal.FailureRecord{
-					URL:        getURLString(nextCrawlToken.URL()),
-					Stage:      failurejournal.StageStorage,
-					Error:      err.Error(),
-					RetryCount: 0,
-					Timestamp:  time.Now(),
-				})
-			}
-			// recoverable → log already done → count error
-			totalErrors++
-			continue
-		}
-		s.writeResults = append(s.writeResults, writeResult)
-
-		// Apply rate limiting delay at the end of the crawl loop using Wait
-		if err := s.rateLimiter.Wait(s.ctx, s.currentHost); err != nil {
-			// Context cancelled, exit the loop
-			return CrawlingExecution{}, err
-		}
+		// Success -> collect stats and write results
+		totalAssets += output.AssetCount
+		s.writeResults = append(s.writeResults, output.WriteResult)
 	}
 
-	// Stats are recorded by defer - return successful execution result
+	// Stats are recorded by defer -> return successful execution result
 	return NewCrawlingExecution(s.writeResults, s.frontier.VisitedCount(), totalAssets, totalErrors), nil
 }
 
