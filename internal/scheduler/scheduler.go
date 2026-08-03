@@ -26,6 +26,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/pkg/failure"
 	"github.com/rohmanhakim/docs-crawler/pkg/failurejournal"
 	"github.com/rohmanhakim/docs-crawler/pkg/urlutil"
+	gopipeline "github.com/rohmanhakim/gopipeline"
 	ratelimiter "github.com/rohmanhakim/rate-limiter"
 	"github.com/rohmanhakim/retrier"
 )
@@ -82,6 +83,7 @@ type Scheduler struct {
 	rateLimiter            ratelimiter.RateLimiter
 	stageDumper            stagedump.Dumper
 	debugLogger            debug.DebugLogger
+	stageRunner            *gopipeline.StageRunner
 }
 
 func NewScheduler() Scheduler {
@@ -151,7 +153,17 @@ func NewSchedulerWithDeps(
 		rateLimiter:            rateLimiter,
 		stageDumper:            stageDumper,
 		debugLogger:            debugLogger,
+		stageRunner:            newStageRunner(),
 	}
+}
+
+// newStageRunner creates a default StageRunner with an in-memory journal.
+func newStageRunner() *gopipeline.StageRunner {
+	runner, err := gopipeline.NewStageRunner(gopipeline.NewInMemoryJournal())
+	if err != nil {
+		panic(fmt.Sprintf("failed to create default StageRunner: %v", err))
+	}
+	return runner
 }
 
 // SubmitUrlForAdmission performs all semantic checks required for a URL
