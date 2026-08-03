@@ -165,6 +165,21 @@ func newStageRunner() *gopipeline.StageRunner {
 	return runner
 }
 
+// newPoolStageRunner creates a StageRunner configured for concurrent pool processing.
+// Uses CollectAll error strategy to gather all errors, and PoolFailureIndividual
+// failure mode to track each pool item separately for fine-grained retry control.
+func newPoolStageRunner() *gopipeline.StageRunner {
+	runner, err := gopipeline.NewStageRunner(
+		gopipeline.NewInMemoryJournal(),
+		gopipeline.WithErrorStrategy(gopipeline.CollectAll),
+		gopipeline.WithPoolFailureMode(gopipeline.PoolFailureIndividual),
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create pool StageRunner: %v", err))
+	}
+	return runner
+}
+
 // SubmitUrlForAdmission performs all semantic checks required for a URL
 // to enter the crawl frontier.
 //
@@ -422,45 +437,69 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	// This closure captures the scheduler's dependencies and initialization config.
 	crawlTask := s.BuildCrawlTask(cfg, seedScheme)
 
-	// If frontier still has URL to be crawl...
-	for {
-		nextCrawlToken, ok := s.frontier.Dequeue()
-		if !ok {
-			break
-		}
+	// Create a pool-stage runner configured for concurrent processing.
+	// Uses CollectAll error strategy to gather all errors, and PoolFailureIndividual
+	// failure mode to track each pool item separately for fine-grained retry control.
+	poolRunner := newPoolStageRunner()
 
-		urlStr := getURLString(nextCrawlToken.URL())
-
-		// Log pipeline start for this URL
+	// Collect all available tokens from the frontier for batch processing.
+	tokens := s.collectTokensFromFrontier()
+	if len(tokens) > 0 {
+		// Log pipeline start for the batch
 		s.debugLogger.LogStage(s.ctx, "pipeline", debug.StageEvent{
 			Type: debug.EventTypeStart,
-			URL:  urlStr,
+			URL:  fmt.Sprintf("batch-size:%d", len(tokens)),
 		})
 
-		// Execute the pipeline using gopipeline
-		stageName := fmt.Sprintf("crawl-%s", urlStr)
-		result := gopipeline.Process(s.ctx, s.stageRunner, stageName,
-			func(progress gopipeline.ProgressFunc) gopipeline.StageResult[CrawlResult] {
-				return crawlTask(s.ctx, s.stageRunner, 0, nextCrawlToken, stageName)
-			})
+		// Execute the pipeline using gopipeline.Pool for concurrent processing.
+		// Pool spawns N workers that process tokens from a shared input channel.
+		// Each worker calls crawlTask for a single token.
+		result := gopipeline.Pool(s.ctx, poolRunner, "crawl", tokens,
+			gopipeline.PoolConfig{Workers: 1},
+			func(ctx context.Context, runner *gopipeline.StageRunner, idx int, token frontier.CrawlToken, stageName string) gopipeline.StageResult[CrawlResult] {
+				return crawlTask(ctx, runner, idx, token, stageName)
+			},
+		)
 
-		// Handle the result
-		output, err := result.Decompose()
+		// Handle the result — with CollectAll, errors are collected in PartialResultsError
+		outputs, err := result.Decompose()
 		if err != nil {
-			// Check for abort errors — scheduler retains control authority
-			if classifiedErr, ok := err.(failure.ClassifiedError); ok {
-				if classifiedErr.Impact() == failure.ImpactLevelAbort {
-					return CrawlingExecution{}, err
-				}
-			}
-			// Recoverable error -> count and continue to next URL
-			totalErrors++
-			continue
-		}
+			if partialErr, ok := err.(*gopipeline.PartialResultsError); ok {
+				// Count all errors
+				totalErrors += len(partialErr.Errors())
 
-		// Success -> collect stats and write results
-		totalAssets += output.AssetCount
-		s.writeResults = append(s.writeResults, output.WriteResult)
+				// Check for abort errors — scheduler retains control authority
+				for _, e := range partialErr.Errors() {
+					if classifiedErr, ok := e.(failure.ClassifiedError); ok {
+						if classifiedErr.Impact() == failure.ImpactLevelAbort {
+							return CrawlingExecution{}, e
+						}
+					}
+				}
+
+				// Extract successful results from partial results
+				for _, raw := range partialErr.PartialResults() {
+					if output, ok := raw.(CrawlResult); ok {
+						totalAssets += output.AssetCount
+						s.writeResults = append(s.writeResults, output.WriteResult)
+					}
+				}
+			} else {
+				// Non-partial error — check for abort
+				if classifiedErr, ok := err.(failure.ClassifiedError); ok {
+					if classifiedErr.Impact() == failure.ImpactLevelAbort {
+						return CrawlingExecution{}, err
+					}
+				}
+				totalErrors++
+			}
+		} else {
+			// All succeeded — collect all results
+			for _, output := range outputs {
+				totalAssets += output.AssetCount
+				s.writeResults = append(s.writeResults, output.WriteResult)
+			}
+		}
 	}
 
 	// Stats are recorded by defer -> return successful execution result
@@ -521,6 +560,25 @@ func RetryOptions(cfg config.Config) []retrier.RetryOption {
 		retrier.WithMultiplier(cfg.BackoffMultiplier()),
 		retrier.WithMaxDuration(cfg.BackoffMaxDuration()),
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Token Collection
+// ---------------------------------------------------------------------------
+
+// collectTokensFromFrontier dequeues all available tokens from the frontier
+// into a slice. Returns an empty slice (not nil) if the frontier is empty.
+// This is used to collect tokens for batch processing with gopipeline.Pool.
+func (s *Scheduler) collectTokensFromFrontier() []frontier.CrawlToken {
+	tokens := make([]frontier.CrawlToken, 0)
+	for {
+		token, ok := s.frontier.Dequeue()
+		if !ok {
+			break
+		}
+		tokens = append(tokens, token)
+	}
+	return tokens
 }
 
 // ---------------------------------------------------------------------------

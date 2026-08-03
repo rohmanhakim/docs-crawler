@@ -233,7 +233,7 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	testURL, _ := url.Parse("https://example.com/page.html")
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	// Note: No second Dequeue because crawl should abort
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
