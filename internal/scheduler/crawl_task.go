@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -37,10 +38,10 @@ func (s *Scheduler) BuildCrawlTask(cfg config.Config, seedScheme string) CrawlTa
 	return func(ctx context.Context, runner *gopipeline.StageRunner, idx int, token frontier.CrawlToken, stageName string) gopipeline.StageResult[CrawlResult] {
 		urlStr := getURLString(token.URL())
 
-		// Log pipeline start for this URL
+		// Log pipeline start for this URL, including pool item index for concurrent debugging
 		s.debugLogger.LogStage(ctx, "pipeline", debug.StageEvent{
 			Type: debug.EventTypeStart,
-			URL:  urlStr,
+			URL:  fmt.Sprintf("idx:%d url:%s", idx, urlStr),
 		})
 
 		// 1. Fetch Page URL

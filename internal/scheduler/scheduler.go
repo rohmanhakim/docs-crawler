@@ -445,17 +445,21 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	// Collect all available tokens from the frontier for batch processing.
 	tokens := s.collectTokensFromFrontier()
 	if len(tokens) > 0 {
-		// Log pipeline start for the batch
+		// Determine worker count from config. The pool handles gracefully when
+		// Workers > len(tokens) — it simply spawns len(tokens) goroutines.
+		workers := cfg.Concurrency()
+
+		// Log pipeline start for the batch, including worker count for debugging.
 		s.debugLogger.LogStage(s.ctx, "pipeline", debug.StageEvent{
 			Type: debug.EventTypeStart,
-			URL:  fmt.Sprintf("batch-size:%d", len(tokens)),
+			URL:  fmt.Sprintf("batch-size:%d workers:%d", len(tokens), workers),
 		})
 
 		// Execute the pipeline using gopipeline.Pool for concurrent processing.
 		// Pool spawns N workers that process tokens from a shared input channel.
 		// Each worker calls crawlTask for a single token.
 		result := gopipeline.Pool(s.ctx, poolRunner, "crawl", tokens,
-			gopipeline.PoolConfig{Workers: 1},
+			gopipeline.PoolConfig{Workers: workers},
 			func(ctx context.Context, runner *gopipeline.StageRunner, idx int, token frontier.CrawlToken, stageName string) gopipeline.StageResult[CrawlResult] {
 				return crawlTask(ctx, runner, idx, token, stageName)
 			},
