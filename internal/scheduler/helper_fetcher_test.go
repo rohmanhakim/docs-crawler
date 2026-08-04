@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,9 +15,19 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// fetcherMock is a testify mock for the Fetcher
+// fetcherMock is a testify mock for the Fetcher.
+// When useBarrier is true, Fetch() tracks concurrent calls and blocks
+// at a channel-based barrier until expectedWorkers arrive simultaneously.
+// This enables deterministic concurrency measurement in tests.
 type fetcherMock struct {
 	mock.Mock
+	// Optional concurrency tracking (zero values = disabled)
+	useBarrier      bool
+	expectedWorkers int
+	barrierReady    chan struct{}
+	closeOnce       sync.Once
+	peakWorkers     atomic.Int32
+	activeWorkers   atomic.Int32
 }
 
 func (f *fetcherMock) Init(httpClient *http.Client, userAgent string) {
@@ -28,6 +40,24 @@ func (f *fetcherMock) Fetch(
 	fetchUrl url.URL,
 	retryOptions []retrier.RetryOption,
 ) (fetcher.FetchResult, failure.ClassifiedError) {
+	// Concurrency tracking: barrier + peak measurement
+	if f.useBarrier {
+		current := f.activeWorkers.Add(1)
+		// Update peak using CAS loop
+		for {
+			old := f.peakWorkers.Load()
+			if current <= old || f.peakWorkers.CompareAndSwap(old, current) {
+				break
+			}
+		}
+		// Close barrier channel once expectedWorkers have arrived
+		if int(current) >= f.expectedWorkers {
+			f.closeOnce.Do(func() { close(f.barrierReady) })
+		}
+		// Block until all expected workers are concurrent
+		<-f.barrierReady
+		f.activeWorkers.Add(-1)
+	}
 	args := f.Called(ctx, crawlDepth, fetchUrl, retryOptions)
 	result := args.Get(0).(fetcher.FetchResult)
 	var err failure.ClassifiedError
@@ -49,6 +79,39 @@ const defaultValidHTML = `<!DOCTYPE html>
 </main>
 </body>
 </html>`
+
+// PeakWorkers returns the peak number of concurrent Fetch calls observed.
+// Only meaningful when useBarrier is true.
+func (f *fetcherMock) PeakWorkers() int32 {
+	return f.peakWorkers.Load()
+}
+
+// newConcurrentFetcherMockForTest creates a fetcher mock configured for
+// concurrency measurement. The Fetch method blocks until expectedWorkers
+// goroutines arrive simultaneously, then records the peak concurrency.
+func newConcurrentFetcherMockForTest(t *testing.T, expectedWorkers int) *fetcherMock {
+	t.Helper()
+	m := &fetcherMock{
+		useBarrier:      true,
+		expectedWorkers: expectedWorkers,
+		barrierReady:    make(chan struct{}),
+	}
+	// Set up default expectation for Init
+	m.On("Init", mock.Anything, mock.Anything).Return()
+	// Set up Fetch to return valid HTML — use Maybe() for concurrent calls
+	testURL, _ := url.Parse("https://example.com/test")
+	result := fetcher.NewFetchResultForTest(
+		*testURL,
+		[]byte(defaultValidHTML),
+		200,
+		"text/html",
+		map[string]string{"Content-Type": "text/html"},
+		time.Now(),
+	)
+	m.On("Fetch", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(result, nil).Maybe()
+	return m
+}
 
 // newFetcherMockForTest creates a properly configured fetcher mock for crawl tests
 func newFetcherMockForTest(t *testing.T) *fetcherMock {

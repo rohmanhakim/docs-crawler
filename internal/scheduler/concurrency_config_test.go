@@ -13,6 +13,7 @@ import (
 	"github.com/rohmanhakim/docs-crawler/internal/frontier"
 	"github.com/rohmanhakim/docs-crawler/internal/metadata"
 	"github.com/rohmanhakim/docs-crawler/internal/robots"
+	"github.com/rohmanhakim/docs-crawler/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -227,6 +228,79 @@ func TestConcurrency_Workers10_DefaultConfig(t *testing.T) {
 
 	_, execErr := s.ExecuteCrawlingWithState(init)
 	assert.NoError(t, execErr)
+}
+
+// ============================================================================
+// Test: Verify actual concurrent worker count using barrier + peak counter
+// ============================================================================
+func TestConcurrency_VerifiesActualWorkerCount(t *testing.T) {
+	const expectedWorkers = 3
+	const numURLs = 6 // Must be > expectedWorkers so pool spawns exactly expectedWorkers
+
+	ctx := context.Background()
+	mockFinalizer := newMockFinalizer(t)
+	noopSink := &metadata.NoopSink{}
+	mockLimiter := newRateLimiterMockForTest(t)
+	mockFrontier := newFrontierMockForTest(t)
+	// Use the concurrent fetcher mock with barrier
+	mockFetcher := newConcurrentFetcherMockForTest(t, expectedWorkers)
+	mockRobot := NewRobotsMockForTest(t)
+	mockStorage := newStorageMockForTest(t)
+	// Storage: allow multiple Write calls since all URLs pass the full pipeline
+	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).
+		Return(storage.WriteResult{}, nil).Maybe()
+	mockFailureJournal := newFailureJournalMockForTest(t)
+
+	// Robots: allow seed URL during initialization
+	mockRobot.On("Init", mock.Anything, mock.Anything).Return()
+	mockRobot.OnDecide(mock.Anything, robots.Decision{
+		Allowed: true, Reason: robots.EmptyRuleSet, CrawlDelay: 0,
+	}, nil).Once()
+
+	// Frontier: disable auto-enqueue and set up multiple tokens
+	mockFrontier.disableAutoEnqueue = true
+	mockFrontier.On("Init", mock.Anything).Return()
+	mockFrontier.On("VisitedCount").Return(0).Maybe()
+	mockFrontier.On("Submit", mock.Anything).Return()
+	mockFrontier.On("Enqueue", mock.Anything).Return()
+
+	// Create tokens for each URL — the pool will dequeue all of them
+	tokens := make([]frontier.CrawlToken, numURLs)
+	for i := 0; i < numURLs; i++ {
+		testURL, _ := url.Parse(fmt.Sprintf("https://example.com/page%d", i))
+		tokens[i] = frontier.NewCrawlToken(*testURL, 0)
+		mockFrontier.OnDequeue(tokens[i], true).Once()
+	}
+	// Final dequeue returns false (frontier exhausted)
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+
+	// Rate limiter: override with .Maybe() for concurrent calls
+	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
+	mockLimiter.On("Wait", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	s := createSchedulerForTest(t, ctx, mockFinalizer, noopSink, mockLimiter, mockFrontier,
+		mockRobot, mockFetcher, nil, nil, nil, nil, mockStorage, mockFailureJournal)
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	err := os.WriteFile(configPath, []byte(fmt.Sprintf(`{
+		"seedUrls": ["https://example.com/page0"],
+		"maxDepth": 0,
+		"concurrency": %d
+	}`, expectedWorkers)), 0644)
+	assert.NoError(t, err)
+
+	init, err := s.InitializeCrawling(configPath)
+	assert.NoError(t, err)
+
+	_, execErr := s.ExecuteCrawlingWithState(init)
+	assert.NoError(t, execErr)
+
+	// Assert actual peak concurrency matches expected workers.
+	// The barrier ensures all expectedWorkers arrived at Fetch simultaneously,
+	// and the atomic counter recorded the peak.
+	assert.Equal(t, int32(expectedWorkers), mockFetcher.PeakWorkers(),
+		"expected %d concurrent workers, but observed %d", expectedWorkers, mockFetcher.PeakWorkers())
 }
 
 // ============================================================================
