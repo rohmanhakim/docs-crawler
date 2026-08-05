@@ -63,7 +63,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithDefaults(t *testing.T) {
 	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -169,7 +169,7 @@ func TestScheduler_Extract_SetExtractParamCalledWithCustomValues(t *testing.T) {
 	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -287,7 +287,7 @@ func TestScheduler_Extract_UsesConfiguredParams(t *testing.T) {
 	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockStorage.On("Write", mock.Anything, mock.Anything, mock.Anything).Return(storage.WriteResult{}, nil)
@@ -429,7 +429,7 @@ func TestScheduler_Extract_ExtractResultNotNil(t *testing.T) {
 	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 	mockConvert := newConvertMockForTest(t)
@@ -546,7 +546,7 @@ func TestScheduler_Extract_InvalidHTMLHandled(t *testing.T) {
 	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 

@@ -32,7 +32,7 @@ func TestSubmitUrlForAdmission_RobotsAllowed_SubmitsToFrontier(t *testing.T) {
 	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)
@@ -283,7 +283,7 @@ func TestSubmitUrlForAdmission_CrawlDelayZero_DoesNotCallSetResourceDelay(t *tes
 	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	ctx := context.Background()
 	mockFinalizer := newMockFinalizer(t)

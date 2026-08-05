@@ -541,7 +541,7 @@ func TestScheduler_NormalizeParam_CreatedWithCorrectValues(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	// Setup sleeper and limiter
 
@@ -659,7 +659,7 @@ func TestScheduler_NormalizeParam_UsesTokenDepth(t *testing.T) {
 	tokenDepth1 := frontier.NewCrawlToken(*mustParseURL("https://example.com/page1"), 1)
 	mockFrontier.OnDequeue(tokenDepth1, true).Once()
 	// Second dequeue: exit loop
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
@@ -772,7 +772,7 @@ func TestScheduler_NormalizeParam_UsesConfigAllowedPathPrefix(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
@@ -886,7 +886,7 @@ func TestScheduler_NormalizeParam_UsesConfigHashAlgo(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()

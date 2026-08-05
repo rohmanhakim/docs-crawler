@@ -347,7 +347,7 @@ func TestScheduler_URLResolutionAndFiltering(t *testing.T) {
 	// First Dequeue returns a token (seed URL processing), second returns false (exit loop)
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	// Set up discovered URLs:
 	// - "/relative-path" (relative, should be resolved and submitted)
@@ -563,7 +563,7 @@ func TestScheduler_URLResolutionAndFiltering_AllRelativeURLs(t *testing.T) {
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.disableAutoEnqueue = true
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 	// Set up extractor mock to return a valid extraction result and expect SetExtractParam
 	setupExtractorMockWithSuccess(mockExtractor, createMinimalHTMLNode())
 	// setupExtractorMockWithSetExtractParamExpectation(mockExtractor, extractor.DefaultExtractParam())

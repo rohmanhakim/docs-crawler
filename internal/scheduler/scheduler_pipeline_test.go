@@ -57,7 +57,7 @@ func TestPipeline_MethodCallOrder(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
@@ -224,7 +224,7 @@ func TestPipeline_CalledExactlyOncePerPage(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
@@ -315,7 +315,7 @@ func TestPipeline_AllStagesCalled(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockFetcher.On("Init", mock.Anything, mock.Anything).Return()
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))

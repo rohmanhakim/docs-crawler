@@ -51,7 +51,7 @@ func TestScheduler_ErrorHandling_HTTP403_ContinuesCrawl(t *testing.T) {
 	testURL, _ := url.Parse("https://example.com/page.html")
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -143,7 +143,7 @@ func TestScheduler_ErrorHandling_ManualRetry_Tracked(t *testing.T) {
 	testURL, _ := url.Parse("https://example.com/page.html")
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -233,7 +233,7 @@ func TestScheduler_ErrorHandling_ImpactAbort_AbortsCrawl(t *testing.T) {
 	testURL, _ := url.Parse("https://example.com/page.html")
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -324,7 +324,7 @@ func TestScheduler_ErrorHandling_StorageError_ManualRetry(t *testing.T) {
 	testURL, _ := url.Parse("https://example.com/page.html")
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -513,7 +513,7 @@ func TestScheduler_ErrorHandling_MixedResults(t *testing.T) {
 	// Setup Dequeue to return both tokens
 	mockFrontier.OnDequeue(token1, true).Once()
 	mockFrontier.OnDequeue(token2, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 
@@ -591,7 +591,7 @@ func TestScheduler_ErrorHandling_AutoRetryErrors_NotTracked(t *testing.T) {
 	testURL, _ := url.Parse("https://example.com/page.html")
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 
@@ -681,7 +681,7 @@ func TestScheduler_ErrorHandling_NeverRetryErrors_NotTracked(t *testing.T) {
 	testURL, _ := url.Parse("https://example.com/page.html")
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0))
 

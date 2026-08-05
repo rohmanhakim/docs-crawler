@@ -176,7 +176,7 @@ func TestIntegration_DebugLogging_FullPipeline_StageSequence(t *testing.T) {
 	mockFrontier.On("Enqueue", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseDebugURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	// Setup other mocks
 
@@ -723,7 +723,7 @@ func TestIntegration_DebugLogging_Frontier_SkipScenarios(t *testing.T) {
 	// First dequeue returns seed token, then false to exit loop
 	seedToken := frontier.NewCrawlToken(*mustParseDebugURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	// Setup other mocks
 
@@ -858,7 +858,7 @@ func TestIntegration_DebugLogging_ErrorPath(t *testing.T) {
 	mockFrontier.On("Submit", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseDebugURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	// Setup other mocks
 
@@ -1185,7 +1185,7 @@ func TestIntegration_DebugLogging_JSONLFileOutput(t *testing.T) {
 	mockFrontier.On("Submit", mock.Anything).Return()
 	seedToken := frontier.NewCrawlToken(*mustParseDebugURL("https://example.com"), 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	// Setup other mocks
 

@@ -442,12 +442,21 @@ func (s *Scheduler) ExecuteCrawlingWithState(init *CrawlInitialization) (Crawlin
 	// failure mode to track each pool item separately for fine-grained retry control.
 	poolRunner := newPoolStageRunner()
 
-	// Collect all available tokens from the frontier for batch processing.
-	tokens := s.collectTokensFromFrontier()
-	if len(tokens) > 0 {
-		// Determine worker count from config. The pool handles gracefully when
-		// Workers > len(tokens) — it simply spawns len(tokens) goroutines.
-		workers := cfg.Concurrency()
+	// Determine worker count from config. The pool handles gracefully when
+	// Workers > len(tokens) — it simply spawns len(tokens) goroutines.
+	workers := cfg.Concurrency()
+
+	// Batched concurrent BFS loop:
+	// 1. Drain all available tokens from the frontier
+	// 2. Process the batch concurrently via gopipeline.Pool
+	// 3. Workers discover new URLs during processing, which are submitted to the frontier
+	// 4. Loop again to drain the frontier for the next batch
+	// 5. Repeat until the frontier is empty or an abort error occurs
+	for {
+		tokens := s.collectTokensFromFrontier()
+		if len(tokens) == 0 {
+			break // frontier exhausted — crawl complete
+		}
 
 		// Log pipeline start for the batch, including worker count for debugging.
 		s.debugLogger.LogStage(s.ctx, "pipeline", debug.StageEvent{

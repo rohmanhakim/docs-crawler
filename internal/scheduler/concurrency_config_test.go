@@ -88,7 +88,10 @@ func TestConcurrency_Workers1_SequentialBehavior(t *testing.T) {
 
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	// Second drain: empty (batch 1 drain)
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
+	// Third drain: empty (batch 2 — loop iteration, frontier exhausted)
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 	mockLimiter.On("Wait", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -147,7 +150,8 @@ func TestConcurrency_Workers5_CorrectWorkerCount(t *testing.T) {
 
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop // batch 2 drain
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 	mockLimiter.On("Wait", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -207,7 +211,7 @@ func TestConcurrency_Workers10_DefaultConfig(t *testing.T) {
 
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 	mockLimiter.On("Wait", mock.Anything, mock.Anything).Return(nil).Maybe()
@@ -272,7 +276,7 @@ func TestConcurrency_VerifiesActualWorkerCount(t *testing.T) {
 		mockFrontier.OnDequeue(tokens[i], true).Once()
 	}
 	// Final dequeue returns false (frontier exhausted)
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	// Rate limiter: override with .Maybe() for concurrent calls
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
@@ -339,7 +343,7 @@ func TestConcurrency_WorkersExceedsBatchSize_HandledGracefully(t *testing.T) {
 
 	seedToken := frontier.NewCrawlToken(*testURL, 0)
 	mockFrontier.OnDequeue(seedToken, true).Once()
-	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Once()
+	mockFrontier.OnDequeue(frontier.CrawlToken{}, false).Maybe() // multi-batch loop
 
 	mockLimiter.On("ResolveDelay", mock.Anything).Return(time.Duration(0)).Maybe()
 	mockLimiter.On("Wait", mock.Anything, mock.Anything).Return(nil).Maybe()
